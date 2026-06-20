@@ -19,11 +19,11 @@
 ### Known Architectural Risks
 1. **CRBL-001 — ContractPipe DTO Validation Not Active:** `resolveSchema()`, `extractPath()`, and `extractMethod()` in `contract.pipe.ts` are placeholders returning `undefined`, `"/"`, and `"POST"`. The pipe exists in the NestJS lifecycle but does not resolve OpenAPI schemas for actual DTO validation. HTTP enforcement is at ~85-90% — ContractGuard, PolicyGuard, and ContractInterceptor are active; ContractPipe is structurally present but functionally dormant. Planned activation: Sprint 1 bootstrap before first feature.
 2. **CRBL Centralization:** ContractGuard, PolicyGuard, ContractPipe, ContractInterceptor, EventValidator, and SchemaRegistry all live in the same NestJS process. If CRBL grows further, it may need extraction into a dedicated enforcement service.
-2. **EventValidator Runtime Gap:** EventValidator is implemented but BullMQ worker infrastructure is not yet deployed. Event enforcement exists in code but cannot be tested end-to-end without a running worker.
-3. **Single Database Instance:** Current design assumes a single PostgreSQL instance. Read replicas for analytics and horizontal scaling are designed but not implemented.
-4. **No Observability Stack:** Prometheus, Grafana, OpenTelemetry are specified but not configured. Development relies on console logging.
-5. **No CI/CD Pipeline:** GitHub Actions workflows are specified but not active. Token scope limitation prevents workflow file deployment.
-6. **JWT Dev Defaults:** JWT secrets use `dev-*-change-in-production` placeholders. These must be rotated before any production deployment.
+3. **EventValidator Runtime Gap:** EventValidator is implemented but BullMQ worker infrastructure is not yet deployed. Event enforcement exists in code but cannot be tested end-to-end without a running worker.
+4. **Single Database Instance:** Current design assumes a single PostgreSQL instance. Read replicas for analytics and horizontal scaling are designed but not implemented.
+5. **No Observability Stack:** Prometheus, Grafana, OpenTelemetry are specified but not configured. Development relies on console logging.
+6. **No CI/CD Pipeline:** GitHub Actions workflows are specified but not active. Token scope limitation prevents workflow file deployment.
+7. **JWT Dev Defaults:** JWT secrets use `dev-*-change-in-production` placeholders. These must be rotated before any production deployment.
 
 ### Deferred Decisions
 1. **Kubernetes Migration (Phase 5):** Current architecture uses direct process execution. Kubernetes is deferred to Phase 5.
@@ -36,7 +36,7 @@
 - [x] All ADRs written and accepted (24/24)
 - [x] All domain specs complete (9/9)
 - [x] All OpenAPI specs complete (9/9, 149 endpoints)
-- [x] CRBL active (5/6 components, EventValidator spec-only)
+- [x] CRBL components: 3/6 runtime-active (ContractGuard, PolicyGuard, ContractInterceptor), 2 structural/spec (SchemaRegistry, EventValidator), 1 dormant (ContractPipe — CRBL-001)
 - [x] Endpoint count corrected
 - [x] Monorepo config present
 - [x] Docker references cleaned
