@@ -1,4 +1,5 @@
 import { Module, Global } from '@nestjs/common';
+import { APP_PIPE } from '@nestjs/core';
 import { SchemaRegistry } from './schema-registry.service';
 import { EventValidator } from './event-validator.service';
 import { ContractGuard } from '../common/guards/contract.guard';
@@ -14,7 +15,7 @@ import { ContractPipe } from '../common/pipes/contract.pipe';
     ContractGuard,
     PolicyGuard,
     ContractInterceptor,
-    ContractPipe,
+    { provide: APP_PIPE, useClass: ContractPipe },
   ],
   exports: [
     SchemaRegistry,

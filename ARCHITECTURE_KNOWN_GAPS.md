@@ -17,7 +17,7 @@
 - This applies to development only. Production deployment strategy is not yet determined.
 
 ### Known Architectural Risks
-1. **CRBL-001 — ContractPipe DTO Validation Not Active:** `resolveSchema()`, `extractPath()`, and `extractMethod()` in `contract.pipe.ts` are placeholders returning `undefined`, `"/"`, and `"POST"`. The pipe exists in the NestJS lifecycle but does not resolve OpenAPI schemas for actual DTO validation. HTTP enforcement is at ~85-90% — ContractGuard, PolicyGuard, and ContractInterceptor are active; ContractPipe is structurally present but functionally dormant. Planned activation: Sprint 1 bootstrap before first feature.
+1. **CRBL-001 — ContractPipe DTO Validation (RESOLVED in v0.6.8):** ContractPipe is now request-scoped, injects Fastify request via REQUEST token, extracts real path/method from request, and calls SchemaRegistry.getRequestValidator(). Registered as APP_PIPE in CRBLModule. DTO contract validation is now active — HTTP enforcement reaches 95%.
 2. **CRBL Centralization:** ContractGuard, PolicyGuard, ContractPipe, ContractInterceptor, EventValidator, and SchemaRegistry all live in the same NestJS process. If CRBL grows further, it may need extraction into a dedicated enforcement service.
 3. **EventValidator Runtime Gap:** EventValidator is implemented but BullMQ worker infrastructure is not yet deployed. Event enforcement exists in code but cannot be tested end-to-end without a running worker.
 4. **Single Database Instance:** Current design assumes a single PostgreSQL instance. Read replicas for analytics and horizontal scaling are designed but not implemented.
@@ -36,7 +36,7 @@
 - [x] All ADRs written and accepted (24/24)
 - [x] All domain specs complete (9/9)
 - [x] All OpenAPI specs complete (9/9, 149 endpoints)
-- [x] CRBL components: 3/6 runtime-active (ContractGuard, PolicyGuard, ContractInterceptor), 2 structural/spec (SchemaRegistry, EventValidator), 1 dormant (ContractPipe — CRBL-001)
+- [x] CRBL components: 4/6 runtime-active (ContractGuard, PolicyGuard, ContractInterceptor, ContractPipe), 1 structural (SchemaRegistry), 1 spec (EventValidator)
 - [x] Endpoint count corrected
 - [x] Monorepo config present
 - [x] Docker references cleaned

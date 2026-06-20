@@ -21,7 +21,6 @@ async function bootstrap(): Promise<void> {
     new PolicyGuard(reflector),
   );
   app.useGlobalInterceptors(new ContractInterceptor(schemaRegistry));
-  app.useGlobalPipes(new ContractPipe(schemaRegistry));
 
   app.enableCors({
     origin: process.env.CORS_ORIGIN?.split(",") || ["http://localhost:3000"],

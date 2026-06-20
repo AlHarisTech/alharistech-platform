@@ -4,48 +4,45 @@ import {
   ArgumentMetadata,
   BadRequestException,
   Logger,
+  Scope,
+  Inject,
 } from "@nestjs/common";
+import { REQUEST } from "@nestjs/core";
+import { FastifyRequest } from "fastify";
 import { SchemaRegistry } from "../../crbl/schema-registry.service";
 
-@Injectable()
+@Injectable({ scope: Scope.REQUEST })
 export class ContractPipe implements PipeTransform {
   private readonly logger = new Logger(ContractPipe.name);
 
-  constructor(private readonly schemaRegistry: SchemaRegistry) {}
+  constructor(
+    private readonly schemaRegistry: SchemaRegistry,
+    @Inject(REQUEST) private readonly request: FastifyRequest,
+  ) {}
 
-  transform(value: any, metadata: ArgumentMetadata) {
-    const { metatype } = metadata;
-
-    if (!metatype || !this.canValidate(metatype)) {
+  transform(value: unknown, metadata: ArgumentMetadata) {
+    if (metadata.type !== "body") {
       return value;
     }
 
-    if (metadata.type === "custom") {
+    if (!this.hasSchemaRegistryReady()) {
       return value;
     }
 
-    if (value === undefined || value === null) {
+    if (value === undefined || value === null || typeof value !== "object") {
       return value;
     }
 
-    const schema = this.resolveSchema(metadata);
-    if (!schema) {
-      this.logger.debug(`No schema found for ${String(metatype.name)}, passing through`);
-      return value;
-    }
+    const path = this.extractPath();
+    const method = this.extractMethod();
 
-    const validator = this.schemaRegistry.getRequestValidator(
-      this.extractPath(metadata),
-      this.extractMethod(metadata),
-    );
-
+    const validator = this.schemaRegistry.getRequestValidator(path, method);
     if (!validator) {
-      this.logger.debug(`No request validator for ${String(metatype.name)}, passing through`);
+      this.logger.debug(`No request validator for ${method} ${path}, passing through`);
       return value;
     }
 
     const valid = validator(value);
-
     if (!valid) {
       const details = (validator.errors || []).map((err) => ({
         field: err.instancePath || "root",
@@ -67,23 +64,21 @@ export class ContractPipe implements PipeTransform {
       });
     }
 
+    this.logger.debug(`Validation passed for ${method} ${path}`);
     return value;
   }
 
-  private canValidate(metatype: new (...args: unknown[]) => unknown): boolean {
-    const types: Array<new (...args: unknown[]) => unknown> = [String, Boolean, Number, Array, Object];
-    return !types.includes(metatype);
+  private hasSchemaRegistryReady(): boolean {
+    return this.schemaRegistry.isReady();
   }
 
-  private resolveSchema(metadata: ArgumentMetadata): any {
-    return undefined;
+  private extractPath(): string {
+    const url = this.request.url || this.request.raw?.url || "/";
+    const parsed = url.split("?")[0];
+    return parsed.replace(/\/+$/, "") || "/";
   }
 
-  private extractPath(metadata: ArgumentMetadata): string {
-    return "/";
-  }
-
-  private extractMethod(metadata: ArgumentMetadata): string {
-    return "POST";
+  private extractMethod(): string {
+    return (this.request.method || "POST").toUpperCase();
   }
 }
