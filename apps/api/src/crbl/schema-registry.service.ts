@@ -130,6 +130,10 @@ export class SchemaRegistry implements OnModuleInit {
     return validator;
   }
 
+  getEventSchema(eventName: string): string | undefined {
+    return this.eventSchemas.get(eventName)?.version;
+  }
+
   getEventValidator(eventName: string): ValidateFunction | undefined {
     const cached = this.eventValidators.get(eventName);
     if (cached) return cached;
