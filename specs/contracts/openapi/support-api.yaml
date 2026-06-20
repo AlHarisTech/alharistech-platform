@@ -1,0 +1,1624 @@
+openapi: "3.1.0"
+info:
+  title: AlharisTech Support API
+  version: "1.0.0"
+  description: >
+    Support domain API for the AlharisTech platform.
+    Manages support tickets, ticket messages, assignments,
+    knowledge base articles, and support performance reporting (Phase 2).
+  contact:
+    name: AlharisTech Engineering
+    email: api@alharistech.com
+  license:
+    name: Proprietary
+servers:
+  - url: https://api.alharistech.com/api/v1
+    description: Production
+  - url: https://api.staging.alharistech.com/api/v1
+    description: Staging
+  - url: http://localhost:4000/api/v1
+    description: Development
+
+tags:
+  - name: Tickets
+    description: Support ticket lifecycle management
+  - name: Ticket Messages
+    description: Ticket message and internal note management
+  - name: Knowledge Base
+    description: Knowledge base article management
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ==========================================================================
+  # TICKETS
+  # ==========================================================================
+  /tickets:
+    post:
+      tags: [Tickets]
+      summary: Create support ticket
+      description: >
+        Create a new support ticket. Priority is auto-assigned based on
+        category if not provided. SLA deadlines are computed server-side.
+        Customer limited to max 10 open tickets (status: open, in_progress,
+        waiting_customer).
+      operationId: createTicket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TicketCreate"
+      responses:
+        "201":
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Ticket"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+    get:
+      tags: [Tickets]
+      summary: List tickets
+      description: >
+        List tickets with role-scoped access. Customers see only their own
+        tickets. Supports filtering, search, and pagination.
+      operationId: listTickets
+      parameters:
+        - name: status
+          in: query
+          description: Filter by ticket status
+          schema:
+            $ref: "#/components/schemas/TicketStatus"
+        - name: priority
+          in: query
+          description: Filter by priority
+          schema:
+            type: string
+            enum: [low, medium, high, urgent]
+        - name: category
+          in: query
+          description: Filter by category
+          schema:
+            type: string
+        - name: assigned_to
+          in: query
+          description: Filter by assigned employee (admin/manager only)
+          schema:
+            type: string
+            format: uuid
+        - name: customer_id
+          in: query
+          description: Filter by customer (admin/manager only)
+          schema:
+            type: string
+            format: uuid
+        - name: search
+          in: query
+          description: Full-text search across title and description
+          schema:
+            type: string
+        - name: tags
+          in: query
+          description: Filter by tags (comma-separated)
+          schema:
+            type: string
+        - name: is_overdue
+          in: query
+          description: Filter overdue tickets (past SLA deadline)
+          schema:
+            type: boolean
+        - name: sort
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum:
+              [created_asc, created_desc, updated_asc, updated_desc, priority_asc, priority_desc]
+            default: created_desc
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated ticket list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Ticket"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /tickets/{id}:
+    get:
+      tags: [Tickets]
+      summary: Get ticket by ID
+      description: >
+        Retrieve ticket detail with messages. Customer view excludes
+        internal notes (is_internal=true) and internal_notes field.
+        Employee/Admin view includes all messages.
+      operationId: getTicket
+      parameters:
+        - $ref: "#/components/parameters/TicketId"
+      responses:
+        "200":
+          description: Ticket detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Ticket"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      tags: [Tickets]
+      summary: Update ticket
+      description: >
+        Partial update of ticket fields: status, priority, category, tags,
+        or internal_notes. Status transitions validated against allowed
+        state machine.
+      operationId: updateTicket
+      parameters:
+        - $ref: "#/components/parameters/TicketId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TicketUpdate"
+      responses:
+        "200":
+          description: Ticket updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Ticket"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  # ==========================================================================
+  # TICKET MESSAGES
+  # ==========================================================================
+  /tickets/{id}/messages:
+    post:
+      tags: [Ticket Messages]
+      summary: Add message to ticket
+      description: >
+        Add a public message or internal note to a ticket.
+        Customers can only create public messages (is_internal=false).
+        If this is the first staff message, first_response_at is recorded.
+      operationId: createTicketMessage
+      parameters:
+        - $ref: "#/components/parameters/TicketId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TicketMessageCreate"
+      responses:
+        "201":
+          description: Message created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/TicketMessage"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+    get:
+      tags: [Ticket Messages]
+      summary: List messages for ticket
+      description: >
+        List all messages for a ticket. Role-scoped: customers see only
+        non-internal messages. Paginated.
+      operationId: listTicketMessages
+      parameters:
+        - $ref: "#/components/parameters/TicketId"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: Message list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TicketMessage"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /tickets/{id}/assign:
+    post:
+      tags: [Tickets]
+      summary: Assign ticket to employee
+      description: >
+        Assign a ticket to an employee. Validates the target user has an
+        appropriate support role (employee, manager, admin). May auto-update
+        status to in_progress if currently open.
+      operationId: assignTicket
+      parameters:
+        - $ref: "#/components/parameters/TicketId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TicketAssign"
+      responses:
+        "200":
+          description: Ticket assigned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Ticket"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /tickets/{id}/close:
+    post:
+      tags: [Tickets]
+      summary: Close ticket
+      description: >
+        Close a ticket. Valid transitions: resolved → closed (auto after 72h
+        or manual), any → closed (admin force-close only, reason required).
+        Closed tickets cannot be modified except via reopen (within 7 days).
+      operationId: closeTicket
+      parameters:
+        - $ref: "#/components/parameters/TicketId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  minLength: 10
+                  maxLength: 500
+                  description: Required for admin force-close; optional otherwise
+              minProperties: 1
+      responses:
+        "200":
+          description: Ticket closed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Ticket"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /tickets/{id}/reopen:
+    post:
+      tags: [Tickets]
+      summary: Reopen ticket
+      description: >
+        Reopen a closed or resolved ticket. Allowed within 7 calendar days
+        of closed_at. After 7 days, a new ticket must be created referencing
+        the old ticket.
+      operationId: reopenTicket
+      parameters:
+        - $ref: "#/components/parameters/TicketId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  maxLength: 500
+                  description: Reason for reopening
+      responses:
+        "200":
+          description: Ticket reopened
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Ticket"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  # ==========================================================================
+  # KNOWLEDGE BASE
+  # ==========================================================================
+  /knowledge/articles:
+    get:
+      tags: [Knowledge Base]
+      summary: List knowledge articles
+      description: >
+        Search and list knowledge articles. For public users, returns only
+        published, non-deleted articles. For employees, returns all
+        non-deleted articles. Supports full-text search and pagination.
+      operationId: listKnowledgeArticles
+      security: []
+      parameters:
+        - name: search
+          in: query
+          description: Full-text search across title_ar, title_en, content_ar, content_en
+          schema:
+            type: string
+            maxLength: 200
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: sub_category
+          in: query
+          schema:
+            type: string
+        - name: tags
+          in: query
+          schema:
+            type: string
+            description: Comma-separated tags
+        - name: is_featured
+          in: query
+          schema:
+            type: boolean
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, oldest, most_viewed, most_helpful]
+            default: newest
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: locale
+          in: query
+          schema:
+            type: string
+            enum: [ar, en]
+            default: ar
+      responses:
+        "200":
+          description: Article list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/KnowledgeArticle"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+                required: [data, meta]
+
+    post:
+      tags: [Knowledge Base]
+      summary: Create knowledge article
+      description: >
+        Create a new knowledge article. Created as draft (is_published=false).
+        Must be published separately to appear in public search.
+      operationId: createKnowledgeArticle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KnowledgeArticleCreate"
+      responses:
+        "201":
+          description: Article created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/KnowledgeArticle"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /knowledge/articles/search:
+    get:
+      tags: [Knowledge Base]
+      summary: Search knowledge articles
+      description: >
+        Full-text search across knowledge articles. Same behavior as
+        GET /knowledge/articles but with required query parameter.
+      operationId: searchKnowledgeArticles
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query string
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, oldest, most_viewed, most_helpful]
+            default: newest
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: locale
+          in: query
+          schema:
+            type: string
+            enum: [ar, en]
+            default: ar
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/KnowledgeArticle"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+                required: [data, meta]
+
+  /knowledge/articles/{id}:
+    get:
+      tags: [Knowledge Base]
+      summary: Get knowledge article by ID
+      description: >
+        Get article detail. Public users can only access published articles.
+      operationId: getKnowledgeArticle
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ArticleId"
+      responses:
+        "200":
+          description: Article detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/KnowledgeArticle"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      tags: [Knowledge Base]
+      summary: Update knowledge article
+      description: >
+        Update an article. Employees can only update their own articles.
+        Admin/Manager can update any article. If published, publishes
+        ArticleUpdated event.
+      operationId: updateKnowledgeArticle
+      parameters:
+        - $ref: "#/components/parameters/ArticleId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KnowledgeArticleUpdate"
+      responses:
+        "200":
+          description: Article updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/KnowledgeArticle"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+    delete:
+      tags: [Knowledge Base]
+      summary: Soft-delete knowledge article
+      description: >
+        Soft-delete an article. Articles linked to resolved tickets retain
+        their reference. Admin only.
+      operationId: deleteKnowledgeArticle
+      parameters:
+        - $ref: "#/components/parameters/ArticleId"
+      responses:
+        "200":
+          description: Article soft-deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/DeleteResponse"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /knowledge/categories:
+    get:
+      tags: [Knowledge Base]
+      summary: List knowledge categories
+      description: >
+        List all knowledge base categories. Public endpoint.
+      operationId: listKnowledgeCategories
+      security: []
+      responses:
+        "200":
+          description: Category list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/KnowledgeCategory"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+
+    post:
+      tags: [Knowledge Base]
+      summary: Create knowledge category
+      description: Create a new knowledge base category. Admin/Manager only.
+      operationId: createKnowledgeCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KnowledgeCategoryCreate"
+      responses:
+        "201":
+          description: Category created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/KnowledgeCategory"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+# ============================================================================
+# COMPONENTS
+# ============================================================================
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        JWT access token obtained from /api/v1/auth/login.
+        Token payload includes sub (user ID), email, role, and permissions.
+
+  parameters:
+    TicketId:
+      name: id
+      in: path
+      required: true
+      description: Ticket UUID
+      schema:
+        type: string
+        format: uuid
+    ArticleId:
+      name: id
+      in: path
+      required: true
+      description: Knowledge article UUID
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    # ------------------------------------------------------------------
+    # TICKET
+    # ------------------------------------------------------------------
+    Ticket:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ticket_number:
+          type: string
+          pattern: "^TKT-\\d{4}-\\d{6}$"
+          description: Format TKT-YYYY-NNNNNN
+        title:
+          type: string
+          minLength: 5
+          maxLength: 500
+        description:
+          type: string
+          minLength: 10
+          maxLength: 10000
+        status:
+          $ref: "#/components/schemas/TicketStatus"
+        priority:
+          $ref: "#/components/schemas/TicketPriority"
+        category:
+          type: string
+          enum:
+            [general, account, billing, service_order, commerce_order,
+              technical, complaint, suggestion, other]
+        sub_category:
+          type: string
+          nullable: true
+        customer_id:
+          type: string
+          format: uuid
+        assigned_to:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            first_name_ar:
+              type: string
+            last_name_ar:
+              type: string
+            first_name_en:
+              type: string
+              nullable: true
+            last_name_en:
+              type: string
+              nullable: true
+        assigned_team:
+          type: string
+          nullable: true
+        source:
+          type: string
+          enum: [web, email, phone, chat, api]
+        sla_response_deadline:
+          type: string
+          format: date-time
+          description: >
+            SLA response deadline. 
+            SLA targets based on priority:
+            urgent=1h, high=4h, medium=8h, low=24h
+        sla_resolution_deadline:
+          type: string
+          format: date-time
+          description: >
+            SLA resolution deadline.
+            SLA targets based on priority:
+            urgent=4h, high=24h, medium=72h, low=168h
+        is_overdue_response:
+          type: boolean
+          description: No first staff response and past response deadline
+        is_overdue_resolution:
+          type: boolean
+          description: Unresolved and past resolution deadline
+        first_response_at:
+          type: string
+          format: date-time
+          nullable: true
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+        closed_at:
+          type: string
+          format: date-time
+          nullable: true
+        reopened_at:
+          type: string
+          format: date-time
+          nullable: true
+        reopened_count:
+          type: integer
+        satisfaction_rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+        satisfaction_comment:
+          type: string
+          nullable: true
+        linked_order_id:
+          type: string
+          format: uuid
+          nullable: true
+        linked_article_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        tags:
+          type: array
+          items:
+            type: string
+        internal_notes:
+          type: string
+          nullable: true
+          description: Staff-only notes (not visible to customers)
+        messages:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/TicketMessage"
+          description: Included in detail view (internal notes filtered by role)
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        [id, ticket_number, title, description, status, priority, category,
+          customer_id, source, sla_response_deadline, sla_resolution_deadline,
+          reopened_count, tags, created_at, updated_at]
+
+    TicketStatus:
+      type: string
+      enum: [open, in_progress, waiting_customer, resolved, closed, reopened]
+      description: >
+        Ticket status and allowed transitions:
+        open → in_progress, resolved
+        in_progress → waiting_customer, resolved
+        waiting_customer → in_progress, resolved
+        resolved → closed (auto after 72h inactivity)
+        resolved → reopened (within 7 days)
+        closed → reopened (within 7 days only)
+        any → closed (admin force-close only, reason required)
+
+    TicketPriority:
+      type: string
+      enum: [low, medium, high, urgent]
+      description: >
+        Priority with SLA targets:
+        urgent: response 1h, resolution 4h
+        high: response 4h, resolution 24h
+        medium: response 8h, resolution 72h
+        low: response 24h, resolution 168h
+
+    TicketCreate:
+      type: object
+      required: [title, description, category]
+      properties:
+        title:
+          type: string
+          minLength: 5
+          maxLength: 500
+          description: Ticket title
+        description:
+          type: string
+          minLength: 10
+          maxLength: 10000
+          description: Detailed description of the issue
+        category:
+          type: string
+          enum:
+            [general, account, billing, service_order, commerce_order,
+              technical, complaint, suggestion, other]
+        sub_category:
+          type: string
+          maxLength: 100
+          nullable: true
+        priority:
+          $ref: "#/components/schemas/TicketPriority"
+          description: Optional; auto-assigned from category if omitted
+        linked_order_id:
+          type: string
+          format: uuid
+          nullable: true
+        source:
+          type: string
+          enum: [web, email, phone, chat, api]
+          default: web
+        tags:
+          type: array
+          items:
+            type: string
+            maxLength: 50
+
+    TicketUpdate:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/TicketStatus"
+          description: >
+            Must be a valid transition from current status.
+            Invalid transitions return 422 with current and allowed statuses.
+        priority:
+          $ref: "#/components/schemas/TicketPriority"
+          description: >
+            Changing priority recalculates SLA deadlines. Sets
+            sla_response_deadline and sla_resolution_deadline.
+        category:
+          type: string
+          enum:
+            [general, account, billing, service_order, commerce_order,
+              technical, complaint, suggestion, other]
+        sub_category:
+          type: string
+          maxLength: 100
+          nullable: true
+        internal_notes:
+          type: string
+          nullable: true
+          description: Staff-only summary (not visible to customers)
+        tags:
+          type: array
+          items:
+            type: string
+      minProperties: 1
+
+    TicketAssign:
+      type: object
+      required: [assigned_to]
+      properties:
+        assigned_to:
+          type: string
+          format: uuid
+          description: User ID of the employee to assign
+        note:
+          type: string
+          maxLength: 500
+          description: Optional note about the assignment
+
+    # ------------------------------------------------------------------
+    # TICKET MESSAGE
+    # ------------------------------------------------------------------
+    TicketMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ticket_id:
+          type: string
+          format: uuid
+        sender_id:
+          type: string
+          format: uuid
+          nullable: true
+        sender_type:
+          type: string
+          enum: [customer, employee, system]
+        sender_name:
+          type: string
+          nullable: true
+        message:
+          type: string
+          minLength: 1
+          maxLength: 20000
+        is_internal:
+          type: boolean
+          description: >
+            Internal notes (visible only to staff). Cannot be set to true
+            when sender_type is customer.
+        attachments:
+          type: array
+          maxItems: 5
+          items:
+            type: object
+            properties:
+              file_name:
+                type: string
+              file_url:
+                type: string
+                format: uri
+              file_size:
+                type: integer
+                description: Size in bytes, max 10MB
+              mime_type:
+                type: string
+                enum:
+                  [image/png, image/jpeg, image/gif, image/webp, application/pdf,
+                    text/plain, text/csv, application/msword,
+                    application/vnd.openxmlformats-officedocument.wordprocessingml.document,
+                    application/vnd.ms-excel,
+                    application/vnd.openxmlformats-officedocument.spreadsheetml.sheet]
+        created_at:
+          type: string
+          format: date-time
+      required:
+        [id, ticket_id, sender_id, sender_type, message, is_internal, created_at]
+
+    TicketMessageCreate:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          minLength: 1
+          maxLength: 20000
+          description: Message body (HTML tags stripped, markdown subset allowed)
+        is_internal:
+          type: boolean
+          default: false
+          description: >
+            Set true for internal notes. Cannot be true when sender is customer.
+        attachments:
+          type: array
+          maxItems: 5
+          items:
+            type: object
+            properties:
+              file_name:
+                type: string
+                maxLength: 255
+              file_url:
+                type: string
+                format: uri
+              file_size:
+                type: integer
+                maximum: 10485760
+                description: File size in bytes, max 10MB
+              mime_type:
+                type: string
+
+    # ------------------------------------------------------------------
+    # KNOWLEDGE ARTICLE
+    # ------------------------------------------------------------------
+    KnowledgeArticle:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title_ar:
+          type: string
+          minLength: 1
+          maxLength: 500
+        title_en:
+          type: string
+          minLength: 1
+          maxLength: 500
+        slug:
+          type: string
+          maxLength: 550
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        content_ar:
+          type: string
+          minLength: 1
+          maxLength: 50000
+        content_en:
+          type: string
+          minLength: 1
+          maxLength: 50000
+        excerpt_ar:
+          type: string
+          maxLength: 500
+          nullable: true
+        excerpt_en:
+          type: string
+          maxLength: 500
+          nullable: true
+        category:
+          type: string
+        sub_category:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        is_published:
+          type: boolean
+        is_featured:
+          type: boolean
+        view_count:
+          type: integer
+        helpful_count:
+          type: integer
+        not_helpful_count:
+          type: integer
+        author_id:
+          type: string
+          format: uuid
+        author_name:
+          type: string
+          nullable: true
+        last_reviewed_by:
+          type: string
+          format: uuid
+          nullable: true
+        last_reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+        seo_meta:
+          type: object
+          nullable: true
+          properties:
+            title_ar:
+              type: string
+            title_en:
+              type: string
+            description_ar:
+              type: string
+            description_en:
+              type: string
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        [id, title_ar, title_en, slug, content_ar, content_en, category,
+          is_published, is_featured, view_count, helpful_count,
+          not_helpful_count, author_id, created_at, updated_at]
+
+    KnowledgeArticleCreate:
+      type: object
+      required: [title_ar, title_en, content_ar, content_en, category]
+      properties:
+        title_ar:
+          type: string
+          minLength: 1
+          maxLength: 500
+        title_en:
+          type: string
+          minLength: 1
+          maxLength: 500
+        content_ar:
+          type: string
+          minLength: 1
+          maxLength: 50000
+        content_en:
+          type: string
+          minLength: 1
+          maxLength: 50000
+        excerpt_ar:
+          type: string
+          maxLength: 500
+          nullable: true
+        excerpt_en:
+          type: string
+          maxLength: 500
+          nullable: true
+        category:
+          type: string
+          minLength: 1
+          maxLength: 100
+        sub_category:
+          type: string
+          maxLength: 100
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+            maxLength: 50
+        is_featured:
+          type: boolean
+          default: false
+        seo_meta:
+          type: object
+          nullable: true
+          properties:
+            title_ar:
+              type: string
+            title_en:
+              type: string
+            description_ar:
+              type: string
+            description_en:
+              type: string
+
+    KnowledgeArticleUpdate:
+      type: object
+      properties:
+        title_ar:
+          type: string
+          minLength: 1
+          maxLength: 500
+        title_en:
+          type: string
+          minLength: 1
+          maxLength: 500
+        content_ar:
+          type: string
+          minLength: 1
+          maxLength: 50000
+        content_en:
+          type: string
+          minLength: 1
+          maxLength: 50000
+        excerpt_ar:
+          type: string
+          maxLength: 500
+          nullable: true
+        excerpt_en:
+          type: string
+          maxLength: 500
+          nullable: true
+        category:
+          type: string
+          minLength: 1
+          maxLength: 100
+        sub_category:
+          type: string
+          maxLength: 100
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        is_featured:
+          type: boolean
+        is_published:
+          type: boolean
+          description: >
+            Set to true to publish. Triggers ArticlePublished event.
+            Set to false to unpublish.
+        seo_meta:
+          type: object
+          nullable: true
+          properties:
+            title_ar:
+              type: string
+            title_en:
+              type: string
+            description_ar:
+              type: string
+            description_en:
+              type: string
+      minProperties: 1
+
+    # ------------------------------------------------------------------
+    # KNOWLEDGE CATEGORY
+    # ------------------------------------------------------------------
+    KnowledgeCategory:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name_ar:
+          type: string
+          maxLength: 100
+        name_en:
+          type: string
+          maxLength: 100
+        slug:
+          type: string
+          maxLength: 150
+        description_ar:
+          type: string
+          nullable: true
+        description_en:
+          type: string
+          nullable: true
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        sort_order:
+          type: integer
+        article_count:
+          type: integer
+          description: Published article count in this category
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, name_ar, name_en, slug, sort_order, article_count, created_at, updated_at]
+
+    KnowledgeCategoryCreate:
+      type: object
+      required: [name_ar, name_en]
+      properties:
+        name_ar:
+          type: string
+          minLength: 1
+          maxLength: 100
+        name_en:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description_ar:
+          type: string
+          nullable: true
+        description_en:
+          type: string
+          nullable: true
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        sort_order:
+          type: integer
+          default: 0
+
+    # ------------------------------------------------------------------
+    # COMMON
+    # ------------------------------------------------------------------
+    DeleteResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        deleted:
+          type: boolean
+          enum: [true]
+        deleted_at:
+          type: string
+          format: date-time
+      required: [id, deleted, deleted_at]
+
+    ResponseMeta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: uuid
+        apiVersion:
+          type: string
+          example: "1.0.0"
+      required: [timestamp, requestId]
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: uuid
+      required: [total, page, limit, totalPages, timestamp, requestId]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+            message:
+              type: string
+              description: Human-readable message (Arabic)
+            message_en:
+              type: string
+              description: Human-readable message (English)
+            statusCode:
+              type: integer
+            details:
+              type: object
+              nullable: true
+              additionalProperties: true
+              description: Additional error context
+          required: [code, message, message_en, statusCode]
+        meta:
+          type: object
+          properties:
+            timestamp:
+              type: string
+              format: date-time
+            requestId:
+              type: string
+              format: uuid
+          required: [timestamp, requestId]
+      required: [error, meta]
+
+  responses:
+    BadRequest:
+      description: Bad request — malformed input
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "VALIDATION_ERROR"
+              message: "الطلب غير صالح"
+              message_en: "Request validation failed"
+              statusCode: 400
+            meta:
+              timestamp: "2026-06-20T14:00:00Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "TOKEN_EXPIRED"
+              message: "انتهت صلاحية الجلسة، يرجى تسجيل الدخول مجدداً"
+              message_en: "Session expired, please login again"
+              statusCode: 401
+            meta:
+              timestamp: "2026-06-20T14:00:00Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "INSUFFICIENT_PERMISSIONS"
+              message: "ليس لديك صلاحية للوصول إلى هذا المورد"
+              message_en: "You do not have permission to access this resource"
+              statusCode: 403
+            meta:
+              timestamp: "2026-06-20T14:00:00Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "RESOURCE_NOT_FOUND"
+              message: "التذكرة غير موجودة"
+              message_en: "Ticket not found"
+              statusCode: 404
+            meta:
+              timestamp: "2026-06-20T14:00:00Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+    Conflict:
+      description: Resource conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "DUPLICATE_ENTRY"
+              message: "المورد موجود مسبقاً"
+              message_en: "Resource already exists"
+              statusCode: 409
+            meta:
+              timestamp: "2026-06-20T14:00:00Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+    ValidationError:
+      description: Validation/business rule violation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "SUPPORT_INVALID_STATUS_TRANSITION"
+              message: "لا يمكن تغيير حالة التذكرة من 'مغلقة' إلى 'قيد المعالجة'"
+              message_en: "Cannot transition ticket status from 'closed' to 'in_progress'"
+              statusCode: 422
+              details:
+                current_status: "closed"
+                attempted_status: "in_progress"
+                allowed_transitions: ["reopened"]
+            meta:
+              timestamp: "2026-06-20T14:00:00Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "INTERNAL_ERROR"
+              message: "حدث خطأ داخلي في الخادم"
+              message_en: "An internal server error occurred"
+              statusCode: 500
+            meta:
+              timestamp: "2026-06-20T14:00:00Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"

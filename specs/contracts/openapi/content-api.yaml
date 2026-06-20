@@ -1,0 +1,1968 @@
+openapi: "3.1.0"
+info:
+  title: AlharisTech Content API
+  version: "1.0.0"
+  description: >
+    Content domain API for the AlharisTech platform.
+    Manages pages, media library, blog posts, blog categories,
+    and menus. Supports version history, rollback, scheduling,
+    and bilingual (Arabic/English) content.
+  contact:
+    name: AlharisTech Engineering
+    email: api@alharistech.com
+  license:
+    name: Proprietary
+servers:
+  - url: https://api.alharistech.com/api/v1
+    description: Production
+  - url: https://api.staging.alharistech.com/api/v1
+    description: Staging
+  - url: http://localhost:4000/api/v1
+    description: Development
+
+tags:
+  - name: Pages
+    description: Page management with version history and publishing
+  - name: Media
+    description: Media library (upload, list, delete)
+  - name: Blog
+    description: Blog post management and categories
+  - name: Menus
+    description: Menu management (header, footer, sidebar)
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ==========================================================================
+  # PAGES
+  # ==========================================================================
+  /pages:
+    get:
+      tags: [Pages]
+      summary: List pages
+      description: >
+        List pages with pagination and filtering. Returns all non-deleted
+        pages. Public blog endpoints are separate.
+      operationId: listPages
+      parameters:
+        - name: search
+          in: query
+          description: Full-text search across title_ar, title_en
+          schema:
+            type: string
+        - name: is_published
+          in: query
+          description: Filter by publish status
+          schema:
+            type: boolean
+        - name: status
+          in: query
+          description: Filter by combined status
+          schema:
+            type: string
+            enum: [published, draft, scheduled, deleted]
+        - name: created_by
+          in: query
+          description: Filter by author
+          schema:
+            type: string
+            format: uuid
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created_asc, created_desc, updated_asc, updated_desc, title_asc, title_desc]
+            default: updated_desc
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated page list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Page"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+    post:
+      tags: [Pages]
+      summary: Create page
+      description: >
+        Create a new page. Validates slug uniqueness.
+        Creates initial PageVersion snapshot (version 1).
+        Page is created as draft (is_published=false).
+      operationId: createPage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PageCreate"
+      responses:
+        "201":
+          description: Page created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Page"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /pages/{id}:
+    get:
+      tags: [Pages]
+      summary: Get page by ID
+      operationId: getPage
+      parameters:
+        - $ref: "#/components/parameters/PageId"
+      responses:
+        "200":
+          description: Page detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Page"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "410":
+          $ref: "#/components/responses/Gone"
+
+    patch:
+      tags: [Pages]
+      summary: Update page
+      description: >
+        Update page fields. Increments version counter and creates
+        a new PageVersion snapshot. Slug changes are validated for
+        uniqueness.
+      operationId: updatePage
+      parameters:
+        - $ref: "#/components/parameters/PageId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PageUpdate"
+      responses:
+        "200":
+          description: Page updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Page"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "410":
+          $ref: "#/components/responses/Gone"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+    delete:
+      tags: [Pages]
+      summary: Soft-delete page
+      description: >
+        Soft-delete a page. Must unpublish the page first if published.
+        Admin/Manager only.
+      operationId: deletePage
+      parameters:
+        - $ref: "#/components/parameters/PageId"
+      responses:
+        "200":
+          description: Page soft-deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/DeleteResponse"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /pages/{id}/publish:
+    post:
+      tags: [Pages]
+      summary: Publish page
+      description: >
+        Publish a page. Sets is_published=true and published_at if first
+        publish. Publishes PagePublished domain event.
+      operationId: publishPage
+      parameters:
+        - $ref: "#/components/parameters/PageId"
+      responses:
+        "200":
+          description: Page published
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Page"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /pages/{id}/unpublish:
+    post:
+      tags: [Pages]
+      summary: Unpublish page
+      description: >
+        Unpublish a page. Sets is_published=false and publishes
+        PageUnpublished domain event.
+      operationId: unpublishPage
+      parameters:
+        - $ref: "#/components/parameters/PageId"
+      responses:
+        "200":
+          description: Page unpublished
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Page"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /pages/{id}/versions:
+    get:
+      tags: [Pages]
+      summary: Get version history
+      description: >
+        Retrieve paginated version history for a page. Returns versions
+        in descending order (latest first).
+      operationId: getPageVersions
+      parameters:
+        - $ref: "#/components/parameters/PageId"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PageVersion"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /pages/{id}/versions/{version}/restore:
+    post:
+      tags: [Pages]
+      summary: Restore page to version
+      description: >
+        Restore a page to a specific version. Creates a new version
+        with the restored snapshot. Admin/Manager only.
+      operationId: restorePageVersion
+      parameters:
+        - $ref: "#/components/parameters/PageId"
+        - name: version
+          in: path
+          required: true
+          description: Version number to restore
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Page restored to version
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Page"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ==========================================================================
+  # MEDIA
+  # ==========================================================================
+  /media:
+    post:
+      tags: [Media]
+      summary: Upload media
+      description: >
+        Upload one or more media files. Accepts multipart/form-data.
+        Allowed types: image/*, application/pdf, video/mp4, video/webm.
+        Maximum 10 files per upload, each max 50MB.
+        Generates thumbnails for images.
+      operationId: uploadMedia
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [files]
+              properties:
+                files:
+                  type: array
+                  minItems: 1
+                  maxItems: 10
+                  items:
+                    type: string
+                    format: binary
+                    description: File to upload (max 50MB each)
+                folder:
+                  type: string
+                  maxLength: 255
+                  description: Virtual folder path
+                alt_text_ar:
+                  type: string
+                  maxLength: 255
+                  description: Accessibility text (Arabic)
+                alt_text_en:
+                  type: string
+                  maxLength: 255
+                  description: Accessibility text (English)
+      responses:
+        "201":
+          description: Media uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Media"
+                  meta:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      timestamp:
+                        type: string
+                        format: date-time
+                      requestId:
+                        type: string
+                        format: uuid
+                    required: [total, timestamp, requestId]
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+    get:
+      tags: [Media]
+      summary: List media
+      description: List media files with pagination and filtering.
+      operationId: listMedia
+      parameters:
+        - name: folder
+          in: query
+          description: Filter by folder path
+          schema:
+            type: string
+        - name: mime_type
+          in: query
+          description: Filter by MIME type prefix (e.g., "image/")
+          schema:
+            type: string
+        - name: search
+          in: query
+          description: Search by original filename
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created_asc, created_desc, name_asc, name_desc, size_asc, size_desc]
+            default: created_desc
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Media list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Media"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /media/{id}:
+    get:
+      tags: [Media]
+      summary: Get media detail
+      operationId: getMedia
+      parameters:
+        - $ref: "#/components/parameters/MediaId"
+      responses:
+        "200":
+          description: Media detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Media"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      tags: [Media]
+      summary: Delete media
+      description: >
+        Delete a media file. Checks that the media is not referenced
+        by any published page or blog post. Admin/Manager only.
+        Physical file cleanup is asynchronous.
+      operationId: deleteMedia
+      parameters:
+        - $ref: "#/components/parameters/MediaId"
+      responses:
+        "200":
+          description: Media deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/DeleteResponse"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  # ==========================================================================
+  # BLOG
+  # ==========================================================================
+  /blog:
+    get:
+      tags: [Blog]
+      summary: List blog posts
+      description: >
+        List blog posts. Public access returns only published posts.
+        Authenticated access returns all posts (for employees).
+      operationId: listBlogPosts
+      security: []
+      parameters:
+        - name: search
+          in: query
+          description: Full-text search across title_ar, title_en, excerpt_ar, excerpt_en
+          schema:
+            type: string
+        - name: category_id
+          in: query
+          description: Filter by category
+          schema:
+            type: string
+            format: uuid
+        - name: tags
+          in: query
+          description: Filter by tags (comma-separated)
+          schema:
+            type: string
+        - name: is_published
+          in: query
+          description: Filter by publish status (default true for public)
+          schema:
+            type: boolean
+        - name: author_id
+          in: query
+          description: Filter by author (admin only)
+          schema:
+            type: string
+            format: uuid
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, oldest, updated_desc, title_asc, title_desc]
+            default: newest
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: locale
+          in: query
+          schema:
+            type: string
+            enum: [ar, en]
+            default: ar
+      responses:
+        "200":
+          description: Blog post list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BlogPost"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+                required: [data, meta]
+
+    post:
+      tags: [Blog]
+      summary: Create blog post
+      description: >
+        Create a new blog post. Stored as draft (is_published=false).
+        Slug uniqueness enforced. Version 1 snapshot created.
+      operationId: createBlogPost
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlogPostCreate"
+      responses:
+        "201":
+          description: Blog post created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/BlogPost"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /blog/{id}:
+    get:
+      tags: [Blog]
+      summary: Get blog post by ID
+      description: >
+        Get blog post detail. Public access returns only published posts.
+      operationId: getBlogPost
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/BlogPostId"
+      responses:
+        "200":
+          description: Blog post detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/BlogPost"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      tags: [Blog]
+      summary: Update blog post
+      description: >
+        Update blog post. Increments version and creates snapshot.
+        Slug changes validated for uniqueness.
+      operationId: updateBlogPost
+      parameters:
+        - $ref: "#/components/parameters/BlogPostId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlogPostUpdate"
+      responses:
+        "200":
+          description: Blog post updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/BlogPost"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+    delete:
+      tags: [Blog]
+      summary: Soft-delete blog post
+      description: >
+        Soft-delete a blog post. Must unpublish first if published.
+        Admin/Manager only.
+      operationId: deleteBlogPost
+      parameters:
+        - $ref: "#/components/parameters/BlogPostId"
+      responses:
+        "200":
+          description: Blog post soft-deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/DeleteResponse"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /blog/categories:
+    get:
+      tags: [Blog]
+      summary: List blog categories
+      description: List all blog categories. Public endpoint.
+      operationId: listBlogCategories
+      security: []
+      parameters:
+        - name: include_post_count
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Blog category list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BlogCategory"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+
+    post:
+      tags: [Blog]
+      summary: Create blog category
+      description: Create a new blog category. Admin/Manager only.
+      operationId: createBlogCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlogCategoryCreate"
+      responses:
+        "201":
+          description: Blog category created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/BlogCategory"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  # ==========================================================================
+  # MENUS
+  # ==========================================================================
+  /menus:
+    get:
+      tags: [Menus]
+      summary: List menus
+      description: >
+        List menus. Public endpoint. Filter by location (header, footer,
+        sidebar, custom).
+      operationId: listMenus
+      security: []
+      parameters:
+        - name: location
+          in: query
+          description: Filter by menu location
+          schema:
+            type: string
+            enum: [header, footer, sidebar, custom]
+        - name: is_active
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: Menu list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Menu"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+
+    post:
+      tags: [Menus]
+      summary: Create menu
+      description: >
+        Create a new menu. Validates items JSONB structure for
+        correct recursive tree (no circular references).
+        Admin/Manager only.
+      operationId: createMenu
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MenuCreate"
+      responses:
+        "201":
+          description: Menu created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Menu"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /menus/{id}:
+    get:
+      tags: [Menus]
+      summary: Get menu by ID
+      description: Get full menu with nested items. Public endpoint.
+      operationId: getMenu
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/MenuId"
+      responses:
+        "200":
+          description: Menu detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Menu"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      tags: [Menus]
+      summary: Update menu
+      description: >
+        Update menu name, location, or items. Validates items structure
+        on update. Publishes MenuUpdated event on save.
+      operationId: updateMenu
+      parameters:
+        - $ref: "#/components/parameters/MenuId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MenuUpdate"
+      responses:
+        "200":
+          description: Menu updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Menu"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+    delete:
+      tags: [Menus]
+      summary: Delete menu
+      description: Delete a menu. Admin/Manager only.
+      operationId: deleteMenu
+      parameters:
+        - $ref: "#/components/parameters/MenuId"
+      responses:
+        "200":
+          description: Menu deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/DeleteResponse"
+                  meta:
+                    $ref: "#/components/schemas/ResponseMeta"
+                required: [data, meta]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+# ============================================================================
+# COMPONENTS
+# ============================================================================
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        JWT access token obtained from /api/v1/auth/login.
+        Token payload includes sub (user ID), email, role, and permissions.
+
+  parameters:
+    PageId:
+      name: id
+      in: path
+      required: true
+      description: Page UUID
+      schema:
+        type: string
+        format: uuid
+    MediaId:
+      name: id
+      in: path
+      required: true
+      description: Media UUID
+      schema:
+        type: string
+        format: uuid
+    BlogPostId:
+      name: id
+      in: path
+      required: true
+      description: Blog post UUID
+      schema:
+        type: string
+        format: uuid
+    MenuId:
+      name: id
+      in: path
+      required: true
+      description: Menu UUID
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    # ------------------------------------------------------------------
+    # PAGE
+    # ------------------------------------------------------------------
+    Page:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title_ar:
+          type: string
+          minLength: 1
+          maxLength: 255
+        title_en:
+          type: string
+          maxLength: 255
+          nullable: true
+        slug:
+          type: string
+          maxLength: 255
+          pattern: "^[a-z0-9]+(?:[-/][a-z0-9]+)*$"
+          description: URL-safe unique slug
+        content_ar:
+          type: object
+          description: TipTap/Slate document structure (JSON)
+        content_en:
+          type: object
+          nullable: true
+          description: TipTap/Slate document structure (JSON)
+        meta_title:
+          type: string
+          maxLength: 160
+          nullable: true
+          description: SEO meta title
+        meta_description:
+          type: string
+          maxLength: 320
+          nullable: true
+          description: SEO meta description
+        is_published:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+        scheduled_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Future publish timestamp (BullMQ scheduled)
+        created_by:
+          type: string
+          format: uuid
+        updated_by:
+          type: string
+          format: uuid
+          nullable: true
+        version:
+          type: integer
+          minimum: 1
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        [id, title_ar, slug, content_ar, is_published, created_by, version,
+          created_at, updated_at]
+
+    PageCreate:
+      type: object
+      required: [title_ar, slug, content_ar]
+      properties:
+        title_ar:
+          type: string
+          minLength: 1
+          maxLength: 255
+        title_en:
+          type: string
+          maxLength: 255
+          nullable: true
+        slug:
+          type: string
+          maxLength: 255
+          pattern: "^[a-z0-9]+(?:[-/][a-z0-9]+)*$"
+        content_ar:
+          type: object
+          description: TipTap/Slate document structure
+        content_en:
+          type: object
+          nullable: true
+          description: TipTap/Slate document structure
+        meta_title:
+          type: string
+          maxLength: 160
+          nullable: true
+        meta_description:
+          type: string
+          maxLength: 320
+          nullable: true
+
+    PageUpdate:
+      type: object
+      properties:
+        title_ar:
+          type: string
+          minLength: 1
+          maxLength: 255
+        title_en:
+          type: string
+          maxLength: 255
+          nullable: true
+        slug:
+          type: string
+          maxLength: 255
+          pattern: "^[a-z0-9]+(?:[-/][a-z0-9]+)*$"
+        content_ar:
+          type: object
+        content_en:
+          type: object
+          nullable: true
+        meta_title:
+          type: string
+          maxLength: 160
+          nullable: true
+        meta_description:
+          type: string
+          maxLength: 320
+          nullable: true
+        change_summary:
+          type: string
+          maxLength: 500
+          description: Summary of changes for the version snapshot
+      minProperties: 1
+
+    PageVersion:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        page_id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          minimum: 1
+        snapshot:
+          type: object
+          description: Full page state at this version
+        change_summary:
+          type: string
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+        created_by_name:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required:
+        [id, page_id, version, snapshot, created_by, created_at]
+
+    # ------------------------------------------------------------------
+    # MEDIA
+    # ------------------------------------------------------------------
+    Media:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+          maxLength: 255
+          description: Storage filename
+        original_name:
+          type: string
+          maxLength: 255
+          description: Original uploaded filename
+        mime_type:
+          type: string
+          maxLength: 100
+          description: MIME type (e.g., image/png)
+        size_bytes:
+          type: integer
+          minimum: 0
+          description: File size in bytes
+        url:
+          type: string
+          format: uri
+          description: Public access URL
+        thumbnail_url:
+          type: string
+          format: uri
+          nullable: true
+          description: Generated thumbnail (for images)
+        alt_text_ar:
+          type: string
+          maxLength: 255
+          nullable: true
+        alt_text_en:
+          type: string
+          maxLength: 255
+          nullable: true
+        folder:
+          type: string
+          maxLength: 255
+          nullable: true
+          description: Virtual folder
+        uploaded_by:
+          type: string
+          format: uuid
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required:
+        [id, filename, original_name, mime_type, size_bytes, url,
+          uploaded_by, created_at]
+
+    # ------------------------------------------------------------------
+    # BLOG POST
+    # ------------------------------------------------------------------
+    BlogPost:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title_ar:
+          type: string
+          minLength: 1
+          maxLength: 255
+        title_en:
+          type: string
+          maxLength: 255
+          nullable: true
+        slug:
+          type: string
+          maxLength: 255
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        content_ar:
+          type: object
+          description: TipTap/Slate document structure (JSON)
+        content_en:
+          type: object
+          nullable: true
+          description: TipTap/Slate document structure (JSON)
+        excerpt_ar:
+          type: string
+          maxLength: 500
+          nullable: true
+        excerpt_en:
+          type: string
+          maxLength: 500
+          nullable: true
+        featured_image:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            url:
+              type: string
+              format: uri
+            alt_text_ar:
+              type: string
+              nullable: true
+            alt_text_en:
+              type: string
+              nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+            maxLength: 50
+        category_id:
+          type: string
+          format: uuid
+          nullable: true
+        category:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            name_ar:
+              type: string
+            name_en:
+              type: string
+            slug:
+              type: string
+        meta_title:
+          type: string
+          maxLength: 160
+          nullable: true
+        meta_description:
+          type: string
+          maxLength: 320
+          nullable: true
+        is_published:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+        scheduled_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+        author_name:
+          type: string
+          nullable: true
+        updated_by:
+          type: string
+          format: uuid
+          nullable: true
+        version:
+          type: integer
+          minimum: 1
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        [id, title_ar, slug, content_ar, is_published, created_by, version,
+          created_at, updated_at]
+
+    BlogPostCreate:
+      type: object
+      required: [title_ar, slug, content_ar]
+      properties:
+        title_ar:
+          type: string
+          minLength: 1
+          maxLength: 255
+        title_en:
+          type: string
+          maxLength: 255
+          nullable: true
+        slug:
+          type: string
+          maxLength: 255
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        content_ar:
+          type: object
+          description: TipTap/Slate document structure
+        content_en:
+          type: object
+          nullable: true
+          description: TipTap/Slate document structure
+        excerpt_ar:
+          type: string
+          maxLength: 500
+          nullable: true
+        excerpt_en:
+          type: string
+          maxLength: 500
+          nullable: true
+        featured_image:
+          type: string
+          format: uuid
+          nullable: true
+          description: Media UUID for featured image
+        tags:
+          type: array
+          items:
+            type: string
+            maxLength: 50
+        category_id:
+          type: string
+          format: uuid
+          nullable: true
+        meta_title:
+          type: string
+          maxLength: 160
+          nullable: true
+        meta_description:
+          type: string
+          maxLength: 320
+          nullable: true
+
+    BlogPostUpdate:
+      type: object
+      properties:
+        title_ar:
+          type: string
+          minLength: 1
+          maxLength: 255
+        title_en:
+          type: string
+          maxLength: 255
+          nullable: true
+        slug:
+          type: string
+          maxLength: 255
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        content_ar:
+          type: object
+        content_en:
+          type: object
+          nullable: true
+        excerpt_ar:
+          type: string
+          maxLength: 500
+          nullable: true
+        excerpt_en:
+          type: string
+          maxLength: 500
+          nullable: true
+        featured_image:
+          type: string
+          format: uuid
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        category_id:
+          type: string
+          format: uuid
+          nullable: true
+        meta_title:
+          type: string
+          maxLength: 160
+          nullable: true
+        meta_description:
+          type: string
+          maxLength: 320
+          nullable: true
+      minProperties: 1
+
+    # ------------------------------------------------------------------
+    # BLOG CATEGORY
+    # ------------------------------------------------------------------
+    BlogCategory:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name_ar:
+          type: string
+          minLength: 1
+          maxLength: 100
+        name_en:
+          type: string
+          maxLength: 100
+          nullable: true
+        slug:
+          type: string
+          maxLength: 255
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        description_ar:
+          type: string
+          nullable: true
+        description_en:
+          type: string
+          nullable: true
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        parent:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            name_ar:
+              type: string
+            name_en:
+              type: string
+        sort_order:
+          type: integer
+        post_count:
+          type: integer
+          description: Published post count
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, name_ar, slug, sort_order, created_at, updated_at]
+
+    BlogCategoryCreate:
+      type: object
+      required: [name_ar, slug]
+      properties:
+        name_ar:
+          type: string
+          minLength: 1
+          maxLength: 100
+        name_en:
+          type: string
+          maxLength: 100
+          nullable: true
+        slug:
+          type: string
+          maxLength: 255
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        description_ar:
+          type: string
+          nullable: true
+        description_en:
+          type: string
+          nullable: true
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        sort_order:
+          type: integer
+          default: 0
+
+    # ------------------------------------------------------------------
+    # MENU
+    # ------------------------------------------------------------------
+    Menu:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        location:
+          type: string
+          enum: [header, footer, sidebar, custom]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MenuItem"
+          description: Recursive menu items tree
+        is_active:
+          type: boolean
+        created_by:
+          type: string
+          format: uuid
+        updated_by:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, name, location, items, is_active, created_by, created_at, updated_at]
+
+    MenuItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Item UUID (generated client-side for tracking)
+        label_ar:
+          type: string
+          minLength: 1
+          maxLength: 100
+        label_en:
+          type: string
+          maxLength: 100
+          nullable: true
+        url:
+          type: string
+          maxLength: 500
+        type:
+          type: string
+          enum: [internal, external, page_link]
+          description: >
+            internal: relative URL, external: absolute URL,
+            page_link: references a page_id
+        page_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Required when type is page_link
+        icon:
+          type: string
+          maxLength: 100
+          nullable: true
+          description: Icon identifier (e.g., Feather icon name)
+        open_in_new_tab:
+          type: boolean
+          default: false
+        sort_order:
+          type: integer
+          default: 0
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/MenuItem"
+          description: Nested child items (recursive)
+      required: [label_ar, url, type]
+
+    MenuCreate:
+      type: object
+      required: [name, location]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        location:
+          type: string
+          enum: [header, footer, sidebar, custom]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MenuItem"
+          description: Menu items tree
+        is_active:
+          type: boolean
+          default: true
+
+    MenuUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        location:
+          type: string
+          enum: [header, footer, sidebar, custom]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MenuItem"
+        is_active:
+          type: boolean
+      minProperties: 1
+
+    # ------------------------------------------------------------------
+    # COMMON
+    # ------------------------------------------------------------------
+    DeleteResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        deleted:
+          type: boolean
+          enum: [true]
+        deleted_at:
+          type: string
+          format: date-time
+      required: [id, deleted, deleted_at]
+
+    ResponseMeta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: uuid
+        apiVersion:
+          type: string
+          example: "1.0.0"
+      required: [timestamp, requestId]
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: uuid
+      required: [total, page, limit, totalPages, timestamp, requestId]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+            message:
+              type: string
+              description: Human-readable message (Arabic)
+            message_en:
+              type: string
+              description: Human-readable message (English)
+            statusCode:
+              type: integer
+            details:
+              type: object
+              nullable: true
+              additionalProperties: true
+              description: Additional error context
+          required: [code, message, message_en, statusCode]
+        meta:
+          type: object
+          properties:
+            timestamp:
+              type: string
+              format: date-time
+            requestId:
+              type: string
+              format: uuid
+          required: [timestamp, requestId]
+      required: [error, meta]
+
+  responses:
+    BadRequest:
+      description: Bad request — malformed input
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "VALIDATION_ERROR"
+              message: "الطلب غير صالح"
+              message_en: "Request validation failed"
+              statusCode: 400
+            meta:
+              timestamp: "2026-06-20T14:00:00Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "TOKEN_EXPIRED"
+              message: "انتهت صلاحية الجلسة، يرجى تسجيل الدخول مجدداً"
+              message_en: "Session expired, please login again"
+              statusCode: 401
+            meta:
+              timestamp: "2026-06-20T14:00:00Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "INSUFFICIENT_PERMISSIONS"
+              message: "ليس لديك صلاحية للوصول إلى هذا المورد"
+              message_en: "You do not have permission to access this resource"
+              statusCode: 403
+            meta:
+              timestamp: "2026-06-20T14:00:00Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "RESOURCE_NOT_FOUND"
+              message: "الصفحة غير موجودة"
+              message_en: "Page not found"
+              statusCode: 404
+            meta:
+              timestamp: "2026-06-20T14:00:00Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+    Gone:
+      description: Resource permanently deleted
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "RESOURCE_DELETED"
+              message: "تم حذف هذه الصفحة"
+              message_en: "This page has been deleted"
+              statusCode: 410
+            meta:
+              timestamp: "2026-06-20T14:00:00Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+    Conflict:
+      description: Resource conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "CONTENT_SLUG_CONFLICT"
+              message: "المسار slug مستخدم من قبل صفحة أخرى"
+              message_en: "This slug is already in use by another page"
+              statusCode: 409
+              details:
+                slug: "about-us"
+                conflicting_page_id: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+            meta:
+              timestamp: "2026-06-20T14:00:00Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+    ValidationError:
+      description: Validation/business rule violation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "CONTENT_PUBLISHED_DELETE"
+              message: "يجب إلغاء نشر الصفحة قبل حذفها"
+              message_en: "Page must be unpublished before deletion"
+              statusCode: 422
+            meta:
+              timestamp: "2026-06-20T14:00:00Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+    PayloadTooLarge:
+      description: Upload exceeds size limit
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "FILE_TOO_LARGE"
+              message: "حجم الملف يتجاوز الحد المسموح به 50 ميجابايت"
+              message_en: "File size exceeds the 50MB limit"
+              statusCode: 413
+            meta:
+              timestamp: "2026-06-20T14:00:00Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "INTERNAL_ERROR"
+              message: "حدث خطأ داخلي في الخادم"
+              message_en: "An internal server error occurred"
+              statusCode: 500
+            meta:
+              timestamp: "2026-06-20T14:00:00Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"

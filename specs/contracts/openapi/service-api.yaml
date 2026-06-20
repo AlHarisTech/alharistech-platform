@@ -1,0 +1,1773 @@
+openapi: "3.1.0"
+info:
+  title: AlharisTech Service API
+  description: |
+    Service Domain API — Service catalog, service orders, and order workflow
+    management for the AlharisTech Platform. Covers service browsing, order
+    submission with documents, status tracking, employee assignment, and
+    service rating.
+
+    Base URL: `https://api.alharistech.com`
+  version: "1.0.0"
+  contact:
+    name: AlharisTech Platform Team
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://api.alharistech.com/api/v1
+    description: Production
+  - url: https://api.staging.alharistech.com/api/v1
+    description: Staging
+  - url: http://localhost:4000/api/v1
+    description: Development
+
+tags:
+  - name: Services
+    description: Service catalog browsing and categories
+  - name: Orders
+    description: Order creation, tracking, status management, assignment, and rating
+
+security:
+  - bearerAuth: []
+
+paths:
+  # =========================================================================
+  # SERVICE CATALOG
+  # =========================================================================
+
+  /services:
+    get:
+      operationId: listServices
+      summary: List active services with search, filter, pagination
+      description: |
+        Returns a paginated list of active services. Supports filtering by
+        category, price type, featured status, price range, and full-text
+        search on Arabic and English name/description.
+
+        Public endpoint — no authentication required.
+
+        Rate limit: 120 requests per minute per IP.
+      tags:
+        - Services
+      security: []
+      parameters:
+        - name: category
+          in: query
+          required: false
+          description: Filter by category slug
+          schema:
+            type: string
+            example: "legal-services"
+        - name: price_type
+          in: query
+          required: false
+          description: Filter by price type
+          schema:
+            type: string
+            enum:
+              - fixed
+              - variable
+              - free
+              - quote
+        - name: q
+          in: query
+          required: false
+          description: Full-text search on name (ar/en) and description (ar/en)
+          schema:
+            type: string
+            maxLength: 200
+            example: "استشارة"
+        - name: is_featured
+          in: query
+          required: false
+          description: Filter featured services only
+          schema:
+            type: boolean
+        - name: min_price
+          in: query
+          required: false
+          description: Minimum price filter (SAR)
+          schema:
+            type: number
+            minimum: 0
+            example: 100
+        - name: max_price
+          in: query
+          required: false
+          description: Maximum price filter (SAR)
+          schema:
+            type: number
+            minimum: 0
+            example: 5000
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-indexed)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: sort_by
+          in: query
+          required: false
+          description: Sort field
+          schema:
+            type: string
+            enum:
+              - sort_order
+              - price
+              - name_ar
+              - created_at
+              - avg_rating
+            default: sort_order
+        - name: order
+          in: query
+          required: false
+          description: Sort direction
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: asc
+      responses:
+        "200":
+          description: Paginated list of active services
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceListResponse"
+
+  /services/{id}:
+    get:
+      operationId: getServiceById
+      summary: Get service detail by ID
+      description: |
+        Returns the full service record including category details,
+        required documents specification, and aggregated rating data.
+
+        Public endpoint — no authentication required.
+
+        Rate limit: 120 requests per minute per IP.
+      tags:
+        - Services
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Service UUID v7
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Service detail with category and ratings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceDetailResponse"
+        "404":
+          description: Service not found or inactive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /services/categories:
+    get:
+      operationId: listServiceCategories
+      summary: List service categories
+      description: |
+        Returns all active service categories. Supports tree structure
+        via parent_id self-reference.
+
+        Public endpoint — no authentication required.
+
+        Rate limit: 120 requests per minute per IP.
+      tags:
+        - Services
+      security: []
+      parameters:
+        - name: parent_id
+          in: query
+          required: false
+          description: Filter by parent category (omit for top-level)
+          schema:
+            type: string
+            format: uuid
+        - name: include_inactive
+          in: query
+          required: false
+          description: Include inactive categories (admin/manager only)
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: List of service categories
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryListResponse"
+
+  # =========================================================================
+  # ORDERS COLLECTION
+  # =========================================================================
+
+  /orders:
+    post:
+      operationId: createOrder
+      summary: Submit new service order with documents
+      description: |
+        Creates a new service order. Validates that the service is active and
+        all required documents are provided. Generates a unique reference
+        number (ORD-YYYYMMDD-XXXX). The order starts with status "pending".
+
+        Requires customer role. The authenticated customer's linked profile
+        is auto-used as the customer_id.
+
+        Rate limit: 10 requests per minute per user.
+      tags:
+        - Orders
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderCreate"
+      responses:
+        "201":
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (requires customer role)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Service not found or inactive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Missing required documents or validation failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    get:
+      operationId: listOrders
+      summary: List orders (role-scoped, filterable)
+      description: |
+        Returns a paginated list of orders with automatic role-based scoping:
+        - Admin/Manager: all orders
+        - Employee: assigned orders (or all if granted orders:read:all)
+        - Customer: own orders only
+
+        Supports filtering by status, service, customer, assigned employee,
+        reference number, and date range.
+
+        Rate limit: 60 requests per minute per user.
+      tags:
+        - Orders
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filter by order status (comma-separated for multiple)
+          schema:
+            type: string
+            example: "pending,in_review"
+        - name: service_id
+          in: query
+          required: false
+          description: Filter by service ID
+          schema:
+            type: string
+            format: uuid
+        - name: customer_id
+          in: query
+          required: false
+          description: Filter by customer ID (admin/manager only; customer auto-scoped)
+          schema:
+            type: string
+            format: uuid
+        - name: assigned_to
+          in: query
+          required: false
+          description: Filter by assigned employee ID
+          schema:
+            type: string
+            format: uuid
+        - name: reference_number
+          in: query
+          required: false
+          description: Filter by exact reference number
+          schema:
+            type: string
+            example: "ORD-20260620-A3F7"
+        - name: from
+          in: query
+          required: false
+          description: Filter orders created after this date
+          schema:
+            type: string
+            format: date
+            example: "2026-06-01"
+        - name: to
+          in: query
+          required: false
+          description: Filter orders created before this date
+          schema:
+            type: string
+            format: date
+            example: "2026-06-30"
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-indexed)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: sort_by
+          in: query
+          required: false
+          description: Sort field
+          schema:
+            type: string
+            enum:
+              - created_at
+              - status
+              - total_amount
+            default: created_at
+        - name: order
+          in: query
+          required: false
+          description: Sort direction
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+      responses:
+        "200":
+          description: Paginated order list scoped by role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderListResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # =========================================================================
+  # ORDER BY ID
+  # =========================================================================
+
+  /orders/{id}:
+    get:
+      operationId: getOrderById
+      summary: Get order detail with status history
+      description: |
+        Returns the full order record including service details, customer
+        info, documents, assigned employee, and complete status history.
+        Role-scoped: customers can only view their own orders; employees
+        can only view assigned orders (unless granted orders:read:all).
+
+        Note: `internal_notes` field is only returned to admin, manager,
+        and assigned employee roles.
+
+        Rate limit: 60 requests per minute per user.
+      tags:
+        - Orders
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Order UUID v7
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Order detail with status history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetailResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    patch:
+      operationId: updateOrderStatus
+      summary: Update order status (employee processing)
+      description: |
+        Updates the order status as part of the order workflow. Valid
+        status transitions are enforced by the state machine:
+
+        ```
+        pending     -> in_review, cancelled, rejected
+        in_review   -> in_progress, cancelled, rejected
+        in_progress -> completed, cancelled
+        completed   -> (terminal)
+        cancelled   -> pending (Admin only)
+        rejected    -> pending (Admin only)
+        draft       -> pending, cancelled
+        ```
+
+        An order requires all required documents before transitioning from
+        `pending` to `in_review`. Completing an order requires all documents
+        to be verified.
+
+        Rate limit: 60 requests per minute per user.
+      tags:
+        - Orders
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Order UUID v7
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderUpdate"
+      responses:
+        "200":
+          description: Order status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderStatusResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Invalid status transition or missing requirements
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # =========================================================================
+  # ORDER SUB-RESOURCES
+  # =========================================================================
+
+  /orders/{id}/documents:
+    post:
+      operationId: uploadOrderDocuments
+      summary: Upload documents to order
+      description: |
+        Uploads documents to an existing order. Documents are appended to
+        the order's documents array. File types and sizes are validated
+        against the service's required_documents specification.
+
+        The order must not be in a terminal status (completed or cancelled).
+
+        Rate limit: 20 requests per minute per user.
+        Max total upload per request: 50 MB.
+      tags:
+        - Orders
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Order UUID v7
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - files
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Document files to upload (max 10 per request)
+                  maxItems: 10
+      responses:
+        "200":
+          description: Documents uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentsResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: File too large or total upload exceeds 50 MB
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Invalid file type, order in terminal status, or validation failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Storage failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    get:
+      operationId: getOrderDocuments
+      summary: Get order documents list
+      description: |
+        Returns the list of documents attached to an order, including
+        verification status for each document.
+
+        Rate limit: 60 requests per minute per user.
+      tags:
+        - Orders
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Order UUID v7
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Order documents
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentsResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /orders/{id}/assign:
+    post:
+      operationId: assignOrder
+      summary: Assign order to employee
+      description: |
+        Assigns an order to an employee for processing. The target user must
+        have role='employee'. Order must be in 'pending' or 'in_review'
+        status. On assignment, if the order is still 'pending', it
+        auto-transitions to 'in_review'.
+
+        Requires admin or manager role.
+
+        Rate limit: 30 requests per minute per user.
+      tags:
+        - Orders
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Order UUID v7
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignOrderRequest"
+      responses:
+        "200":
+          description: Order assigned successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderAssignmentResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (requires admin or manager)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Invalid employee, order in terminal status, or already assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /orders/{id}/rate:
+    post:
+      operationId: rateOrder
+      summary: Rate completed service order
+      description: |
+        Submits a rating for a completed service order. Only the customer
+        who owns the order can rate it. The order must be in 'completed'
+        status and not already rated. Rating cannot be changed once submitted.
+
+        Rate limit: 20 requests per minute per user.
+      tags:
+        - Orders
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Order UUID v7
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RateOrderRequest"
+      responses:
+        "200":
+          description: Order rated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderRatingResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (requires customer who owns the order)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Order already rated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Order not completed or rating out of range
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT access token from the Identity domain. Token payload contains
+        `sub` (user ID), `email`, `role`, and `permissions` array.
+
+  schemas:
+    # -------------------------------------------------------------------------
+    # ENUMS
+    # -------------------------------------------------------------------------
+
+    OrderStatus:
+      type: string
+      enum:
+        - draft
+        - pending
+        - in_review
+        - in_progress
+        - completed
+        - cancelled
+        - rejected
+      description: |
+        Order workflow status with valid transitions:
+        pending -> in_review, cancelled, rejected
+        in_review -> in_progress, cancelled, rejected
+        in_progress -> completed, cancelled
+        completed -> (terminal)
+        cancelled -> pending (Admin reopen only)
+        rejected -> pending (Admin reopen only)
+
+    PriceType:
+      type: string
+      enum:
+        - fixed
+        - variable
+        - free
+        - quote
+      description: Service price type. 'quote' means price is determined after review.
+
+    # -------------------------------------------------------------------------
+    # SERVICE SCHEMAS
+    # -------------------------------------------------------------------------
+
+    Service:
+      type: object
+      required:
+        - id
+        - name_ar
+        - name_en
+        - slug
+        - description_ar
+        - description_en
+        - price
+        - currency
+        - price_type
+        - is_active
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Service UUID v7
+          example: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        category_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Category UUID
+        name_ar:
+          type: string
+          maxLength: 255
+          description: Service name in Arabic
+          example: "استشارة قانونية شاملة"
+        name_en:
+          type: string
+          maxLength: 255
+          description: Service name in English
+          example: "Comprehensive Legal Consultation"
+        slug:
+          type: string
+          maxLength: 255
+          description: URL-safe slug generated from name_en
+          example: "comprehensive-legal-consultation"
+        description_ar:
+          type: string
+          description: Detailed description in Arabic
+          example: "نقدم استشارة قانونية شاملة تشمل جميع جوانب القضية"
+        description_en:
+          type: string
+          description: Detailed description in English
+          example: "We provide comprehensive legal consultation covering all aspects of the case"
+        short_description_ar:
+          type: string
+          nullable: true
+          maxLength: 500
+          description: Short summary in Arabic
+          example: "استشارة قانونية متكاملة"
+        short_description_en:
+          type: string
+          nullable: true
+          maxLength: 500
+          description: Short summary in English
+          example: "Complete legal consultation"
+        price:
+          type: number
+          format: double
+          minimum: 0
+          description: Service price (can be 0 for free services)
+          example: 1500.00
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          description: ISO 4217 currency code
+          example: "SAR"
+        price_type:
+          $ref: "#/components/schemas/PriceType"
+        required_documents:
+          type: array
+          description: Required documents specification for this service
+          items:
+            type: object
+            required:
+              - name_ar
+              - name_en
+              - type
+              - required
+            properties:
+              name_ar:
+                type: string
+                description: Document name in Arabic
+                example: "هوية وطنية"
+              name_en:
+                type: string
+                description: Document name in English
+                example: "National ID"
+              type:
+                type: string
+                description: Accepted file types (pipe-separated extensions)
+                example: "pdf|jpg|png"
+              required:
+                type: boolean
+                description: Whether this document is mandatory
+              max_size_mb:
+                type: integer
+                description: Maximum file size in MB
+                example: 5
+        estimated_duration_days:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: Estimated completion time in business days
+          example: 5
+        is_active:
+          type: boolean
+          description: Whether the service is publicly available
+          example: true
+        is_featured:
+          type: boolean
+          description: Whether the service is featured
+          example: true
+        sort_order:
+          type: integer
+          default: 0
+          description: Display ordering
+        icon_url:
+          type: string
+          format: uri
+          nullable: true
+          description: Icon image URL
+        cover_image_url:
+          type: string
+          format: uri
+          nullable: true
+          description: Cover image URL
+        avg_rating:
+          type: number
+          format: double
+          nullable: true
+          minimum: 1
+          maximum: 5
+          description: Average customer rating
+          example: 4.5
+        total_ratings:
+          type: integer
+          minimum: 0
+          description: Total number of ratings received
+          example: 28
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          example: "2026-01-01T00:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2026-06-15T10:00:00Z"
+
+    ServiceCategory:
+      type: object
+      required:
+        - id
+        - name_ar
+        - name_en
+        - slug
+        - is_active
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Category UUID v7
+          example: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        name_ar:
+          type: string
+          maxLength: 255
+          description: Category name in Arabic
+          example: "خدمات قانونية"
+        name_en:
+          type: string
+          maxLength: 255
+          description: Category name in English
+          example: "Legal Services"
+        slug:
+          type: string
+          maxLength: 255
+          description: URL-safe slug
+          example: "legal-services"
+        description_ar:
+          type: string
+          nullable: true
+          description: Category description in Arabic
+        description_en:
+          type: string
+          nullable: true
+          description: Category description in English
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Parent category ID (self-referential for tree structure)
+        icon_url:
+          type: string
+          format: uri
+          nullable: true
+          description: Category icon URL
+        sort_order:
+          type: integer
+          default: 0
+          description: Display ordering
+        is_active:
+          type: boolean
+          description: Whether the category is active
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          example: "2026-01-01T00:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last update timestamp
+
+    # -------------------------------------------------------------------------
+    # SERVICE RESPONSE SCHEMAS
+    # -------------------------------------------------------------------------
+
+    ServiceListResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Service"
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/ResponseMeta"
+            - type: object
+              properties:
+                pagination:
+                  $ref: "#/components/schemas/PaginationMeta"
+
+    ServiceDetailResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          allOf:
+            - $ref: "#/components/schemas/Service"
+            - type: object
+              properties:
+                category:
+                  $ref: "#/components/schemas/ServiceCategory"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    CategoryListResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceCategory"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    # -------------------------------------------------------------------------
+    # ORDER SCHEMAS
+    # -------------------------------------------------------------------------
+
+    Order:
+      type: object
+      required:
+        - id
+        - reference_number
+        - customer_id
+        - service_id
+        - status
+        - total_amount
+        - currency
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Order UUID v7
+          example: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        reference_number:
+          type: string
+          pattern: "^ORD-\\d{8}-[A-Z0-9]{4}$"
+          description: Auto-generated unique reference (ORD-YYYYMMDD-XXXX)
+          example: "ORD-20260620-A3F7"
+        customer_id:
+          type: string
+          format: uuid
+          description: Customer UUID from Customer domain
+        service_id:
+          type: string
+          format: uuid
+          description: Service UUID
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        total_amount:
+          type: number
+          format: double
+          minimum: 0
+          description: Denormalized from service.price at creation time
+          example: 1500.00
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          description: ISO 4217 currency code
+          example: "SAR"
+        notes:
+          type: string
+          nullable: true
+          maxLength: 5000
+          description: Customer notes
+          example: "عاجل - معاملة رقم 12345"
+        internal_notes:
+          type: string
+          nullable: true
+          maxLength: 5000
+          description: Staff-only notes (not returned to customer)
+        assigned_to:
+          type: string
+          format: uuid
+          nullable: true
+          description: Assigned employee user ID
+        assigned_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Assignment timestamp
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Completion timestamp
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Cancellation timestamp
+        cancel_reason:
+          type: string
+          nullable: true
+          maxLength: 500
+          description: Required if status is cancelled
+        rating:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 5
+          description: Customer rating (1-5), only when status is completed
+          example: 5
+        rating_comment:
+          type: string
+          nullable: true
+          description: Optional rating comment
+          example: "خدمة ممتازة وسريعة"
+        rated_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Rating timestamp
+        documents:
+          type: array
+          description: Order documents
+          items:
+            type: object
+            required:
+              - id
+              - name
+              - url
+              - type
+              - uploaded_at
+              - verified
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+                description: Document display name
+                example: "National ID - front side"
+              url:
+                type: string
+                format: uri
+                description: Signed storage URL
+              type:
+                type: string
+                description: File MIME type
+                example: "application/pdf"
+              uploaded_at:
+                type: string
+                format: date-time
+              verified:
+                type: boolean
+              verified_by:
+                type: string
+                format: uuid
+                nullable: true
+                description: User ID who verified the document
+              verified_at:
+                type: string
+                format: date-time
+                nullable: true
+        status_history:
+          type: array
+          description: Append-only status change log
+          items:
+            type: object
+            required:
+              - status
+              - changed_by
+              - changed_at
+            properties:
+              status:
+                $ref: "#/components/schemas/OrderStatus"
+              changed_by:
+                type: string
+                format: uuid
+                description: User ID who made the change
+              changed_at:
+                type: string
+                format: date-time
+              note:
+                type: string
+                nullable: true
+                description: Optional note about the transition
+        created_by:
+          type: string
+          format: uuid
+          description: User ID who created the order
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          example: "2026-06-20T12:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2026-06-20T14:30:00Z"
+
+    OrderCreate:
+      type: object
+      required:
+        - service_id
+      properties:
+        service_id:
+          type: string
+          format: uuid
+          description: Service UUID to order
+          example: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        notes:
+          type: string
+          maxLength: 5000
+          description: Optional customer notes for the order
+          example: "عاجل - أحتاج الخدمة خلال 3 أيام"
+        documents:
+          type: array
+          description: Pre-uploaded document references
+          items:
+            type: object
+            required:
+              - name
+              - url
+              - type
+            properties:
+              name:
+                type: string
+                description: Document name
+                example: "National ID - front side"
+              url:
+                type: string
+                format: uri
+                description: Document URL (must be from allowed storage domains)
+                example: "https://storage.alharistech.com/uploads/doc-001.pdf"
+              type:
+                type: string
+                description: File MIME type
+                example: "application/pdf"
+
+    OrderUpdate:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+          description: New status for the order
+        note:
+          type: string
+          maxLength: 500
+          description: Optional note explaining the status change
+          example: "تم التحقق من المستندات وبدء المعالجة"
+        cancel_reason:
+          type: string
+          maxLength: 500
+          description: Required when status is 'cancelled'
+          example: "طلب العميل إلغاء الطلب"
+
+    AssignOrderRequest:
+      type: object
+      required:
+        - employee_id
+      properties:
+        employee_id:
+          type: string
+          format: uuid
+          description: User ID of the employee to assign (must have role='employee')
+          example: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+    RateOrderRequest:
+      type: object
+      required:
+        - rating
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Rating value (1-5)
+          example: 5
+        comment:
+          type: string
+          maxLength: 1000
+          description: Optional rating comment
+          example: "خدمة ممتازة وسريعة"
+
+    # -------------------------------------------------------------------------
+    # ORDER RESPONSE SCHEMAS
+    # -------------------------------------------------------------------------
+
+    OrderResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          $ref: "#/components/schemas/Order"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    OrderListResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/ResponseMeta"
+            - type: object
+              properties:
+                pagination:
+                  $ref: "#/components/schemas/PaginationMeta"
+
+    OrderDetailResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          allOf:
+            - $ref: "#/components/schemas/Order"
+            - type: object
+              properties:
+                customer:
+                  type: object
+                  description: Customer summary (cross-domain)
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    first_name_ar:
+                      type: string
+                    last_name_ar:
+                      type: string
+                    email:
+                      type: string
+                      format: email
+                service:
+                  type: object
+                  description: Service summary
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    name_ar:
+                      type: string
+                    name_en:
+                      type: string
+                    slug:
+                      type: string
+                assigned_employee:
+                  type: object
+                  nullable: true
+                  description: Assigned employee summary (cross-domain from Identity)
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    first_name_ar:
+                      type: string
+                    last_name_ar:
+                      type: string
+                    email:
+                      type: string
+                      format: email
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    OrderStatusResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: object
+          required:
+            - id
+            - status
+          properties:
+            id:
+              type: string
+              format: uuid
+              description: Order UUID
+              example: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+            status:
+              $ref: "#/components/schemas/OrderStatus"
+            reference_number:
+              type: string
+              description: Order reference number
+              example: "ORD-20260620-A3F7"
+            status_history:
+              type: array
+              description: Updated status history
+              items:
+                type: object
+                properties:
+                  status:
+                    $ref: "#/components/schemas/OrderStatus"
+                  changed_by:
+                    type: string
+                    format: uuid
+                  changed_at:
+                    type: string
+                    format: date-time
+                  note:
+                    type: string
+                    nullable: true
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    OrderAssignmentResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: object
+          required:
+            - id
+            - assigned_to
+            - assigned_at
+            - status
+          properties:
+            id:
+              type: string
+              format: uuid
+              description: Order UUID
+              example: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+            assigned_to:
+              type: object
+              description: Assigned employee info
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                name_ar:
+                  type: string
+                name_en:
+                  type: string
+            assigned_at:
+              type: string
+              format: date-time
+              description: Assignment timestamp
+              example: "2026-06-20T14:00:00Z"
+            status:
+              $ref: "#/components/schemas/OrderStatus"
+              description: Current status (may have auto-transitioned to in_review)
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    OrderRatingResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: object
+          required:
+            - id
+            - rating
+            - rated_at
+          properties:
+            id:
+              type: string
+              format: uuid
+              description: Order UUID
+              example: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+            rating:
+              type: integer
+              minimum: 1
+              maximum: 5
+              description: The submitted rating
+              example: 5
+            rated_at:
+              type: string
+              format: date-time
+              description: Rating timestamp
+              example: "2026-06-20T15:00:00Z"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    DocumentsResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: object
+          required:
+            - order_id
+            - documents
+          properties:
+            order_id:
+              type: string
+              format: uuid
+              description: Order UUID
+            documents:
+              type: array
+              items:
+                type: object
+                required:
+                  - id
+                  - name
+                  - url
+                  - type
+                  - uploaded_at
+                  - verified
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+                  url:
+                    type: string
+                    format: uri
+                  type:
+                    type: string
+                  uploaded_at:
+                    type: string
+                    format: date-time
+                  verified:
+                    type: boolean
+                  verified_by:
+                    type: string
+                    format: uuid
+                    nullable: true
+                  verified_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    # -------------------------------------------------------------------------
+    # ERROR & META SCHEMAS
+    # -------------------------------------------------------------------------
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - meta
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+            - message_en
+            - statusCode
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+              example: "ORDER_INVALID_TRANSITION"
+            message:
+              type: string
+              description: Human-readable error message in Arabic
+              example: "لا يمكن الانتقال من in_progress إلى pending"
+            message_en:
+              type: string
+              description: Human-readable error message in English
+              example: "Cannot transition from in_progress to pending"
+            statusCode:
+              type: integer
+              description: HTTP status code
+              example: 422
+            details:
+              description: |
+                Additional error details. May contain field-level validation
+                errors or contextual information.
+              oneOf:
+                - type: array
+                  items:
+                    $ref: "#/components/schemas/ValidationErrorDetail"
+                - type: object
+                  additionalProperties: true
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    ValidationErrorDetail:
+      type: object
+      properties:
+        field:
+          type: string
+          description: The field that failed validation
+          example: "service_id"
+        code:
+          type: string
+          description: Field-level error code
+          example: "REQUIRED"
+        message:
+          type: string
+          description: Field-level error message
+          example: "Service ID is required"
+        received:
+          description: The invalid value that was received
+
+    ResponseMeta:
+      type: object
+      required:
+        - timestamp
+        - requestId
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of the response
+          example: "2026-06-20T12:00:00Z"
+        requestId:
+          type: string
+          format: uuid
+          description: Unique request identifier for tracing
+          example: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+    PaginationMeta:
+      type: object
+      required:
+        - total
+        - perPage
+        - currentPage
+        - hasNextPage
+        - hasPreviousPage
+      properties:
+        total:
+          type: integer
+          minimum: 0
+          description: Total number of records
+          example: 85
+        perPage:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Number of items per page
+          example: 20
+        currentPage:
+          type: integer
+          minimum: 1
+          description: Current page number
+          example: 1
+        totalPages:
+          type: integer
+          minimum: 0
+          description: Total number of pages
+          example: 5
+        hasNextPage:
+          type: boolean
+          description: Whether there are more pages after the current one
+          example: true
+        hasPreviousPage:
+          type: boolean
+          description: Whether there are pages before the current one
+          example: false

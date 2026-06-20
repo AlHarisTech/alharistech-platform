@@ -1,0 +1,1453 @@
+openapi: "3.1.0"
+info:
+  title: AlharisTech Customer API
+  description: |
+    Customer Domain API — Customer relationship management for the
+    AlharisTech Platform. Covers customer CRUD, search/filter, tagging,
+    communication logging, CSV import/export, and duplicate merging.
+
+    Base URL: `https://api.alharistech.com`
+  version: "1.0.0"
+  contact:
+    name: AlharisTech Platform Team
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://api.alharistech.com/api/v1
+    description: Production
+  - url: https://api.staging.alharistech.com/api/v1
+    description: Staging
+  - url: http://localhost:4000/api/v1
+    description: Development
+
+tags:
+  - name: Customers
+    description: Customer CRUD, search, and profile management
+  - name: Import/Export
+    description: CSV import and export operations
+
+security:
+  - bearerAuth: []
+
+paths:
+  # =========================================================================
+  # CUSTOMER COLLECTION
+  # =========================================================================
+
+  /customers:
+    get:
+      operationId: listCustomers
+      summary: List, search, and filter customers
+      description: |
+        Returns a paginated list of customers. Supports full-text search
+        (Arabic and English), filtering by type, tags, source, city,
+        active status, and sorting by multiple fields.
+
+        Employee users can list customers. Customer users cannot list all
+        customers (403 Forbidden) — they can only access their own profile.
+
+        Rate limit: 60 requests per minute per user.
+      tags:
+        - Customers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Full-text search query on name (Arabic/English), email, and phone
+          schema:
+            type: string
+            maxLength: 200
+            example: "أحمد"
+        - name: type
+          in: query
+          required: false
+          description: Filter by customer type
+          schema:
+            type: string
+            enum:
+              - individual
+              - company
+        - name: tags
+          in: query
+          required: false
+          description: Filter by tags (comma-separated, AND logic)
+          schema:
+            type: array
+            items:
+              type: string
+            example: ["vip", "مستورد"]
+          explode: false
+        - name: source
+          in: query
+          required: false
+          description: Filter by lead source
+          schema:
+            type: string
+            enum:
+              - website
+              - walk_in
+              - phone
+              - import
+              - referral
+              - other
+        - name: city
+          in: query
+          required: false
+          description: Filter by city (case-insensitive partial match)
+          schema:
+            type: string
+            maxLength: 100
+            example: "الرياض"
+        - name: is_active
+          in: query
+          required: false
+          description: Filter by active status
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-indexed)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: sort_by
+          in: query
+          required: false
+          description: Sort field
+          schema:
+            type: string
+            enum:
+              - created_at
+              - last_name_ar
+              - total_orders
+              - total_spent
+              - last_order_at
+            default: created_at
+        - name: order
+          in: query
+          required: false
+          description: Sort direction
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+      responses:
+        "200":
+          description: Paginated customer list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerListResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (customer role cannot list all customers)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      operationId: createCustomer
+      summary: Create new customer record
+      description: |
+        Creates a new customer. Company-type customers require company_name_ar
+        and a unique tax_number. Email must be unique across all non-deleted
+        customers. A CustomerProfile is automatically created with defaults.
+
+        Rate limit: 20 requests per minute per user.
+      tags:
+        - Customers
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerCreate"
+      responses:
+        "201":
+          description: Customer created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (requires admin or manager)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email or tax number already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "CUSTOMER_EMAIL_EXISTS"
+                  message: "البريد الإلكتروني مسجل مسبقاً"
+                  message_en: "Email already registered"
+                  statusCode: 409
+                  details:
+                    email: "ahmed@example.com"
+                meta:
+                  timestamp: "2026-06-20T12:00:00Z"
+                  requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        "422":
+          description: Validation failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # =========================================================================
+  # CUSTOMER BY ID
+  # =========================================================================
+
+  /customers/{id}:
+    get:
+      operationId: getCustomerById
+      summary: Get customer detail with order history
+      description: |
+        Returns the full customer record including profile, recent
+        communication logs (last 10), and order history from the Service
+        domain. Customer users can only access their own linked profile.
+
+        Rate limit: 60 requests per minute per user.
+      tags:
+        - Customers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Customer UUID v7
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Customer details with profile, communications, and order history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerDetailResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (customer accessing another's profile)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Customer not found or soft-deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    patch:
+      operationId: updateCustomer
+      summary: Update customer profile
+      description: |
+        Partially updates an existing customer record. Only the fields
+        provided in the request body are updated.
+
+        Rate limit: 30 requests per minute per user.
+      tags:
+        - Customers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Customer UUID v7
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerUpdate"
+      responses:
+        "200":
+          description: Customer updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (requires admin or manager)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Validation failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: deleteCustomer
+      summary: Soft-delete customer
+      description: |
+        Soft-deletes a customer by setting deleted_at. The record is never
+        physically removed. Orders, communications, and tickets remain
+        accessible. Requires admin role.
+
+        Rate limit: 20 requests per minute per user.
+      tags:
+        - Customers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Customer UUID v7
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Customer soft-deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (requires admin)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # =========================================================================
+  # CUSTOMER SUB-RESOURCES
+  # =========================================================================
+
+  /customers/{id}/orders:
+    get:
+      operationId: getCustomerOrders
+      summary: Get customer order history (cross-domain from Service)
+      description: |
+        Returns paginated order history for a customer, fetched from the
+        Service domain. Customer users can only view their own orders.
+
+        Rate limit: 60 requests per minute per user.
+      tags:
+        - Customers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Customer UUID v7
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-indexed)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+        - name: status
+          in: query
+          required: false
+          description: Filter by order status
+          schema:
+            type: string
+            enum:
+              - pending
+              - in_review
+              - in_progress
+              - completed
+              - cancelled
+              - rejected
+      responses:
+        "200":
+          description: Customer orders list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerOrdersResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # =========================================================================
+  # IMPORT/EXPORT
+  # =========================================================================
+
+  /customers/import:
+    post:
+      operationId: importCustomers
+      summary: Import customers from CSV file
+      description: |
+        Imports customers from a CSV file. The CSV must conform to the
+        required template columns. Rows with validation errors are skipped
+        and reported; valid rows are committed. Max file size: 10 MB.
+
+        Required columns: first_name_ar, last_name_ar, email (optional for
+        walk-in), phone (optional), type (individual/company), source.
+
+        Rate limit: 5 requests per hour per user.
+      tags:
+        - Import/Export
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV file with customer data
+      responses:
+        "200":
+          description: Import completed with summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResultResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (requires admin)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: File too large (max 10 MB)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "FILE_TOO_LARGE"
+                  message: "حجم الملف أكبر من الحد المسموح"
+                  message_en: "File size exceeds maximum allowed"
+                  statusCode: 413
+                meta:
+                  timestamp: "2026-06-20T12:00:00Z"
+                  requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        "422":
+          description: Invalid CSV structure or validation failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /customers/export:
+    post:
+      operationId: exportCustomers
+      summary: Export customers to CSV
+      description: |
+        Exports filtered customers to CSV. Accepts optional filter criteria
+        in the request body. Large exports (>1,000 rows) are processed
+        asynchronously with a download link returned. The download link
+        expires after 24 hours.
+
+        Rate limit: 10 requests per hour per user.
+      tags:
+        - Import/Export
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum:
+                    - individual
+                    - company
+                  description: Filter by customer type
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  description: Filter by tags
+                source:
+                  type: string
+                  enum:
+                    - website
+                    - walk_in
+                    - phone
+                    - import
+                    - referral
+                    - other
+                  description: Filter by lead source
+                city:
+                  type: string
+                  description: Filter by city
+                is_active:
+                  type: boolean
+                  description: Filter by active status
+                from:
+                  type: string
+                  format: date
+                  description: Filter customers created after this date
+                to:
+                  type: string
+                  format: date
+                  description: Filter customers created before this date
+      responses:
+        "202":
+          description: Export accepted for processing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportResultResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (requires admin or manager)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT access token from the Identity domain. Token payload contains
+        `sub` (user ID), `email`, `role`, and `permissions` array.
+
+  schemas:
+    # -------------------------------------------------------------------------
+    # CUSTOMER SCHEMAS
+    # -------------------------------------------------------------------------
+
+    Customer:
+      type: object
+      required:
+        - id
+        - type
+        - first_name_ar
+        - last_name_ar
+        - source
+        - is_active
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Customer UUID v7
+          example: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        user_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Linked Identity user ID (nullable for walk-in customers)
+          example: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6e"
+        type:
+          type: string
+          enum:
+            - individual
+            - company
+          description: Customer type
+          example: "individual"
+        email:
+          type: string
+          format: email
+          nullable: true
+          description: Email address (nullable for walk-in customers)
+          example: "ahmed@example.com"
+        phone:
+          type: string
+          nullable: true
+          description: Phone number in E.164 format
+          example: "+966512345678"
+        first_name_ar:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: First name in Arabic
+          example: "أحمد"
+        last_name_ar:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Last name in Arabic
+          example: "العلي"
+        first_name_en:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 100
+          description: First name in English
+          example: "Ahmed"
+        last_name_en:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 100
+          description: Last name in English
+          example: "Al-Ali"
+        company_name_ar:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Company name in Arabic (required when type=company)
+          example: "شركة التقنية المتقدمة"
+        company_name_en:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Company name in English
+          example: "Advanced Technology Co."
+        tax_number:
+          type: string
+          nullable: true
+          maxLength: 50
+          description: Tax registration number (required when type=company, unique)
+          example: "300123456789"
+        national_id:
+          type: string
+          nullable: true
+          maxLength: 50
+          description: National ID (encrypted at rest, only returned if user has explicit permission)
+        date_of_birth:
+          type: string
+          format: date
+          nullable: true
+          description: Date of birth
+          example: "1990-05-15"
+        address_city:
+          type: string
+          nullable: true
+          maxLength: 100
+          description: City
+          example: "الرياض"
+        address_district:
+          type: string
+          nullable: true
+          maxLength: 100
+          description: District
+          example: "الملز"
+        address_street:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Street address
+          example: "شارع الملك فهد"
+        address_postal_code:
+          type: string
+          nullable: true
+          maxLength: 20
+          description: Postal code
+          example: "12345"
+        tags:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 50
+          description: Customer tags (max 20)
+          example: ["vip", "مستورد"]
+        source:
+          type: string
+          enum:
+            - website
+            - walk_in
+            - phone
+            - import
+            - referral
+            - other
+          description: Lead source
+          example: "website"
+        is_active:
+          type: boolean
+          description: Whether the customer is active
+          example: true
+        notes:
+          type: string
+          nullable: true
+          description: Internal notes
+          example: "عميل مهم - متابعة شهرية"
+        created_by:
+          type: string
+          format: uuid
+          description: ID of the user who created this record
+          example: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          example: "2025-01-15T09:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2026-06-18T14:22:00Z"
+
+    CustomerCreate:
+      type: object
+      required:
+        - first_name_ar
+        - last_name_ar
+      properties:
+        type:
+          type: string
+          enum:
+            - individual
+            - company
+          default: individual
+          description: Customer type
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: Email address (nullable for walk-in, must be unique if provided)
+          example: "ahmed@example.com"
+        phone:
+          type: string
+          pattern: "^\\+[1-9]\\d{1,14}$"
+          maxLength: 20
+          description: Phone number in E.164 format
+          example: "+966512345678"
+        first_name_ar:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: First name in Arabic (required)
+          example: "أحمد"
+        last_name_ar:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Last name in Arabic (required)
+          example: "العلي"
+        first_name_en:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: First name in English
+          example: "Ahmed"
+        last_name_en:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Last name in English
+          example: "Al-Ali"
+        company_name_ar:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Company name in Arabic (required if type=company)
+          example: "شركة التقنية المتقدمة"
+        company_name_en:
+          type: string
+          maxLength: 255
+          description: Company name in English
+          example: "Advanced Technology Co."
+        tax_number:
+          type: string
+          maxLength: 50
+          description: Tax registration number (required if type=company, must be unique)
+          example: "300123456789"
+        national_id:
+          type: string
+          maxLength: 50
+          description: National ID (encrypted at rest)
+        date_of_birth:
+          type: string
+          format: date
+          description: Date of birth (YYYY-MM-DD)
+          example: "1990-05-15"
+        address_city:
+          type: string
+          maxLength: 100
+          description: City
+          example: "الرياض"
+        address_district:
+          type: string
+          maxLength: 100
+          description: District
+          example: "الملز"
+        address_street:
+          type: string
+          maxLength: 255
+          description: Street address
+          example: "شارع الملك فهد"
+        address_postal_code:
+          type: string
+          maxLength: 20
+          description: Postal code
+          example: "12345"
+        tags:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 50
+          description: Initial tags for the customer
+          example: ["vip"]
+        source:
+          type: string
+          enum:
+            - website
+            - walk_in
+            - phone
+            - import
+            - referral
+            - other
+          default: website
+          description: Lead source
+        notes:
+          type: string
+          description: Internal notes
+        preferred_language:
+          type: string
+          enum:
+            - ar
+            - en
+          default: ar
+          description: Preferred communication language
+        preferred_contact_method:
+          type: string
+          enum:
+            - email
+            - phone
+            - both
+          default: email
+          description: Preferred contact method
+        marketing_opt_in:
+          type: boolean
+          default: false
+          description: Whether the customer opted in for marketing
+
+    CustomerUpdate:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - individual
+            - company
+          description: Customer type
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: Email address (must be unique)
+          example: "ahmed@example.com"
+        phone:
+          type: string
+          pattern: "^\\+[1-9]\\d{1,14}$"
+          maxLength: 20
+          description: Phone number in E.164 format
+          example: "+966512345678"
+        first_name_ar:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: First name in Arabic
+          example: "أحمد"
+        last_name_ar:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Last name in Arabic
+          example: "العلي"
+        first_name_en:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: First name in English
+          example: "Ahmed"
+        last_name_en:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Last name in English
+          example: "Al-Ali"
+        company_name_ar:
+          type: string
+          maxLength: 255
+          description: Company name in Arabic
+          example: "شركة التقنية المتقدمة"
+        company_name_en:
+          type: string
+          maxLength: 255
+          description: Company name in English
+          example: "Advanced Technology Co."
+        tax_number:
+          type: string
+          maxLength: 50
+          description: Tax registration number
+          example: "300123456789"
+        date_of_birth:
+          type: string
+          format: date
+          description: Date of birth (YYYY-MM-DD)
+          example: "1990-05-15"
+        address_city:
+          type: string
+          maxLength: 100
+          description: City
+          example: "الرياض"
+        address_district:
+          type: string
+          maxLength: 100
+          description: District
+          example: "الملز"
+        address_street:
+          type: string
+          maxLength: 255
+          description: Street address
+          example: "شارع الملك فهد"
+        address_postal_code:
+          type: string
+          maxLength: 20
+          description: Postal code
+          example: "12345"
+        source:
+          type: string
+          enum:
+            - website
+            - walk_in
+            - phone
+            - import
+            - referral
+            - other
+          description: Lead source
+        notes:
+          type: string
+          description: Internal notes
+
+    # -------------------------------------------------------------------------
+    # RESPONSE SCHEMAS
+    # -------------------------------------------------------------------------
+
+    CustomerResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          $ref: "#/components/schemas/Customer"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    CustomerListResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Customer"
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/ResponseMeta"
+            - type: object
+              properties:
+                pagination:
+                  $ref: "#/components/schemas/PaginationMeta"
+
+    CustomerDetailResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          allOf:
+            - $ref: "#/components/schemas/Customer"
+            - type: object
+              properties:
+                profile:
+                  type: object
+                  description: Customer profile extension
+                  properties:
+                    avatar_url:
+                      type: string
+                      nullable: true
+                      description: Avatar image URL
+                    preferred_language:
+                      type: string
+                      enum:
+                        - ar
+                        - en
+                      description: Preferred language
+                      example: "ar"
+                    preferred_contact_method:
+                      type: string
+                      enum:
+                        - email
+                        - phone
+                        - both
+                      description: Preferred contact method
+                      example: "email"
+                    marketing_opt_in:
+                      type: boolean
+                      description: Marketing opt-in status
+                      example: false
+                    total_orders:
+                      type: integer
+                      minimum: 0
+                      description: Total number of orders
+                      example: 12
+                    total_spent:
+                      type: number
+                      format: double
+                      minimum: 0
+                      description: Total amount spent (SAR)
+                      example: 45000.00
+                    last_order_at:
+                      type: string
+                      format: date-time
+                      nullable: true
+                      description: Timestamp of last order
+                      example: "2026-06-15T10:30:00Z"
+                recent_communications:
+                  type: array
+                  description: Last 10 communication logs
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      channel:
+                        type: string
+                        enum:
+                          - email
+                          - phone
+                          - sms
+                          - in_person
+                          - chat
+                          - other
+                      direction:
+                        type: string
+                        enum:
+                          - inbound
+                          - outbound
+                      subject:
+                        type: string
+                      created_at:
+                        type: string
+                        format: date-time
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    CustomerOrdersResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            required:
+              - id
+              - status
+              - created_at
+            properties:
+              id:
+                type: string
+                format: uuid
+                description: Order UUID v7
+              reference_number:
+                type: string
+                description: Order reference number
+                example: "ORD-20260610-A3F7"
+              service:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  name_ar:
+                    type: string
+                  name_en:
+                    type: string
+                  slug:
+                    type: string
+              status:
+                type: string
+                enum:
+                  - draft
+                  - pending
+                  - in_review
+                  - in_progress
+                  - completed
+                  - cancelled
+                  - rejected
+              total_amount:
+                type: number
+                format: double
+                description: Order total in SAR
+                example: 1500.00
+              currency:
+                type: string
+                example: "SAR"
+              rating:
+                type: integer
+                nullable: true
+                minimum: 1
+                maximum: 5
+                description: Customer rating for completed orders
+              created_at:
+                type: string
+                format: date-time
+                description: Order creation timestamp
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/ResponseMeta"
+            - type: object
+              properties:
+                pagination:
+                  $ref: "#/components/schemas/PaginationMeta"
+
+    ImportResultResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: object
+          required:
+            - import_id
+            - total_rows
+            - success_count
+            - failed_count
+          properties:
+            import_id:
+              type: string
+              format: uuid
+              description: Import batch ID
+            total_rows:
+              type: integer
+              minimum: 0
+              description: Total rows in the CSV
+              example: 150
+            success_count:
+              type: integer
+              minimum: 0
+              description: Successfully imported rows
+              example: 142
+            failed_count:
+              type: integer
+              minimum: 0
+              description: Rows that failed validation
+              example: 8
+            failed_rows:
+              type: array
+              description: Details of failed rows
+              items:
+                type: object
+                properties:
+                  row:
+                    type: integer
+                    description: Row number in the CSV
+                  errors:
+                    type: array
+                    items:
+                      type: string
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    ExportResultResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: object
+          required:
+            - export_id
+            - estimated_total
+          properties:
+            export_id:
+              type: string
+              format: uuid
+              description: Export job ID
+            estimated_total:
+              type: integer
+              minimum: 0
+              description: Estimated total customers matching filter
+              example: 350
+            download_url:
+              type: string
+              format: uri
+              description: Download URL for the generated CSV (available after processing)
+              example: "https://storage.alharistech.com/exports/export-123.csv"
+            message:
+              type: string
+              description: Processing status message
+              example: "جاري تجهيز ملف التصدير..."
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    DeleteResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: object
+          required:
+            - id
+            - deleted
+          properties:
+            id:
+              type: string
+              format: uuid
+              description: ID of the soft-deleted resource
+            deleted:
+              type: boolean
+              example: true
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    # -------------------------------------------------------------------------
+    # ERROR & META SCHEMAS
+    # -------------------------------------------------------------------------
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - meta
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+            - message_en
+            - statusCode
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+              example: "CUSTOMER_EMAIL_EXISTS"
+            message:
+              type: string
+              description: Human-readable error message in Arabic
+              example: "البريد الإلكتروني مسجل مسبقاً"
+            message_en:
+              type: string
+              description: Human-readable error message in English
+              example: "Email already registered"
+            statusCode:
+              type: integer
+              description: HTTP status code
+              example: 409
+            details:
+              description: |
+                Additional error details. May contain field-level validation
+                errors or contextual information.
+              oneOf:
+                - type: array
+                  items:
+                    $ref: "#/components/schemas/ValidationErrorDetail"
+                - type: object
+                  additionalProperties: true
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    ValidationErrorDetail:
+      type: object
+      properties:
+        field:
+          type: string
+          description: The field that failed validation
+          example: "email"
+        code:
+          type: string
+          description: Field-level error code
+          example: "INVALID_FORMAT"
+        message:
+          type: string
+          description: Field-level error message
+          example: "Must be a valid email address"
+        received:
+          description: The invalid value that was received
+
+    ResponseMeta:
+      type: object
+      required:
+        - timestamp
+        - requestId
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of the response
+          example: "2026-06-20T12:00:00Z"
+        requestId:
+          type: string
+          format: uuid
+          description: Unique request identifier for tracing
+          example: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+    PaginationMeta:
+      type: object
+      required:
+        - total
+        - perPage
+        - currentPage
+        - hasNextPage
+        - hasPreviousPage
+      properties:
+        total:
+          type: integer
+          minimum: 0
+          description: Total number of records
+          example: 150
+        perPage:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Number of items per page
+          example: 20
+        currentPage:
+          type: integer
+          minimum: 1
+          description: Current page number
+          example: 1
+        totalPages:
+          type: integer
+          minimum: 0
+          description: Total number of pages
+          example: 8
+        hasNextPage:
+          type: boolean
+          description: Whether there are more pages after the current one
+          example: true
+        hasPreviousPage:
+          type: boolean
+          description: Whether there are pages before the current one
+          example: false

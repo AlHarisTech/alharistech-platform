@@ -1,0 +1,566 @@
+# =============================================================================
+# SYSTEM EXECUTION BOUNDARY MAP
+# Deployment blueprint: what runs where across all 3 compute layers
+# Defines inter-layer communication rules, data flow constraints, and BullMQ queues
+# Version: 1.0 | Production-grade complete specification
+# =============================================================================
+
+boundaries:
+
+  # ===========================================================================
+  # FRONTEND LAYER — Next.js (Web + Admin)
+  # ===========================================================================
+  frontend:
+    name: "Next.js Frontend Layer"
+    apps:
+      - "apps/web — Official Website (public-facing)"
+      - "apps/admin — Admin Dashboard (internal)"
+    runs:
+      - "React Server Components (SSR pages — server-side data fetching)"
+      - "Client Components (interactive UI with React 19+ hooks)"
+      - "TanStack Query (data fetching, caching, optimistic updates, infinite scroll)"
+      - "Zustand stores (client-side state: auth, cart, UI, notifications)"
+      - "shadcn/ui components (accessible, RTL-compatible UI library)"
+      - "TailwindCSS 4 utility classes (bilingual RTL/LTR layout)"
+      - "Next.js API routes (BFF layer — auth callbacks, form actions, CSRF)"
+      - "Next.js Middleware (route protection, i18n redirect, locale detection)"
+      - "Static Site Generation (blog posts, knowledge articles, public pages)"
+      - "Image optimization (next/image — responsive, WebP/AVIF conversion)"
+      - "Internationalization (next-intl — Arabic primary, English secondary)"
+      - "Service Worker (offline caching, PWA install prompts)"
+      - "Analytics SDK (page views, events, conversion tracking)"
+    does_not_run:
+      - "Database queries (direct — goes through NestJS API)"
+      - "Business logic (domain services, validation beyond form-level)"
+      - "File processing (image resize done via next/image or worker)"
+      - "Email/SMS sending (dispatches to NestJS → BullMQ worker)"
+      - "Payment processing (handled by NestJS → payment gateway)"
+      - "Report generation (PDF/Excel — dispatched to worker)"
+      - "AI model inference (proxied to NestJS → AI service)"
+      - "Webhook processing (handled by NestJS)"
+      - "Scheduled cron jobs (handled by BullMQ repeatable jobs)"
+      - "Background data sync (handled by worker)"
+    communication:
+      outbound:
+        - target: "backend"
+          protocol: "HTTPS (TLS 1.3)"
+          pattern: "REST JSON over /api/v1/*"
+          auth: "JWT Bearer token in Authorization header"
+        - target: "backend"
+          protocol: "HTTPS"
+          pattern: "GraphQL over /graphql (complex queries)"
+          auth: "JWT Bearer token"
+        - target: "S3 (MinIO)"
+          protocol: "HTTPS"
+          pattern: "Presigned URLs for direct uploads"
+          auth: "Presigned URL token"
+      inbound:
+        - source: "backend"
+          protocol: "HTTPS"
+          pattern: "Next.js revalidation (on-demand ISR via /api/revalidate)"
+          auth: "Shared secret token header"
+
+  # ===========================================================================
+  # BACKEND LAYER — NestJS API Gateway
+  # ===========================================================================
+  backend:
+    name: "NestJS API Gateway"
+    app: "apps/api"
+    runs:
+      - "REST endpoints (all 184 CRUD operations across 9 domains)"
+      - "GraphQL resolvers (complex queries, field-level authorization)"
+      - "Authentication (JWT access/refresh token issuance, rotation, revocation)"
+      - "Authorization (RBAC policy engine evaluating access-control.yaml)"
+      - "Input validation (Zod pipes — strict schema enforcement)"
+      - "Business logic (domain services within each module)"
+      - "Database access (Drizzle ORM repositories — parameterized queries)"
+      - "File upload handling (multipart → S3 presigned upload orchestration)"
+      - "Rate limiting (per-IP, per-user, per-endpoint via Redis)"
+      - "Audit logging (all mutations logged to audit_logs table)"
+      - "CSRF protection (token-based for state-changing operations)"
+      - "CORS management (whitelist origins per environment)"
+      - "Health checks (/health — DB, Redis, S3 connectivity)"
+      - "Metrics exposition (Prometheus metrics endpoint /metrics)"
+      - "OpenAPI spec generation (/api-docs — auto-generated Swagger)"
+      - "WebSocket gateway (real-time notifications, ticket updates via Socket.IO)"
+      - "API versioning (URL-based: /api/v1/, /api/v2/)"
+      - "Pagination, filtering, sorting (standardized query params)"
+      - "Bulk operations (batch create/update via transactional endpoints)"
+      - "i18n response formatting (error messages in ar/en based on Accept-Language)"
+    does_not_run:
+      - "Background jobs (dispatches to worker via BullMQ queues)"
+      - "Email/SMS sending (enqueues to notification queue)"
+      - "Report generation (enqueues to report queue — PDF, Excel, CSV)"
+      - "AI inference long-running tasks (enqueues to ai queue)"
+      - "Knowledge ingestion pipeline (enqueues to ingestion queue)"
+      - "File virus scanning (enqueues to file-processing queue)"
+      - "Image processing/resize (enqueues to file-processing queue)"
+      - "Scheduled tasks (managed by BullMQ repeatable jobs, not cron in NestJS)"
+      - "Webhook delivery retry logic (worker handles retries)"
+      - "Data warehouse ETL (handled by analytics pipeline)"
+    queues_dispatched:
+      - queue: "notification.email"
+        job_types: ["send-welcome-email", "send-order-confirmation", "send-password-reset",
+                     "send-security-alert", "send-customer-welcome", "send-import-summary",
+                     "send-order-status-update", "send-notify-assigned", "send-cancellation-notice",
+                     "send-rejection-notice", "send-payment-receipt", "send-payment-failure",
+                     "send-shipping-confirmation", "send-delivery-confirmation",
+                     "send-refund-confirmation", "send-ticket-confirmation",
+                     "send-ticket-status-update", "send-resolution-confirmation",
+                     "send-report-ready", "send-kpi-alert", "send-dashboard-share",
+                     "send-content-published", "send-blog-post-alert",
+                     "send-low-stock", "send-restock-reminder",
+                     "send-admin-restock-alert", "send-sla-warning",
+                     "send-sla-escalation", "send-new-ticket-alert"]
+      - queue: "notification.sms"
+        job_types: ["send-sms-otp", "send-sms-order-status", "send-sms-security-alert"]
+      - queue: "notification.push"
+        job_types: ["send-push-notification", "send-push-order-update"]
+      - queue: "analytics.report"
+        job_types: ["generate-pdf-report", "generate-excel-report", "generate-csv-report",
+                     "schedule-recurring-report"]
+      - queue: "ai.ingestion"
+        job_types: ["ingest-document", "ingest-knowledge-source", "regenerate-embeddings",
+                     "index-product-search", "index-article-search", "reindex-content"]
+      - queue: "ai.inference"
+        job_types: ["run-agent-chat", "run-automation-workflow",
+                     "generate-content-suggestions", "run-moderation-check"]
+      - queue: "file.processing"
+        job_types: ["resize-image", "convert-format", "virus-scan-upload",
+                     "generate-thumbnail", "optimize-media"]
+      - queue: "commerce.shipping"
+        job_types: ["create-shipment", "update-tracking", "check-delivery-status"]
+      - queue: "scheduler.repeatable"
+        job_types: ["hourly-kpi-recalculation", "daily-backup", "cleanup-expired-sessions",
+                     "cleanup-expired-exports", "check-cart-abandonment",
+                     "check-sla-deadlines", "regenerate-sitemap",
+                     "publish-scheduled-pages", "aggregate-daily-metrics"]
+      - queue: "webhook.delivery"
+        job_types: ["deliver-webhook", "retry-failed-webhook"]
+    communication:
+      outbound:
+        - target: "worker"
+          protocol: "BullMQ (Redis-backed)"
+          pattern: "Job enqueue with backoff + retry strategy"
+        - target: "PostgreSQL"
+          protocol: "TCP (connection pool via pgBouncer)"
+          pattern: "Drizzle ORM — read/write to primary, read-only to replicas"
+        - target: "Redis"
+          protocol: "TCP"
+          pattern: "Cache get/set, rate limit counters, session store, BullMQ backend"
+        - target: "S3 (MinIO)"
+          protocol: "HTTPS"
+          pattern: "Presigned URL generation, object metadata, lifecycle policies"
+      inbound:
+        - source: "frontend"
+          protocol: "HTTPS"
+          pattern: "REST /api/v1/* and GraphQL /graphql"
+          auth: "JWT Bearer or public (for unauthenticated endpoints)"
+        - source: "worker"
+          protocol: "HTTP (internal)"
+          pattern: "Internal callbacks for job completion status"
+          auth: "Internal service account token"
+
+  # ===========================================================================
+  # WORKER LAYER — BullMQ Worker Processes
+  # ===========================================================================
+  worker:
+    name: "BullMQ Worker Layer"
+    app: "apps/worker (separate NestJS standalone application or Node.js process)"
+    runs:
+      - "Email sending (SMTP/Resend/SendGrid — templated, localized, bilingual)"
+      - "SMS sending (Twilio/Unifonic — OTP, alerts, status updates)"
+      - "Push notification delivery (FCM/APNs via firebase-admin)"
+      - "Report generation (PDF via Puppeteer/Playwright, Excel via exceljs, CSV)"
+      - "File processing (Sharp for image resize, ClamAV for virus scan, ffmpeg for video)"
+      - "AI embedding generation (OpenAI/Anthropic API calls — text → vector)"
+      - "Knowledge ingestion pipeline (document parsing → chunking → embedding → pgvector insert)"
+      - "Scheduled tasks (repeatable jobs: backups, cleanup, KPI recalculation, SLA checks)"
+      - "Webhook delivery (HTTP POST to external URLs with exponential backoff retry)"
+      - "Cart abandonment detection (scan inactive carts > 24h, emit CartAbandoned event)"
+      - "SLA monitoring (scan open tickets, check deadlines, emit SLA events)"
+      - "Content moderation (AI-powered text/image moderation via moderation queue)"
+      - "Search index sync (product/article create/update/delete → search index)"
+      - "Sitemap regeneration (on content publish/unpublish events)"
+      - "Email bounce/complaint processing (webhook receiver → mark preferences)"
+      - "Data export (CSV generation for customer/product exports)"
+      - "Cache warming (precompute popular queries after data changes)"
+    does_not_run:
+      - "HTTP request handling (Nginx/NestJS handles this)"
+      - "Real-time user interactions (WebSocket through NestJS)"
+      - "Synchronous API responses (workers are async by design)"
+      - "Direct database schema migrations (run via NestJS CLI or migration tool)"
+      - "Authentication/authorization decisions (handled by NestJS guards)"
+    queues_consumed:
+      - queue: "notification.email"
+        concurrency: 10
+        retry_strategy: "exponential backoff (1min, 5min, 15min, 1h), max 5 attempts"
+        failure_handler: "NotificationPermanentlyFailed event after all retries"
+      - queue: "notification.sms"
+        concurrency: 5
+        retry_strategy: "exponential backoff, max 3 attempts"
+      - queue: "notification.push"
+        concurrency: 10
+        retry_strategy: "linear backoff, max 3 attempts"
+      - queue: "analytics.report"
+        concurrency: 3
+        retry_strategy: "fixed backoff (5min), max 2 attempts"
+        timeout: "10 minutes per job"
+      - queue: "ai.ingestion"
+        concurrency: 2
+        retry_strategy: "fixed backoff (10min), max 2 attempts"
+        timeout: "30 minutes per job"
+      - queue: "ai.inference"
+        concurrency: 5
+        retry_strategy: "exponential backoff (30s, 2min, 10min), max 3 attempts"
+        timeout: "3 minutes per job"
+      - queue: "file.processing"
+        concurrency: 4
+        retry_strategy: "fixed backoff (1min), max 2 attempts"
+        timeout: "5 minutes per job"
+      - queue: "commerce.shipping"
+        concurrency: 3
+        retry_strategy: "fixed backoff (5min), max 2 attempts"
+      - queue: "scheduler.repeatable"
+        concurrency: 1
+        retry_strategy: "no retry (next scheduled run will re-attempt)"
+      - queue: "webhook.delivery"
+        concurrency: 5
+        retry_strategy: "exponential backoff (1min, 5min, 30min, 2h, 6h), max 5 attempts"
+        failure_handler: "Mark webhook subscription as failing after max retries"
+    communication:
+      outbound:
+        - target: "PostgreSQL"
+          protocol: "TCP"
+          pattern: "Drizzle ORM — read for data needed in jobs, write for audit logs"
+        - target: "Redis"
+          protocol: "TCP"
+          pattern: "BullMQ job state, rate limit counters"
+        - target: "S3 (MinIO)"
+          protocol: "HTTPS"
+          pattern: "Read input files, write generated reports/processed files"
+        - target: "SMTP/Email API"
+          protocol: "HTTPS"
+          pattern: "Send templated emails via Resend/SendGrid"
+        - target: "SMS API"
+          protocol: "HTTPS"
+          pattern: "Send SMS via Twilio/Unifonic REST API"
+        - target: "AI API (OpenAI/Anthropic)"
+          protocol: "HTTPS"
+          pattern: "Chat completions, embeddings, moderation endpoints"
+      inbound:
+        - source: "backend"
+          protocol: "BullMQ (Redis-backed)"
+          pattern: "Job enqueue events from NestJS services"
+
+  # ===========================================================================
+  # DATABASE LAYER — PostgreSQL 16
+  # ===========================================================================
+  database:
+    name: "PostgreSQL 16"
+    runs:
+      - "ACID transactions (SERIALIZABLE isolation for financial operations)"
+      - "Full-text search (tsvector with Arabic + English dictionaries via pg_bigm)"
+      - "Vector similarity search (pgvector — IVFFlat/HNSW indexes for AI embeddings)"
+      - "JSONB queries (flexible schemas: customer tags, order documents, product metadata)"
+      - "Row-Level Security (RLS policies as defense-in-depth below application RBAC)"
+      - "Materialized views (dashboard aggregations, KPI snapshots, report precomputes)"
+      - "Partitioning (ticket_messages, notification_logs, audit_logs by month)"
+      - "Connection pooling (pgBouncer — transaction mode, 200 pool size)"
+      - "Point-in-Time Recovery (PITR via WAL archiving to S3 — 30-day retention)"
+      - "Read replicas (1 for analytics queries, 1 for reporting — async streaming)"
+      - "Extensions: pgvector, pg_bigm, pg_stat_statements, pg_cron, uuid-ossp, postgis"
+    access_pattern:
+      write: "Only backend connects directly via Drizzle ORM to primary"
+      read: "Backend connects to primary for OLTP reads; read replicas for analytics/reports"
+      worker: "Worker reads from replica for report data, writes audit logs to primary"
+      analytics: "Read-only replicas for reporting, KPI dashboards, data exports"
+    schemas:
+      - schema: "identity"
+        tables: ["users", "roles", "sessions", "refresh_tokens", "audit_logs"]
+      - schema: "customer"
+        tables: ["customers", "customer_profiles", "communication_logs", "tags", "import_history"]
+      - schema: "service"
+        tables: ["services", "service_categories", "orders", "order_status_history",
+                  "order_documents", "order_ratings", "order_assignments", "required_documents"]
+      - schema: "commerce"
+        tables: ["products", "product_categories", "product_images", "carts", "cart_items",
+                  "commerce_orders", "commerce_order_items", "commerce_order_status_history",
+                  "inventory", "inventory_transactions", "coupons", "coupon_usage",
+                  "product_reviews", "price_history", "shipments", "payment_transactions"]
+      - schema: "support"
+        tables: ["tickets", "ticket_messages", "ticket_status_history", "ticket_assignments",
+                  "knowledge_articles", "article_versions", "article_feedback",
+                  "sla_policies", "sla_breaches", "support_reports"]
+      - schema: "content"
+        tables: ["pages", "page_versions", "page_schedules", "media", "media_variants",
+                  "blog_posts", "blog_categories", "menus", "menu_items", "sitemap_cache"]
+      - schema: "notification"
+        tables: ["notification_templates", "notification_logs", "notification_preferences",
+                  "notification_rate_limits"]
+      - schema: "analytics"
+        tables: ["dashboards", "dashboard_widgets", "dashboard_shares", "reports",
+                  "report_schedules", "kpis", "kpi_values", "kpi_thresholds",
+                  "metric_definitions", "metric_snapshots"]
+      - schema: "ai"
+        tables: ["ai_agents", "ai_agent_configs", "ai_interactions", "ai_interaction_chunks",
+                  "ai_knowledge_sources", "ai_documents", "ai_embeddings",
+                  "ai_prompts", "ai_prompt_versions", "ai_moderation_logs",
+                  "ai_automation_rules", "ai_automation_executions"]
+
+  # ===========================================================================
+  # CACHE LAYER — Redis 7
+  # ===========================================================================
+  cache:
+    name: "Redis 7"
+    runs:
+      - "BullMQ job queues (all 10 queues with priority lanes)"
+      - "Session store (JWT refresh token blacklist/whitelist)"
+      - "Rate limit counters (sliding window per IP/user)"
+      - "Response cache (GET requests with TTL: products 5min, pages 10min, config 30min)"
+      - "Cart data (guest carts before user login, merged on authentication)"
+      - "Real-time presence (WebSocket connection tracking for Socket.IO)"
+      - "Distributed locks (Redlock for cron jobs, report generation deduplication)"
+      - "Feature flags (LaunchDarkly-style toggles cached locally)"
+      - "OTP storage (Temporary one-time passwords with 5min TTL)"
+    access_pattern:
+      write: "Backend (NestJS) writes via ioredis. Worker writes job results."
+      read: "Backend reads for cache, sessions, rate limits. Worker reads queue data."
+    eviction: "volatile-lru — only TTL'd keys evicted, persistent keys preserved"
+
+  # ===========================================================================
+  # STORAGE LAYER — S3-Compatible (MinIO)
+  # ===========================================================================
+  storage:
+    name: "S3-Compatible Object Storage (MinIO)"
+    runs:
+      - "Media uploads (images, documents, videos — organized by domain/entity/id)"
+      - "Generated reports (PDF, Excel, CSV — auto-expire 30 days via lifecycle policy)"
+      - "Database backups (WAL archives, daily pg_dump)"
+      - "User uploads (order documents, identity verification documents)"
+      - "Static assets (public images, logos, favicons — CDN-ready)"
+      - "CSV import/export files (temporary processing artifacts)"
+    buckets:
+      - "alharis-media — user-uploaded media (persistent)"
+      - "alharis-documents — order documents, identity docs (persistent)"
+      - "alharis-reports — generated reports (30-day lifecycle)"
+      - "alharis-exports — CSV exports (7-day lifecycle)"
+      - "alharis-backups — database backups (30-day retention)"
+      - "alharis-static — public static assets (persistent, CDN origin)"
+    access_pattern:
+      upload: "Backend generates presigned URLs → frontend uploads directly. Worker processes files."
+      download: "Presigned URLs to frontend. Worker reads for processing."
+
+# ===========================================================================
+# INTER-LAYER COMMUNICATION RULES
+# ===========================================================================
+communication_rules:
+  - rule: "Frontend never connects directly to PostgreSQL"
+    enforcement: "Network firewall — only NestJS and Worker subnets can reach DB"
+  - rule: "Frontend never connects directly to Redis"
+    enforcement: "Network firewall — Redis in private subnet"
+  - rule: "All external API calls go through NestJS API Gateway"
+    enforcement: "Nginx reverse proxy — only /api/v1/* routes exposed publicly"
+  - rule: "Worker never handles HTTP requests"
+    enforcement: "Worker has no HTTP server — only BullMQ consumer running"
+  - rule: "S3 presigned URLs expire in 15 minutes for uploads, 1 hour for downloads"
+    enforcement: "Enforced in NestJS S3 service when generating URLs"
+  - rule: "JWT access tokens expire in 15 minutes, refresh tokens in 7 days"
+    enforcement: "Enforced in NestJS AuthService at token generation"
+  - rule: "All inter-service communication uses TLS 1.3"
+    enforcement: "Nginx reverse proxy terminates TLS, internal services on private network"
+  - rule: "BullMQ jobs have max 5 retries with exponential backoff"
+    enforcement: "Configured per-queue in BullMQ QueueOptions"
+  - rule: "Database migrations run before application start"
+    enforcement: "CI/CD pipeline: migration step before deploy step"
+
+# ===========================================================================
+# DATA FLOW CONSTRAINTS
+# ===========================================================================
+data_flow_constraints:
+  - constraint: "PII data never logged"
+    applies_to: [frontend, backend, worker]
+    enforcement: "Logger redacts email, phone, ip fields via custom logger transport"
+  - constraint: "Passwords never leave the identity domain"
+    applies_to: [backend]
+    enforcement: "password_hash column only accessible in identity module repository"
+  - constraint: "Payment data never stored in application database"
+    applies_to: [backend]
+    enforcement: "Only payment_id reference stored; card details handled by gateway iframe"
+  - constraint: "AI prompts/responses retained max 90 days for interaction history"
+    applies_to: [backend, worker]
+    enforcement: "Scheduled cleanup job purges ai_interactions > 90 days"
+  - constraint: "Customer data export requires admin approval"
+    applies_to: [backend]
+    enforcement: "ExportService checks role and logs export audit entry"
+  - constraint: "Bulk operations limited to 10,000 records per batch"
+    applies_to: [backend]
+    enforcement: "ImportService/ExportService enforce batch size limits"
+
+# ===========================================================================
+# BULLMQ QUEUE ARCHITECTURE
+# ===========================================================================
+queues:
+  notification.email:
+    description: "Email delivery pipeline — templated, localized, bilingual"
+    priority_levels: [high, normal, low]
+    high: "Security alerts, password reset"
+    normal: "Order confirmations, ticket updates, welcome emails"
+    low: "Newsletters, marketing, blog subscriptions"
+    concurrency: 10
+    rate_limit:
+      group_key: "recipient"
+      max: 20
+      duration: 3600000  # 20 emails/hour per recipient
+
+  notification.sms:
+    description: "SMS delivery pipeline"
+    priority_levels: [high, normal]
+    high: "OTP codes, security alerts"
+    normal: "Order status updates"
+    concurrency: 5
+    rate_limit:
+      group_key: "phone"
+      max: 5
+      duration: 3600000  # 5 SMS/hour per phone
+
+  notification.push:
+    description: "Push notification delivery via FCM/APNs"
+    priority_levels: [normal]
+    concurrency: 10
+
+  analytics.report:
+    description: "Async report generation (PDF, Excel, CSV)"
+    priority_levels: [normal, low]
+    concurrency: 3
+    timeout: 600000  # 10 minutes
+
+  ai.ingestion:
+    description: "Document ingestion → chunking → embedding → pgvector storage"
+    priority_levels: [normal, low]
+    concurrency: 2
+    timeout: 1800000  # 30 minutes
+
+  ai.inference:
+    description: "AI model inference calls with moderation"
+    priority_levels: [high, normal]
+    high: "Customer support chat"
+    normal: "Content generation, automation workflows"
+    concurrency: 5
+    timeout: 180000  # 3 minutes
+
+  file.processing:
+    description: "Image resize, format conversion, virus scan, thumbnail generation"
+    priority_levels: [normal]
+    concurrency: 4
+    timeout: 300000  # 5 minutes
+
+  commerce.shipping:
+    description: "Shipping carrier integration — label creation, tracking"
+    priority_levels: [normal]
+    concurrency: 3
+    timeout: 120000  # 2 minutes
+
+  scheduler.repeatable:
+    description: "Cron-style repeatable jobs for scheduled maintenance"
+    priority_levels: [normal]
+    concurrency: 1
+    jobs:
+      - name: "hourly-kpi-recalculation"
+        cron: "0 * * * *"
+      - name: "daily-backup"
+        cron: "0 2 * * *"
+      - name: "cleanup-expired-sessions"
+        cron: "0 3 * * *"
+      - name: "cleanup-expired-exports"
+        cron: "0 4 * * *"
+      - name: "check-cart-abandonment"
+        cron: "0 */6 * * *"  # every 6 hours
+      - name: "check-sla-deadlines"
+        cron: "*/15 * * * *"  # every 15 minutes
+      - name: "publish-scheduled-pages"
+        cron: "*/5 * * * *"  # every 5 minutes
+      - name: "regenerate-sitemap"
+        cron: "0 1 * * *"
+      - name: "aggregate-daily-metrics"
+        cron: "0 1 * * *"
+
+  webhook.delivery:
+    description: "Outbound webhook delivery with retry"
+    priority_levels: [normal, low]
+    normal: "Customer-configured webhooks"
+    low: "Third-party integrations"
+    concurrency: 5
+    max_attempts: 5
+    backoff:
+      type: "exponential"
+      delays: [60000, 300000, 1800000, 7200000, 21600000]  # 1min, 5min, 30min, 2h, 6h
+
+# ===========================================================================
+# DEPLOYMENT TOPOLOGY (Docker Compose — Development)
+# ===========================================================================
+deployment:
+  development:
+    services:
+      - name: "postgres"
+        image: "postgres:16-alpine"
+        ports: ["5432:5432"]
+        volumes: ["postgres_data:/var/lib/postgresql/data"]
+        healthcheck: "pg_isready -U alharis"
+      - name: "redis"
+        image: "redis:7-alpine"
+        ports: ["6379:6379"]
+        volumes: ["redis_data:/data"]
+        healthcheck: "redis-cli ping"
+      - name: "minio"
+        image: "minio/minio:latest"
+        ports: ["9000:9000", "9001:9001"]
+        volumes: ["minio_data:/data"]
+        command: "server /data --console-address :9001"
+      - name: "api"
+        build: "apps/api"
+        ports: ["3001:3001"]
+        depends_on: ["postgres", "redis", "minio"]
+        env_file: "apps/api/.env.development"
+      - name: "worker"
+        build: "apps/worker"
+        depends_on: ["postgres", "redis", "minio"]
+        env_file: "apps/worker/.env.development"
+      - name: "web"
+        build: "apps/web"
+        ports: ["3000:3000"]
+        depends_on: ["api"]
+        env_file: "apps/web/.env.development"
+      - name: "admin"
+        build: "apps/admin"
+        ports: ["3002:3002"]
+        depends_on: ["api"]
+        env_file: "apps/admin/.env.development"
+      - name: "pgbouncer"
+        image: "edoburu/pgbouncer:latest"
+        ports: ["6432:6432"]
+        depends_on: ["postgres"]
+        environment:
+          DB_HOST: "postgres"
+          DB_PORT: "5432"
+          POOL_MODE: "transaction"
+          MAX_CLIENT_CONN: "200"
+
+  staging:
+    orchestrator: "Docker Compose + GitHub Actions"
+    additional:
+      - "nginx reverse proxy (TLS termination, static asset caching)"
+      - "pgBouncer connection pooler"
+      - "Prometheus + Grafana (metrics + alerts)"
+      - "Read replica for analytics"
+
+  production:
+    orchestrator: "Docker + Kubernetes (Phase 5)"
+    additional:
+      - "Horizontal Pod Autoscaling (HPA) for API, Worker"
+      - "Cluster autoscaling based on queue depth"
+      - "Multi-AZ PostgreSQL with read replicas"
+      - "Redis Cluster for high availability"
+      - "CDN (CloudFront/Cloudflare) for static assets"
+      - "WAF (Web Application Firewall)"
+      - "Hashicorp Vault for secrets management"

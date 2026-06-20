@@ -1,0 +1,1490 @@
+openapi: "3.1.0"
+info:
+  title: AlharisTech Analytics API
+  version: "1.0.0"
+  description: |
+    Analytics Domain API — AlharisTech Platform.
+    Business intelligence dashboards, report generation and export, and KPI tracking.
+    All queries read from PostgreSQL read replicas.
+  contact:
+    name: AlharisTech Platform Team
+    email: platform@alharistech.com
+
+servers:
+  - url: https://api.alharistech.com/api/v1
+    description: Production
+  - url: https://api.staging.alharistech.com/api/v1
+    description: Staging
+  - url: http://localhost:4000/api/v1
+    description: Development
+
+tags:
+  - name: Dashboards
+    description: Dashboard CRUD and overview
+  - name: Reports
+    description: Report generation, listing, and download
+  - name: KPIs
+    description: KPI definitions and tracking
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ─── DASHBOARDS ────────────────────────────────────────────────────────
+  /analytics/dashboards/overview:
+    get:
+      tags:
+        - Dashboards
+      summary: Get overview dashboard with widget data
+      description: |
+        Returns the system overview dashboard with all widget data resolved from
+        the read replica. Accessible to Admin, Manager, and Employee roles.
+        Employee data is scoped to their own metrics.
+      operationId: getOverviewDashboard
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+            - employee
+      parameters:
+        - name: date_from
+          in: query
+          description: Start date for widget queries
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          description: End date for widget queries
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Overview dashboard with widget data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardOverviewResponse"
+          headers:
+            X-Data-Source:
+              schema:
+                type: string
+                enum:
+                  - replica
+                  - primary
+              description: Data source used (primary indicates replica fallback)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /analytics/dashboards:
+    get:
+      tags:
+        - Dashboards
+      summary: List custom dashboards
+      description: Returns a paginated list of custom dashboards. System dashboards excluded.
+      operationId: listDashboards
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SortByParam"
+        - name: search
+          in: query
+          description: Search by dashboard name
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated list of dashboards
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags:
+        - Dashboards
+      summary: Create custom dashboard
+      description: |
+        Creates a new custom dashboard with widgets. Widget queries are validated
+        to be read-only before saving (INSERT, UPDATE, DELETE, DROP, ALTER,
+        TRUNCATE, CREATE are rejected).
+      operationId: createDashboard
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DashboardCreate"
+      responses:
+        "201":
+          description: Dashboard created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Duplicate dashboard name for this user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Widget query validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /analytics/dashboards/{id}:
+    get:
+      tags:
+        - Dashboards
+      summary: Get dashboard by ID with widget data
+      description: Returns a dashboard with all widget data resolved from the read replica.
+      operationId: getDashboard
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - $ref: "#/components/parameters/DashboardIdParam"
+        - name: date_from
+          in: query
+          description: Start date for widget queries
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          description: End date for widget queries
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Dashboard with widget data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Dashboards
+      summary: Update dashboard
+      description: |
+        Updates a custom dashboard. Only the owner or admin can modify.
+        System dashboards (is_system=true) cannot be modified by non-admins.
+        Widget queries are re-validated on update.
+      operationId: updateDashboard
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - $ref: "#/components/parameters/DashboardIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DashboardUpdate"
+      responses:
+        "200":
+          description: Dashboard updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags:
+        - Dashboards
+      summary: Delete custom dashboard
+      description: |
+        Deletes a custom dashboard. System dashboards cannot be deleted.
+        Only the owner or an admin can delete.
+      operationId: deleteDashboard
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - $ref: "#/components/parameters/DashboardIdParam"
+      responses:
+        "200":
+          description: Dashboard deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Attempt to delete system dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ─── REPORTS ───────────────────────────────────────────────────────────
+  /analytics/reports:
+    post:
+      tags:
+        - Reports
+      summary: Generate report (async)
+      description: |
+        Submits a report generation job. Large reports (>10,000 rows or >60s)
+        are processed asynchronously via BullMQ. Returns 202 with job ID and
+        estimated completion time.
+      operationId: generateReport
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportGenerateRequest"
+      responses:
+        "202":
+          description: Report generation accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportGenerateResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Report generation rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - Reports
+      summary: List reports
+      description: Returns a paginated, filterable list of generated reports.
+      operationId: listReports
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: type
+          in: query
+          description: Filter by report type
+          schema:
+            $ref: "#/components/schemas/ReportType"
+        - name: status
+          in: query
+          description: Filter by report status
+          schema:
+            $ref: "#/components/schemas/ReportStatus"
+        - name: created_at[gte]
+          in: query
+          description: Filter by creation date (greater than or equal)
+          schema:
+            type: string
+            format: date-time
+        - name: created_at[lte]
+          in: query
+          description: Filter by creation date (less than or equal)
+          schema:
+            type: string
+            format: date-time
+        - $ref: "#/components/parameters/SortByParam"
+      responses:
+        "200":
+          description: Paginated list of reports
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /analytics/reports/{id}:
+    get:
+      tags:
+        - Reports
+      summary: Get report details
+      description: Returns full details of a report including generation status and file info.
+      operationId: getReport
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Report ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Report details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /analytics/reports/{id}/download:
+    get:
+      tags:
+        - Reports
+      summary: Download generated report file
+      description: |
+        Returns a presigned S3 URL for downloading the completed report file.
+        The presigned URL is valid for 15 minutes. If the report is not yet
+        completed, returns 400. If the S3 object has expired (30 days),
+        returns 410 Gone.
+      operationId: downloadReport
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Report ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Download URL or binary file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportDownloadResponse"
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Report not yet completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "410":
+          description: Report file expired (30-day retention)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "REPORT_EXPIRED"
+                  message: "Report file has expired and must be regenerated"
+                  message_en: "Report file has expired and must be regenerated"
+                  statusCode: 410
+                meta:
+                  timestamp: "2026-06-20T10:00:00.000Z"
+                  requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+  # ─── KPIs ──────────────────────────────────────────────────────────────
+  /analytics/kpis:
+    get:
+      tags:
+        - KPIs
+      summary: List KPIs
+      description: Returns a list of defined KPIs filterable by domain.
+      operationId: listKpis
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: domain
+          in: query
+          description: Filter by business domain
+          schema:
+            $ref: "#/components/schemas/KpiDomain"
+        - name: is_active
+          in: query
+          description: Filter by active status
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of KPIs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KpiListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags:
+        - KPIs
+      summary: Define new KPI
+      description: Creates a new KPI definition. KPI name must be unique within its domain.
+      operationId: createKpi
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KpiCreate"
+      responses:
+        "201":
+          description: KPI created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KpiDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Duplicate KPI name in same domain
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Unknown metric
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /analytics/kpis/{id}:
+    get:
+      tags:
+        - KPIs
+      summary: Get KPI detail with history
+      description: Returns a KPI with its current value and last 12 historical data points.
+      operationId: getKpi
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: KPI ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: KPI detail with history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KpiDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Standard user JWT authentication
+
+  parameters:
+    DashboardIdParam:
+      name: id
+      in: path
+      required: true
+      description: Dashboard ID (UUID v7)
+      schema:
+        type: string
+        format: uuid
+    PageParam:
+      name: page
+      in: query
+      description: Page number for offset pagination
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      description: Items per page (max 100)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    SortByParam:
+      name: sortBy
+      in: query
+      description: Sort field (prefix with `-` for descending)
+      schema:
+        type: string
+        example: "-created_at"
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid JWT
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    # ── Enums ────────────────────────────────────────────────────────────
+    WidgetType:
+      type: string
+      enum:
+        - metric_card
+        - chart_bar
+        - chart_line
+        - chart_pie
+        - table
+        - number
+      description: Visualization type for dashboard widgets
+
+    ReportType:
+      type: string
+      enum:
+        - sales
+        - customers
+        - orders
+        - employees
+        - financial
+      description: Business report type
+
+    ReportStatus:
+      type: string
+      enum:
+        - pending
+        - processing
+        - completed
+        - failed
+      description: Asynchronous report generation status
+
+    ExportFormat:
+      type: string
+      enum:
+        - pdf
+        - excel
+        - csv
+      description: Report export file format
+
+    KpiDomain:
+      type: string
+      enum:
+        - sales
+        - support
+        - customers
+        - orders
+        - services
+        - commerce
+      description: Business domain for KPI categorization
+
+    KpiPeriod:
+      type: string
+      enum:
+        - daily
+        - weekly
+        - monthly
+        - quarterly
+        - yearly
+      description: KPI measurement period
+
+    ThresholdType:
+      type: string
+      enum:
+        - above
+        - below
+      description: Direction of threshold crossing for alerting
+
+    Trend:
+      type: string
+      enum:
+        - up
+        - down
+        - stable
+
+    # ── DateRange ────────────────────────────────────────────────────────
+    DateRange:
+      type: object
+      required:
+        - start
+        - end
+      properties:
+        start:
+          type: string
+          format: date
+          description: Start date (inclusive)
+          example: "2026-04-01"
+        end:
+          type: string
+          format: date
+          description: End date (inclusive)
+          example: "2026-06-30"
+
+    # ── Dashboard Widget ─────────────────────────────────────────────────
+    DashboardWidget:
+      type: object
+      required:
+        - id
+        - type
+        - title
+        - position
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique widget identifier within the dashboard
+        type:
+          $ref: "#/components/schemas/WidgetType"
+        title:
+          type: string
+          maxLength: 255
+          description: Widget display title
+          example: "Orders Today"
+        query:
+          type: string
+          maxLength: 4000
+          description: SQL query string or named query reference (must be read-only)
+          example: "SELECT COUNT(*) FROM orders WHERE created_at >= $1"
+        query_params:
+          type: object
+          description: Bound parameters for the query
+          additionalProperties: true
+        position:
+          type: object
+          required:
+            - x
+            - y
+            - w
+            - h
+          properties:
+            x:
+              type: integer
+              minimum: 0
+            y:
+              type: integer
+              minimum: 0
+            w:
+              type: integer
+              minimum: 1
+              maximum: 12
+            h:
+              type: integer
+              minimum: 1
+              maximum: 6
+        refresh_interval:
+          type: integer
+          minimum: 60
+          default: 300
+          description: Minimum refresh interval in seconds (min 60)
+        visualization_config:
+          type: object
+          description: Chart visualization options
+          properties:
+            colors:
+              type: array
+              items:
+                type: string
+              description: Hex color codes for chart series
+            show_labels:
+              type: boolean
+              default: true
+            stacked:
+              type: boolean
+              default: false
+            y_axis_label:
+              type: string
+            x_axis_label:
+              type: string
+          additionalProperties: true
+        data_source:
+          type: string
+          enum:
+            - replica
+            - cache
+          default: replica
+          description: Data source for this widget
+
+    WidgetDataPoint:
+      type: object
+      description: Resolved data for a single widget
+      properties:
+        value:
+          description: Primary metric value (scalar or object depending on widget type)
+        change_percent:
+          type: number
+          format: float
+          nullable: true
+          description: Percentage change from previous period
+        trend:
+          $ref: "#/components/schemas/Trend"
+        labels:
+          type: array
+          items:
+            type: string
+          description: Chart labels (for chart widgets)
+        datasets:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+              data:
+                type: array
+                items: {}
+        refreshed_at:
+          type: string
+          format: date-time
+          description: When this widget data was last computed
+        stale:
+          type: boolean
+          description: True if data is from cache due to query timeout
+
+    # ── Dashboard ────────────────────────────────────────────────────────
+    Dashboard:
+      type: object
+      required:
+        - id
+        - name
+        - widgets
+        - is_system
+        - created_by
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: "Q2 Sales Dashboard"
+        description:
+          type: string
+          maxLength: 2000
+        widgets:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardWidget"
+        is_system:
+          type: boolean
+          description: True for seeded system dashboards (cannot be deleted)
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    DashboardCreate:
+      type: object
+      required:
+        - name
+        - widgets
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 2000
+        widgets:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/DashboardWidget"
+
+    DashboardUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 2000
+        widgets:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardWidget"
+
+    # ── Dashboard Overview ───────────────────────────────────────────────
+    DashboardOverview:
+      type: object
+      required:
+        - dashboard
+        - widgets
+      properties:
+        dashboard:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            is_system:
+              type: boolean
+        widgets:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/WidgetDataPoint"
+          description: Widget data keyed by widget ID
+          example:
+            orders_today:
+              value: 42
+              change_percent: 12.5
+              trend: up
+            revenue_mtd:
+              value: 156000
+              currency: SAR
+              change_percent: -3.2
+              trend: down
+            active_tickets:
+              value: 18
+              by_priority:
+                urgent: 2
+                high: 5
+                normal: 11
+            new_customers:
+              value: 28
+              change_percent: 8.0
+              trend: up
+            orders_trend:
+              labels:
+                - "Week 1"
+                - "Week 2"
+                - "Week 3"
+                - "Week 4"
+              datasets:
+                - label: Orders
+                  data:
+                    - 95
+                    - 110
+                    - 102
+                    - 130
+            revenue_by_service:
+              labels:
+                - "Service A"
+                - "Service B"
+                - "Service C"
+              datasets:
+                - data:
+                    - 45000
+                    - 72000
+                    - 39000
+
+    # ── Report ───────────────────────────────────────────────────────────
+    Report:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - status
+        - format
+        - generated_by
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 255
+          example: "Q2 2026 Sales Report"
+        type:
+          $ref: "#/components/schemas/ReportType"
+        parameters:
+          type: object
+          description: Report configuration (date range, filters, grouping)
+          additionalProperties: true
+        status:
+          $ref: "#/components/schemas/ReportStatus"
+        format:
+          $ref: "#/components/schemas/ExportFormat"
+        generated_by:
+          type: string
+          format: uuid
+          description: User ID who generated the report
+        generated_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When report generation completed
+        s3_url:
+          type: string
+          format: uri
+          nullable: true
+          description: S3 object URL for download
+        s3_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: S3 lifecycle expiration (30 days from generation)
+        job_id:
+          type: string
+          nullable: true
+          description: BullMQ job reference
+        error_message:
+          type: string
+          nullable: true
+          description: Error details if status is failed
+        file_size_bytes:
+          type: integer
+          format: int64
+          nullable: true
+          description: Size of the generated file in bytes
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ReportGenerateRequest:
+      type: object
+      required:
+        - name
+        - type
+        - parameters
+        - format
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: "Q2 2026 Sales Report"
+        type:
+          $ref: "#/components/schemas/ReportType"
+        parameters:
+          type: object
+          required:
+            - date_range
+          properties:
+            date_range:
+              $ref: "#/components/schemas/DateRange"
+            group_by:
+              type: string
+              enum:
+                - day
+                - week
+                - month
+                - quarter
+              description: Time grouping for aggregation
+            service_id:
+              type: string
+              format: uuid
+            payment_status:
+              type: string
+              enum:
+                - pending
+                - paid
+                - refunded
+            customer_type:
+              type: string
+            status:
+              type: string
+            assigned_to:
+              type: string
+              format: uuid
+            employee_id:
+              type: string
+              format: uuid
+            department:
+              type: string
+            metric:
+              type: string
+              description: For employee reports (orders_processed, tickets_resolved, avg_rating)
+            payment_method:
+              type: string
+            currency:
+              type: string
+              default: "SAR"
+            invoice_status:
+              type: string
+          additionalProperties: true
+          example:
+            date_range:
+              start: "2026-04-01"
+              end: "2026-06-30"
+            group_by: "month"
+            payment_status: "paid"
+        format:
+          $ref: "#/components/schemas/ExportFormat"
+
+    ReportGenerateResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            type:
+              $ref: "#/components/schemas/ReportType"
+            status:
+              type: string
+              enum:
+                - pending
+            job_id:
+              type: string
+              description: BullMQ job ID for status tracking
+            estimated_completion_seconds:
+              type: integer
+              description: Estimated time until report is ready
+          example:
+            id: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+            name: "Q2 2026 Sales Report"
+            type: "sales"
+            status: "pending"
+            job_id: "bullmq-job-abc123"
+            estimated_completion_seconds: 30
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    ReportDownloadResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            download_url:
+              type: string
+              format: uri
+              description: Presigned S3 URL (valid 15 minutes)
+            expires_at:
+              type: string
+              format: date-time
+              description: Presigned URL expiry time
+            file_name:
+              type: string
+            file_size_bytes:
+              type: integer
+              format: int64
+            format:
+              $ref: "#/components/schemas/ExportFormat"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    # ── KPI ──────────────────────────────────────────────────────────────
+    Kpi:
+      type: object
+      required:
+        - id
+        - name
+        - metric
+        - domain
+        - target_value
+        - current_value
+        - unit
+        - period
+        - threshold_type
+        - is_active
+        - created_by
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 255
+          example: "Monthly Revenue"
+        metric:
+          type: string
+          maxLength: 100
+          description: Machine-readable metric identifier
+          example: "total_revenue"
+        description:
+          type: string
+          maxLength: 2000
+        domain:
+          $ref: "#/components/schemas/KpiDomain"
+        target_value:
+          type: number
+          format: double
+          description: Target value to measure against
+          example: 500000
+        current_value:
+          type: number
+          format: double
+          description: Computed current value (recalculated hourly)
+          example: 456000
+        unit:
+          type: string
+          maxLength: 20
+          description: Unit of measurement
+          example: "SAR"
+        period:
+          $ref: "#/components/schemas/KpiPeriod"
+        threshold_type:
+          $ref: "#/components/schemas/ThresholdType"
+        progress_percent:
+          type: number
+          format: float
+          description: Current value as percentage of target
+          example: 91.2
+        is_active:
+          type: boolean
+        last_calculated_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    KpiCreate:
+      type: object
+      required:
+        - name
+        - metric
+        - domain
+        - target_value
+        - unit
+        - period
+        - threshold_type
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: "Monthly Revenue"
+        metric:
+          type: string
+          maxLength: 100
+          example: "total_revenue"
+        description:
+          type: string
+          maxLength: 2000
+        domain:
+          $ref: "#/components/schemas/KpiDomain"
+        target_value:
+          type: number
+          format: double
+          example: 500000
+        unit:
+          type: string
+          maxLength: 20
+          example: "SAR"
+        period:
+          $ref: "#/components/schemas/KpiPeriod"
+        threshold_type:
+          $ref: "#/components/schemas/ThresholdType"
+
+    KpiDataPoint:
+      type: object
+      properties:
+        value:
+          type: number
+          format: double
+        timestamp:
+          type: string
+          format: date-time
+
+    # ── Response Envelopes ───────────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - meta
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+            - message_en
+            - statusCode
+          properties:
+            code:
+              type: string
+              example: "REPORT_GENERATION_FAILED"
+            message:
+              type: string
+              example: "فشل إنشاء التقرير. يرجى المحاولة مرة أخرى"
+            message_en:
+              type: string
+              example: "Report generation failed. Please try again"
+            statusCode:
+              type: integer
+            details:
+              type: object
+              additionalProperties: true
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    ResponseMeta:
+      type: object
+      required:
+        - timestamp
+        - requestId
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: uuid
+        pagination:
+          $ref: "#/components/schemas/PaginationMeta"
+        date_range:
+          $ref: "#/components/schemas/DateRange"
+        apiVersion:
+          type: string
+          example: "1.0.0"
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        hasNextPage:
+          type: boolean
+        hasPreviousPage:
+          type: boolean
+
+    DeleteResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            deleted:
+              type: boolean
+              enum:
+                - true
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    # ── Wrapped Response Schemas ─────────────────────────────────────────
+    DashboardOverviewResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/DashboardOverview"
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/ResponseMeta"
+            - type: object
+              properties:
+                date_range:
+                  $ref: "#/components/schemas/DateRange"
+
+    DashboardListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Dashboard"
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/ResponseMeta"
+            - type: object
+              properties:
+                pagination:
+                  $ref: "#/components/schemas/PaginationMeta"
+
+    DashboardDetailResponse:
+      type: object
+      properties:
+        data:
+          allOf:
+            - $ref: "#/components/schemas/Dashboard"
+            - type: object
+              properties:
+                widget_data:
+                  type: object
+                  additionalProperties:
+                    $ref: "#/components/schemas/WidgetDataPoint"
+                  description: Resolved widget data keyed by widget ID
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/ResponseMeta"
+            - type: object
+              properties:
+                date_range:
+                  $ref: "#/components/schemas/DateRange"
+
+    ReportListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Report"
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/ResponseMeta"
+            - type: object
+              properties:
+                pagination:
+                  $ref: "#/components/schemas/PaginationMeta"
+
+    ReportDetailResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Report"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    KpiListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Kpi"
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/ResponseMeta"
+            - type: object
+              properties:
+                pagination:
+                  $ref: "#/components/schemas/PaginationMeta"
+
+    KpiDetailResponse:
+      type: object
+      properties:
+        data:
+          allOf:
+            - $ref: "#/components/schemas/Kpi"
+            - type: object
+              properties:
+                history:
+                  type: array
+                  maxItems: 12
+                  items:
+                    $ref: "#/components/schemas/KpiDataPoint"
+                  description: Last 12 historical data points
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"

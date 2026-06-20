@@ -1,0 +1,1195 @@
+openapi: "3.1.0"
+info:
+  title: AlharisTech Notification API
+  version: "1.0.0"
+  description: |
+    Notification Domain API — AlharisTech Platform.
+    Transactional and multi-channel notification delivery with template management,
+    user preferences, and delivery logging.
+  contact:
+    name: AlharisTech Platform Team
+    email: platform@alharistech.com
+
+servers:
+  - url: https://api.alharistech.com/api/v1
+    description: Production
+  - url: https://api.staging.alharistech.com/api/v1
+    description: Staging
+  - url: http://localhost:4000/api/v1
+    description: Development
+
+tags:
+  - name: Templates
+    description: Notification template CRUD
+  - name: Delivery
+    description: Notification sending (internal)
+  - name: Log
+    description: Notification delivery history
+  - name: Preferences
+    description: User notification preferences
+
+security:
+  - bearerAuth: []
+
+paths:
+  /notifications/templates:
+    get:
+      tags:
+        - Templates
+      summary: List notification templates
+      description: Returns a paginated, filterable list of notification templates. Accessible to Admin and Manager roles.
+      operationId: listNotificationTemplates
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: channel
+          in: query
+          description: Filter by notification channel
+          schema:
+            $ref: "#/components/schemas/NotificationChannel"
+        - name: is_active
+          in: query
+          description: Filter by active status
+          schema:
+            type: boolean
+        - name: search
+          in: query
+          description: Search by template name or code
+          schema:
+            type: string
+        - $ref: "#/components/parameters/SortByParam"
+      responses:
+        "200":
+          description: Paginated list of templates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationTemplateListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags:
+        - Templates
+      summary: Create notification template
+      description: |
+        Creates a new notification template. Template code must be unique (snake_case).
+        Handlebars syntax is validated on save. Requires Admin role.
+      operationId: createNotificationTemplate
+      security:
+        - bearerAuth:
+            - admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationTemplateCreate"
+      responses:
+        "201":
+          description: Template created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationTemplateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Template code already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "DUPLICATE_ENTRY"
+                  message: "Notification template code already exists"
+                  message_en: "Notification template code already exists"
+                  statusCode: 409
+                meta:
+                  timestamp: "2026-06-20T10:00:00.000Z"
+                  requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        "422":
+          description: Invalid Handlebars syntax or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "NOTIF_INVALID_TEMPLATE_SYNTAX"
+                  message: "Invalid Handlebars template syntax"
+                  message_en: "Invalid Handlebars template syntax"
+                  statusCode: 422
+                meta:
+                  timestamp: "2026-06-20T10:00:00.000Z"
+                  requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+  /notifications/templates/{id}:
+    get:
+      tags:
+        - Templates
+      summary: Get notification template by ID
+      description: Returns full details of a single notification template.
+      operationId: getNotificationTemplate
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - $ref: "#/components/parameters/TemplateIdParam"
+      responses:
+        "200":
+          description: Template details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationTemplateResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Templates
+      summary: Update notification template
+      description: |
+        Partially updates a notification template. Handlebars syntax is re-validated on save.
+        Template code is immutable after creation. Requires Admin role.
+      operationId: updateNotificationTemplate
+      security:
+        - bearerAuth:
+            - admin
+      parameters:
+        - $ref: "#/components/parameters/TemplateIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationTemplateUpdate"
+      responses:
+        "200":
+          description: Template updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationTemplateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Conflict (e.g., attempting to change template code)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Invalid Handlebars syntax or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags:
+        - Templates
+      summary: Delete notification template (soft-delete)
+      description: Soft-deletes a notification template (sets is_active=false). Existing logs retain template_code for traceability. Requires Admin role.
+      operationId: deleteNotificationTemplate
+      security:
+        - bearerAuth:
+            - admin
+      parameters:
+        - $ref: "#/components/parameters/TemplateIdParam"
+      responses:
+        "200":
+          description: Template soft-deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /notifications/send:
+    post:
+      tags:
+        - Delivery
+      summary: Send notification (internal)
+      description: |
+        Sends a notification using a registered template. This endpoint is for internal
+        service-account use only (machine-to-machine JWT). End users cannot access it.
+
+        Flow: template lookup → preference check → rate limit check → Handlebars render → provider dispatch → log.
+      operationId: sendNotification
+      security:
+        - serviceAccountAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationSendRequest"
+      responses:
+        "201":
+          description: Notification accepted and dispatched
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationSendResponse"
+        "400":
+          description: Bad request (inactive template, missing phone for SMS, non-critical SMS type)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                templateInactive:
+                  value:
+                    error:
+                      code: "NOTIF_TEMPLATE_INACTIVE"
+                      message: "Notification template is not active"
+                      message_en: "Notification template is not active"
+                      statusCode: 400
+                    meta:
+                      timestamp: "2026-06-20T10:00:00.000Z"
+                      requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+                smsCriticalOnly:
+                  value:
+                    error:
+                      code: "NOTIF_SMS_CRITICAL_ONLY"
+                      message: "SMS channel is reserved for critical notifications only"
+                      message_en: "SMS channel is reserved for critical notifications only"
+                      statusCode: 400
+                    meta:
+                      timestamp: "2026-06-20T10:00:00.000Z"
+                      requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+                noPhone:
+                  value:
+                    error:
+                      code: "NOTIF_NO_PHONE"
+                      message: "User does not have a phone number for SMS delivery"
+                      message_en: "User does not have a phone number for SMS delivery"
+                      statusCode: 400
+                    meta:
+                      timestamp: "2026-06-20T10:00:00.000Z"
+                      requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Template not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Missing required template variables
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "NOTIF_MISSING_VARIABLES"
+                  message: "Required template variables are missing"
+                  message_en: "Required template variables are missing"
+                  statusCode: 422
+                meta:
+                  timestamp: "2026-06-20T10:00:00.000Z"
+                  requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "NOTIF_RATE_LIMITED"
+                  message: "Notification rate limit exceeded for this user/channel"
+                  message_en: "Notification rate limit exceeded for this user/channel"
+                  statusCode: 429
+                meta:
+                  timestamp: "2026-06-20T10:00:00.000Z"
+                  requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+  /notifications/log:
+    get:
+      tags:
+        - Log
+      summary: List notification logs
+      description: |
+        Returns paginated notification delivery logs. Admin and Manager roles see all logs.
+        Users see only their own logs via /users/me/notifications/log.
+      operationId: listNotificationLogs
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: user_id
+          in: query
+          description: Filter by user ID
+          schema:
+            type: string
+            format: uuid
+        - name: channel
+          in: query
+          description: Filter by notification channel
+          schema:
+            $ref: "#/components/schemas/NotificationChannel"
+        - name: status
+          in: query
+          description: Filter by delivery status
+          schema:
+            $ref: "#/components/schemas/NotificationLogStatus"
+        - name: template_code
+          in: query
+          description: Filter by template code
+          schema:
+            type: string
+        - name: created_at[gte]
+          in: query
+          description: Filter by creation date (greater than or equal)
+          schema:
+            type: string
+            format: date-time
+        - name: created_at[lte]
+          in: query
+          description: Filter by creation date (less than or equal)
+          schema:
+            type: string
+            format: date-time
+        - $ref: "#/components/parameters/SortByParam"
+      responses:
+        "200":
+          description: Paginated list of notification logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationLogListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /notifications/log/{id}:
+    get:
+      tags:
+        - Log
+      summary: Get notification log entry by ID
+      description: Returns full details of a single notification log entry.
+      operationId: getNotificationLogEntry
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Notification log entry ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Notification log entry details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationLogEntryResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /users/me/notifications/preferences:
+    get:
+      tags:
+        - Preferences
+      summary: Get own notification preferences
+      description: |
+        Returns the authenticated user's notification preferences, grouped by channel.
+        Preferences indicate opt-in/opt-out per channel and notification type.
+      operationId: getUserNotificationPreferences
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+            - employee
+            - customer
+            - partner
+      responses:
+        "200":
+          description: User notification preferences grouped by channel
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserNotificationPreferenceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      tags:
+        - Preferences
+      summary: Update own notification preferences
+      description: |
+        Updates the authenticated user's notification preferences. Sends a list of
+        preference objects (channel, notification_type, is_enabled). Missing
+        channel/type combinations are unchanged.
+      operationId: updateUserNotificationPreferences
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+            - employee
+            - customer
+            - partner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserNotificationPreferenceUpdate"
+      responses:
+        "200":
+          description: Preferences updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserNotificationPreferenceResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          description: Invalid notification_type value
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Standard user JWT authentication
+    serviceAccountAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Machine-to-machine service account JWT (internal endpoints only)
+
+  parameters:
+    TemplateIdParam:
+      name: id
+      in: path
+      required: true
+      description: Notification template ID (UUID v7)
+      schema:
+        type: string
+        format: uuid
+    PageParam:
+      name: page
+      in: query
+      description: Page number for offset pagination
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      description: Items per page (max 100)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    SortByParam:
+      name: sortBy
+      in: query
+      description: Sort field (prefix with `-` for descending)
+      schema:
+        type: string
+        example: "-created_at"
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Missing or invalid JWT
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "TOKEN_INVALID"
+              message: "Authentication required"
+              message_en: "Authentication required"
+              statusCode: 401
+            meta:
+              timestamp: "2026-06-20T10:00:00.000Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+    Forbidden:
+      description: Authenticated but insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "INSUFFICIENT_PERMISSIONS"
+              message: "You do not have permission to access this resource"
+              message_en: "You do not have permission to access this resource"
+              statusCode: 403
+            meta:
+              timestamp: "2026-06-20T10:00:00.000Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "RESOURCE_NOT_FOUND"
+              message: "The requested resource was not found"
+              message_en: "The requested resource was not found"
+              statusCode: 404
+            meta:
+              timestamp: "2026-06-20T10:00:00.000Z"
+              requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+  schemas:
+    # ── Enums ────────────────────────────────────────────────────────────
+    NotificationChannel:
+      type: string
+      enum:
+        - email
+        - sms
+        - push
+        - in_app
+
+    NotificationLogStatus:
+      type: string
+      enum:
+        - pending
+        - sent
+        - failed
+        - retrying
+        - permanently_failed
+        - skipped
+
+    NotificationType:
+      type: string
+      enum:
+        - order_update
+        - ticket_update
+        - marketing
+        - security
+        - account
+        - payment
+        - reminder
+
+    TemplateVariableType:
+      type: string
+      enum:
+        - string
+        - number
+        - url
+        - date
+        - boolean
+
+    # ── Core Schemas ─────────────────────────────────────────────────────
+    TemplateVariable:
+      type: object
+      description: A variable definition for Handlebars template substitution
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: "^[a-zA-Z_][a-zA-Z0-9_]*$"
+          description: Variable name used in Handlebars template (e.g., "userName")
+          example: "userName"
+        description:
+          type: string
+          maxLength: 500
+          description: Human-readable description of the variable
+          example: "اسم المستخدم"
+        required:
+          type: boolean
+          default: true
+          description: Whether this variable must be provided when sending
+        defaultValue:
+          description: Default value if not provided (null means no default)
+          example: null
+        type:
+          $ref: "#/components/schemas/TemplateVariableType"
+          description: Data type of the variable
+
+    # ── NotificationTemplate ─────────────────────────────────────────────
+    NotificationTemplate:
+      type: object
+      required:
+        - id
+        - code
+        - name
+        - subject_template_ar
+        - subject_template_en
+        - body_template_ar
+        - body_template_en
+        - channel
+        - variables
+        - is_active
+        - created_by
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUID v7 primary key
+          example: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        code:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: "^[a-z][a-z0-9_]*$"
+          description: Unique template code in snake_case
+          example: "order_confirmed"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Human-readable template name
+          example: "تأكيد الطلب"
+        description:
+          type: string
+          maxLength: 2000
+          description: Optional purpose/usage description
+        subject_template_ar:
+          type: string
+          maxLength: 500
+          description: Arabic subject Handlebars template
+          example: "تم تأكيد طلبك #{{orderId}}"
+        subject_template_en:
+          type: string
+          maxLength: 500
+          description: English subject Handlebars template
+          example: "Your order #{{orderId}} has been confirmed"
+        body_template_ar:
+          type: string
+          maxLength: 65535
+          description: Arabic body Handlebars template (HTML)
+          example: "<p>عزيزي {{userName}}،</p><p>تم تأكيد طلبك رقم {{orderId}}.</p>"
+        body_template_en:
+          type: string
+          maxLength: 65535
+          description: English body Handlebars template (HTML)
+          example: "<p>Dear {{userName}},</p><p>Your order #{{orderId}} has been confirmed.</p>"
+        channel:
+          $ref: "#/components/schemas/NotificationChannel"
+        variables:
+          type: array
+          description: Array of variable definitions for template substitution
+          items:
+            $ref: "#/components/schemas/TemplateVariable"
+        is_active:
+          type: boolean
+          description: Whether the template is available for use
+        created_by:
+          type: string
+          format: uuid
+          description: User ID who created the template
+        updated_by:
+          type: string
+          format: uuid
+          nullable: true
+          description: User ID who last updated the template
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    NotificationTemplateCreate:
+      type: object
+      required:
+        - code
+        - name
+        - subject_template_ar
+        - subject_template_en
+        - body_template_ar
+        - body_template_en
+        - channel
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: "^[a-z][a-z0-9_]*$"
+          description: Unique template code in snake_case (immutable after creation)
+          example: "order_confirmed"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: "تأكيد الطلب"
+        description:
+          type: string
+          maxLength: 2000
+        subject_template_ar:
+          type: string
+          maxLength: 500
+          example: "تم تأكيد طلبك #{{orderId}}"
+        subject_template_en:
+          type: string
+          maxLength: 500
+          example: "Your order #{{orderId}} has been confirmed"
+        body_template_ar:
+          type: string
+          maxLength: 65535
+          example: "<p>عزيزي {{userName}}،</p><p>تم تأكيد طلبك رقم {{orderId}}.</p>"
+        body_template_en:
+          type: string
+          maxLength: 65535
+          example: "<p>Dear {{userName}},</p><p>Your order #{{orderId}} has been confirmed.</p>"
+        channel:
+          $ref: "#/components/schemas/NotificationChannel"
+        variables:
+          type: array
+          items:
+            $ref: "#/components/schemas/TemplateVariable"
+
+    NotificationTemplateUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 2000
+        subject_template_ar:
+          type: string
+          maxLength: 500
+        subject_template_en:
+          type: string
+          maxLength: 500
+        body_template_ar:
+          type: string
+          maxLength: 65535
+        body_template_en:
+          type: string
+          maxLength: 65535
+        channel:
+          $ref: "#/components/schemas/NotificationChannel"
+        variables:
+          type: array
+          items:
+            $ref: "#/components/schemas/TemplateVariable"
+        is_active:
+          type: boolean
+
+    # ── Notification Send ────────────────────────────────────────────────
+    NotificationSendRequest:
+      type: object
+      required:
+        - template_code
+        - user_id
+        - variables
+      properties:
+        template_code:
+          type: string
+          maxLength: 100
+          description: Reference to template.code
+          example: "order_confirmed"
+        user_id:
+          type: string
+          format: uuid
+          description: Target user ID
+        channel:
+          $ref: "#/components/schemas/NotificationChannel"
+          description: Override template channel (optional)
+        variables:
+          type: object
+          description: Key-value pairs for Handlebars template substitution
+          additionalProperties: true
+          example:
+            userName: "أحمد"
+            orderId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+            orderStatus: "جاهز للتسليم"
+        metadata:
+          type: object
+          description: Source context for the notification
+          properties:
+            source:
+              type: string
+              description: Originating service name
+              example: "order_service"
+            source_id:
+              type: string
+              format: uuid
+              description: Related entity ID
+            notification_type:
+              $ref: "#/components/schemas/NotificationType"
+              description: Classification of this notification
+          additionalProperties: true
+
+    NotificationSendResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            log_id:
+              type: string
+              format: uuid
+              description: Created notification log entry ID
+            status:
+              type: string
+              enum:
+                - sent
+                - failed
+                - skipped
+              description: Immediate delivery status after dispatch
+            recipient:
+              type: string
+              format: email
+              description: Masked recipient address
+              example: "u***@example.com"
+            channel:
+              $ref: "#/components/schemas/NotificationChannel"
+            skipped_reason:
+              type: string
+              nullable: true
+              description: Reason if status is "skipped" (e.g., user opted out)
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    # ── Notification Log ─────────────────────────────────────────────────
+    NotificationLogEntry:
+      type: object
+      required:
+        - id
+        - channel
+        - recipient
+        - status
+        - retry_count
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        template_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Template used (null for ad-hoc sends)
+        template_code:
+          type: string
+          nullable: true
+          description: Template code for traceability
+        user_id:
+          type: string
+          format: uuid
+          nullable: true
+        channel:
+          $ref: "#/components/schemas/NotificationChannel"
+        recipient:
+          type: string
+          description: Email or phone (masked in non-admin responses)
+          example: "u***@example.com"
+        recipient_name:
+          type: string
+          nullable: true
+        subject:
+          type: string
+          nullable: true
+          description: Rendered subject line
+        body:
+          type: string
+          nullable: true
+          description: Rendered body (may be truncated for sensitive content)
+        status:
+          $ref: "#/components/schemas/NotificationLogStatus"
+        provider:
+          type: string
+          nullable: true
+          description: External provider name (sendgrid, twilio, firebase)
+          example: "sendgrid"
+        provider_message_id:
+          type: string
+          nullable: true
+          description: External provider's message ID
+        error_message:
+          type: string
+          nullable: true
+          description: Failure reason if status is failed/permanently_failed
+        retry_count:
+          type: integer
+          minimum: 0
+          default: 0
+        max_retries:
+          type: integer
+          minimum: 0
+          default: 3
+        next_retry_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Scheduled retry time with exponential backoff
+        sent_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ── User Notification Preferences ────────────────────────────────────
+    NotificationPreference:
+      type: object
+      required:
+        - notification_type
+        - is_enabled
+      properties:
+        notification_type:
+          $ref: "#/components/schemas/NotificationType"
+        is_enabled:
+          type: boolean
+          description: Whether notifications of this type are enabled for the channel
+
+    UserNotificationPreferenceUpdate:
+      type: object
+      required:
+        - preferences
+      properties:
+        preferences:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+              - channel
+              - notification_type
+              - is_enabled
+            properties:
+              channel:
+                $ref: "#/components/schemas/NotificationChannel"
+              notification_type:
+                $ref: "#/components/schemas/NotificationType"
+              is_enabled:
+                type: boolean
+          example:
+            - channel: email
+              notification_type: order_update
+              is_enabled: true
+            - channel: email
+              notification_type: marketing
+              is_enabled: false
+            - channel: sms
+              notification_type: order_update
+              is_enabled: true
+
+    # ── Response Envelopes ───────────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - meta
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+            - message_en
+            - statusCode
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+              example: "NOTIF_TEMPLATE_INACTIVE"
+            message:
+              type: string
+              description: Human-readable message in Arabic
+              example: "قالب الإشعار غير مفعل"
+            message_en:
+              type: string
+              description: Human-readable message in English
+              example: "Notification template is not active"
+            statusCode:
+              type: integer
+              description: HTTP status code
+            details:
+              type: object
+              description: Additional error context
+              additionalProperties: true
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    ResponseMeta:
+      type: object
+      required:
+        - timestamp
+        - requestId
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp
+        requestId:
+          type: string
+          format: uuid
+          description: Unique request identifier for tracing
+        pagination:
+          $ref: "#/components/schemas/PaginationMeta"
+        apiVersion:
+          type: string
+          example: "1.0.0"
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+          description: Total number of records
+        page:
+          type: integer
+          description: Current page number
+        per_page:
+          type: integer
+          description: Items per page
+        hasNextPage:
+          type: boolean
+        hasPreviousPage:
+          type: boolean
+
+    DeleteResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            deleted:
+              type: boolean
+              enum:
+                - true
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    # ── Wrapped Response Schemas ─────────────────────────────────────────
+    NotificationTemplateListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationTemplate"
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/ResponseMeta"
+            - type: object
+              properties:
+                pagination:
+                  $ref: "#/components/schemas/PaginationMeta"
+
+    NotificationTemplateResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/NotificationTemplate"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    NotificationLogListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationLogEntry"
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/ResponseMeta"
+            - type: object
+              properties:
+                pagination:
+                  $ref: "#/components/schemas/PaginationMeta"
+
+    NotificationLogEntryResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/NotificationLogEntry"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    UserNotificationPreferenceResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            email:
+              type: array
+              items:
+                $ref: "#/components/schemas/NotificationPreference"
+            sms:
+              type: array
+              items:
+                $ref: "#/components/schemas/NotificationPreference"
+            push:
+              type: array
+              items:
+                $ref: "#/components/schemas/NotificationPreference"
+            in_app:
+              type: array
+              items:
+                $ref: "#/components/schemas/NotificationPreference"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"

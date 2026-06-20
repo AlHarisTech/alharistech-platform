@@ -1,0 +1,1408 @@
+# =============================================================================
+# ACCESS CONTROL POLICY ENGINE SPEC
+# Machine-readable RBAC policy specification derived from permission-matrix.yaml
+# Priority-based evaluation: higher number = higher priority
+# Default deny at priority 0, all explicit allows above
+# Version: 1.0
+# =============================================================================
+
+# Policy evaluation model:
+#   1. Collect all policies matching (role in roles) OR (roles contains "*")
+#   2. If any matching policy has effect: deny → deny immediately
+#   3. If any matching policy has effect: allow → allow (highest priority wins)
+#   4. Fall through to default-deny (priority 0)
+
+policies:
+
+  # ===========================================================================
+  # IDENTITY DOMAIN POLICIES
+  # ===========================================================================
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["identity:users"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin]
+    resources: ["identity:roles"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [manager]
+    resources: ["identity:roles"]
+    actions: ["read"]
+    conditions: []
+    priority: 80
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["identity:sessions"]
+    actions: ["read", "revoke"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager, employee, customer, partner]
+    resources: ["identity:auth_tokens"]
+    actions: ["issue", "refresh", "revoke"]
+    conditions: []
+    priority: 60
+
+  - effect: allow
+    roles: [employee, customer, partner]
+    resources: ["identity:users"]
+    actions: ["read"]
+    conditions:
+      - field: "id"
+        operator: "equals"
+        value: "$caller.id"
+    priority: 50
+
+  - effect: allow
+    roles: [employee, customer, partner]
+    resources: ["identity:sessions"]
+    actions: ["read"]
+    conditions:
+      - field: "userId"
+        operator: "equals"
+        value: "$caller.id"
+    priority: 50
+
+  # Employee role has empty actions on roles → no explicit policy needed (falls to deny)
+
+  # ===========================================================================
+  # CUSTOMER DOMAIN POLICIES
+  # ===========================================================================
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["customer:customers"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["customer:customer_profiles"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["customer:communication_logs"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["customer:customer_tags"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin]
+    resources: ["customer:customer_import"]
+    actions: ["create"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["customer:customer_export"]
+    actions: ["create"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin]
+    resources: ["customer:customer_merge"]
+    actions: ["create"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [employee]
+    resources: ["customer:customers"]
+    actions: ["read"]
+    conditions: []
+    priority: 70
+
+  - effect: allow
+    roles: [employee]
+    resources: ["customer:customer_profiles"]
+    actions: ["read"]
+    conditions: []
+    priority: 70
+
+  - effect: allow
+    roles: [employee]
+    resources: ["customer:communication_logs"]
+    actions: ["create", "read"]
+    conditions: []
+    priority: 70
+
+  - effect: allow
+    roles: [customer]
+    resources: ["customer:customers"]
+    actions: ["read"]
+    conditions:
+      - field: "id"
+        operator: "equals"
+        value: "$caller.customerId"
+    priority: 50
+
+  - effect: allow
+    roles: [customer]
+    resources: ["customer:customer_profiles"]
+    actions: ["read"]
+    conditions:
+      - field: "customerId"
+        operator: "equals"
+        value: "$caller.customerId"
+    priority: 50
+
+  - effect: allow
+    roles: [partner]
+    resources: ["customer:customers"]
+    actions: ["read"]
+    conditions:
+      - field: "assignedPartnerId"
+        operator: "equals"
+        value: "$caller.id"
+    priority: 40
+
+  # ===========================================================================
+  # SERVICE DOMAIN POLICIES
+  # ===========================================================================
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["service:services"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["service:service_categories"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["service:service_orders"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["service:order_assignment"]
+    actions: ["create", "read", "update"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager, employee]
+    resources: ["service:order_documents"]
+    actions: ["create", "read", "verify"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin]
+    resources: ["service:order_documents"]
+    actions: ["delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["service:order_ratings"]
+    actions: ["read", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [employee]
+    resources: ["service:services"]
+    actions: ["read"]
+    conditions: []
+    priority: 70
+
+  - effect: allow
+    roles: [employee]
+    resources: ["service:service_categories"]
+    actions: ["read"]
+    conditions: []
+    priority: 70
+
+  - effect: allow
+    roles: [employee]
+    resources: ["service:service_orders"]
+    actions: ["read", "update"]
+    conditions:
+      - field: "assignedTo"
+        operator: "equals"
+        value: "$caller.id"
+    priority: 60
+
+  - effect: allow
+    roles: [employee]
+    resources: ["service:order_documents"]
+    actions: ["create", "read", "verify"]
+    conditions:
+      - field: "order.assignedTo"
+        operator: "equals"
+        value: "$caller.id"
+    priority: 60
+
+  - effect: allow
+    roles: [customer]
+    resources: ["service:services"]
+    actions: ["read"]
+    conditions: []
+    priority: 50
+
+  - effect: allow
+    roles: [customer]
+    resources: ["service:service_categories"]
+    actions: ["read"]
+    conditions: []
+    priority: 50
+
+  - effect: allow
+    roles: [customer]
+    resources: ["service:service_orders"]
+    actions: ["create", "read"]
+    conditions:
+      - field: "customerId"
+        operator: "equals"
+        value: "$caller.customerId"
+    priority: 50
+
+  - effect: allow
+    roles: [customer]
+    resources: ["service:order_documents"]
+    actions: ["create", "read"]
+    conditions:
+      - field: "order.customerId"
+        operator: "equals"
+        value: "$caller.customerId"
+    priority: 50
+
+  - effect: allow
+    roles: [customer]
+    resources: ["service:order_ratings"]
+    actions: ["create"]
+    conditions:
+      - field: "order.customerId"
+        operator: "equals"
+        value: "$caller.customerId"
+      - field: "order.status"
+        operator: "equals"
+        value: "completed"
+    priority: 50
+
+  - effect: allow
+    roles: [partner]
+    resources: ["service:services"]
+    actions: ["read"]
+    conditions: []
+    priority: 40
+
+  - effect: allow
+    roles: [partner]
+    resources: ["service:service_categories"]
+    actions: ["read"]
+    conditions: []
+    priority: 40
+
+  # ===========================================================================
+  # COMMERCE DOMAIN POLICIES
+  # ===========================================================================
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["commerce:products"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["commerce:product_categories"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["commerce:carts"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["commerce:commerce_orders"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["commerce:inventory"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["commerce:coupons"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["commerce:product_reviews"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["commerce:price_history"]
+    actions: ["read"]
+    conditions: []
+    priority: 80
+
+  - effect: allow
+    roles: [admin]
+    resources: ["commerce:products"]
+    actions: ["delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin]
+    resources: ["commerce:coupons"]
+    actions: ["delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [employee]
+    resources: ["commerce:products"]
+    actions: ["read"]
+    conditions: []
+    priority: 70
+
+  - effect: allow
+    roles: [employee]
+    resources: ["commerce:product_categories"]
+    actions: ["read"]
+    conditions: []
+    priority: 70
+
+  - effect: allow
+    roles: [employee]
+    resources: ["commerce:carts"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 70
+
+  - effect: allow
+    roles: [employee]
+    resources: ["commerce:commerce_orders"]
+    actions: ["read"]
+    conditions: []
+    priority: 70
+
+  - effect: allow
+    roles: [employee]
+    resources: ["commerce:inventory"]
+    actions: ["read"]
+    conditions: []
+    priority: 70
+
+  - effect: allow
+    roles: [employee]
+    resources: ["commerce:coupons"]
+    actions: ["read"]
+    conditions: []
+    priority: 70
+
+  - effect: allow
+    roles: [manager]
+    resources: ["commerce:commerce_orders"]
+    actions: ["read", "update"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [manager]
+    resources: ["commerce:inventory"]
+    actions: ["read", "update"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [manager]
+    resources: ["commerce:coupons"]
+    actions: ["create", "read", "update"]
+    conditions: []
+    priority: 90
+
+  - effect: allow
+    roles: [manager]
+    resources: ["commerce:product_reviews"]
+    actions: ["read", "update"]
+    conditions: []
+    priority: 90
+
+  - effect: allow
+    roles: [customer]
+    resources: ["commerce:products"]
+    actions: ["read"]
+    conditions: []
+    priority: 50
+
+  - effect: allow
+    roles: [customer]
+    resources: ["commerce:product_categories"]
+    actions: ["read"]
+    conditions: []
+    priority: 50
+
+  - effect: allow
+    roles: [customer]
+    resources: ["commerce:carts"]
+    actions: ["create", "read", "update", "delete"]
+    conditions:
+      - field: "customerId"
+        operator: "equals"
+        value: "$caller.customerId"
+    priority: 50
+
+  - effect: allow
+    roles: [customer]
+    resources: ["commerce:commerce_orders"]
+    actions: ["create", "read"]
+    conditions:
+      - field: "customerId"
+        operator: "equals"
+        value: "$caller.customerId"
+    priority: 50
+
+  - effect: allow
+    roles: [customer]
+    resources: ["commerce:coupons"]
+    actions: ["read"]
+    conditions:
+      - field: "isActive"
+        operator: "equals"
+        value: true
+    priority: 50
+
+  - effect: allow
+    roles: [customer]
+    resources: ["commerce:product_reviews"]
+    actions: ["create", "read"]
+    conditions:
+      - field: "reviewerId"
+        operator: "equals"
+        value: "$caller.customerId"
+    priority: 50
+
+  - effect: allow
+    roles: [partner]
+    resources: ["commerce:products"]
+    actions: ["read"]
+    conditions: []
+    priority: 40
+
+  - effect: allow
+    roles: [partner]
+    resources: ["commerce:product_categories"]
+    actions: ["read"]
+    conditions: []
+    priority: 40
+
+  - effect: allow
+    roles: [partner]
+    resources: ["commerce:carts"]
+    actions: ["create", "read", "update", "delete"]
+    conditions:
+      - field: "customerId"
+        operator: "equals"
+        value: "$caller.customerId"
+    priority: 40
+
+  - effect: allow
+    roles: [partner]
+    resources: ["commerce:commerce_orders"]
+    actions: ["read"]
+    conditions:
+      - field: "assignedPartnerId"
+        operator: "equals"
+        value: "$caller.id"
+    priority: 40
+
+  # ===========================================================================
+  # SUPPORT DOMAIN POLICIES
+  # ===========================================================================
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["support:tickets"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["support:ticket_status"]
+    actions: ["read", "update"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["support:ticket_assignment"]
+    actions: ["create", "read", "update"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["support:ticket_messages"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["support:knowledge_articles"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["support:knowledge_article_publish"]
+    actions: ["create", "update"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["support:ticket_reports"]
+    actions: ["read"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin]
+    resources: ["support:sla_configuration"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [manager]
+    resources: ["support:sla_configuration"]
+    actions: ["read"]
+    conditions: []
+    priority: 80
+
+  - effect: allow
+    roles: [manager]
+    resources: ["support:tickets"]
+    actions: ["create", "read", "update"]
+    conditions: []
+    priority: 90
+
+  - effect: allow
+    roles: [manager]
+    resources: ["support:ticket_messages"]
+    actions: ["create", "read", "update"]
+    conditions: []
+    priority: 90
+
+  - effect: allow
+    roles: [manager]
+    resources: ["support:knowledge_articles"]
+    actions: ["create", "read", "update"]
+    conditions: []
+    priority: 90
+
+  - effect: allow
+    roles: [employee]
+    resources: ["support:tickets"]
+    actions: ["create", "read"]
+    conditions: []
+    priority: 70
+
+  - effect: allow
+    roles: [employee]
+    resources: ["support:ticket_status"]
+    actions: ["update"]
+    conditions:
+      - field: "assignedTo"
+        operator: "equals"
+        value: "$caller.id"
+    priority: 70
+
+  - effect: allow
+    roles: [employee]
+    resources: ["support:ticket_messages"]
+    actions: ["create", "read", "update"]
+    conditions:
+      - field: "senderId"
+        operator: "equals"
+        value: "$caller.id"
+    priority: 70
+
+  - effect: allow
+    roles: [employee]
+    resources: ["support:knowledge_articles"]
+    actions: ["read"]
+    conditions: []
+    priority: 70
+
+  - effect: allow
+    roles: [employee]
+    resources: ["support:ticket_reports"]
+    actions: ["read"]
+    conditions:
+      - field: "employeeId"
+        operator: "equals"
+        value: "$caller.id"
+    priority: 70
+
+  - effect: allow
+    roles: [customer]
+    resources: ["support:tickets"]
+    actions: ["create", "read"]
+    conditions:
+      - field: "customerId"
+        operator: "equals"
+        value: "$caller.customerId"
+    priority: 50
+
+  - effect: allow
+    roles: [customer]
+    resources: ["support:ticket_messages"]
+    actions: ["create", "read"]
+    conditions:
+      - field: "ticket.customerId"
+        operator: "equals"
+        value: "$caller.customerId"
+      - field: "message.isInternal"
+        operator: "equals"
+        value: false
+    priority: 50
+
+  - effect: allow
+    roles: [customer]
+    resources: ["support:knowledge_articles"]
+    actions: ["read"]
+    conditions:
+      - field: "isPublished"
+        operator: "equals"
+        value: true
+    priority: 50
+
+  - effect: allow
+    roles: [admin]
+    resources: ["support:tickets"]
+    actions: ["delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin]
+    resources: ["support:knowledge_articles"]
+    actions: ["delete"]
+    conditions: []
+    priority: 100
+
+  # ===========================================================================
+  # CONTENT DOMAIN POLICIES
+  # ===========================================================================
+
+  - effect: allow
+    roles: [admin, manager, employee]
+    resources: ["content:pages"]
+    actions: ["create", "read", "update"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["content:pages"]
+    actions: ["delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager, employee]
+    resources: ["content:page_publish"]
+    actions: ["create", "update"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["content:page_schedule"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["content:page_versions"]
+    actions: ["read", "restore"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [employee]
+    resources: ["content:page_versions"]
+    actions: ["read"]
+    conditions: []
+    priority: 70
+
+  - effect: allow
+    roles: [admin, manager, employee]
+    resources: ["content:media"]
+    actions: ["create", "read"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["content:media"]
+    actions: ["update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager, employee]
+    resources: ["content:blog_posts"]
+    actions: ["create", "read", "update"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["content:blog_posts"]
+    actions: ["delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager, employee]
+    resources: ["content:blog_publish"]
+    actions: ["create", "update"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["content:blog_categories"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [employee]
+    resources: ["content:blog_categories"]
+    actions: ["read"]
+    conditions: []
+    priority: 70
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["content:menus"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [employee]
+    resources: ["content:menus"]
+    actions: ["read"]
+    conditions: []
+    priority: 70
+
+  - effect: allow
+    roles: [admin, manager, employee]
+    resources: ["content:sitemap"]
+    actions: ["read"]
+    conditions: []
+    priority: 80
+
+  - effect: allow
+    roles: [customer, partner]
+    resources: ["content:pages"]
+    actions: ["read"]
+    conditions:
+      - field: "isPublished"
+        operator: "equals"
+        value: true
+    priority: 50
+
+  - effect: allow
+    roles: [customer, partner]
+    resources: ["content:blog_posts"]
+    actions: ["read"]
+    conditions:
+      - field: "isPublished"
+        operator: "equals"
+        value: true
+    priority: 50
+
+  - effect: allow
+    roles: [customer, partner]
+    resources: ["content:blog_categories"]
+    actions: ["read"]
+    conditions: []
+    priority: 50
+
+  - effect: allow
+    roles: [customer, partner]
+    resources: ["content:sitemap"]
+    actions: ["read"]
+    conditions: []
+    priority: 50
+
+  # ===========================================================================
+  # NOTIFICATION DOMAIN POLICIES
+  # ===========================================================================
+
+  - effect: allow
+    roles: [admin]
+    resources: ["notification:notification_templates"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [manager]
+    resources: ["notification:notification_templates"]
+    actions: ["read"]
+    conditions: []
+    priority: 80
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["notification:notification_logs"]
+    actions: ["read"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["notification:notification_preferences"]
+    actions: ["read", "update"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin]
+    resources: ["notification:notification_bulk"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [manager]
+    resources: ["notification:notification_bulk"]
+    actions: ["execute"]
+    conditions: []
+    priority: 80
+
+  - effect: allow
+    roles: [employee, customer, partner]
+    resources: ["notification:notification_preferences"]
+    actions: ["read", "update"]
+    conditions:
+      - field: "userId"
+        operator: "equals"
+        value: "$caller.id"
+    priority: 50
+
+  - effect: allow
+    roles: [customer, partner]
+    resources: ["notification:notification_logs"]
+    actions: ["read"]
+    conditions:
+      - field: "userId"
+        operator: "equals"
+        value: "$caller.id"
+    priority: 50
+
+  # ===========================================================================
+  # ANALYTICS DOMAIN POLICIES
+  # ===========================================================================
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["analytics:analytics_dashboards"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["analytics:analytics_reports"]
+    actions: ["create", "read"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin]
+    resources: ["analytics:analytics_reports"]
+    actions: ["update"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["analytics:analytics_report_export"]
+    actions: ["create", "read"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["analytics:analytics_kpis"]
+    actions: ["create", "read", "update"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin]
+    resources: ["analytics:analytics_kpis"]
+    actions: ["delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["analytics:analytics_metrics"]
+    actions: ["read"]
+    conditions: []
+    priority: 80
+
+  - effect: allow
+    roles: [employee]
+    resources: ["analytics:analytics_dashboards"]
+    actions: ["read"]
+    conditions:
+      - field: "visibility"
+        operator: "in"
+        value: ["overview", "team"]
+    priority: 70
+
+  - effect: allow
+    roles: [partner]
+    resources: ["analytics:analytics_dashboards"]
+    actions: ["read"]
+    conditions:
+      - field: "ownerId"
+        operator: "equals"
+        value: "$caller.id"
+    priority: 40
+
+  - effect: allow
+    roles: [partner]
+    resources: ["analytics:analytics_reports"]
+    actions: ["create", "read"]
+    conditions:
+      - field: "ownerId"
+        operator: "equals"
+        value: "$caller.id"
+    priority: 40
+
+  - effect: allow
+    roles: [partner]
+    resources: ["analytics:analytics_report_export"]
+    actions: ["read"]
+    conditions:
+      - field: "report.ownerId"
+        operator: "equals"
+        value: "$caller.id"
+    priority: 40
+
+  # ===========================================================================
+  # AI DOMAIN POLICIES
+  # ===========================================================================
+
+  - effect: allow
+    roles: [admin]
+    resources: ["ai:ai_agents"]
+    actions: ["create", "read", "update", "delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [manager]
+    resources: ["ai:ai_agents"]
+    actions: ["read"]
+    conditions: []
+    priority: 80
+
+  - effect: allow
+    roles: [admin, manager, employee]
+    resources: ["ai:ai_agent_invoke"]
+    actions: ["execute"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [customer]
+    resources: ["ai:ai_agent_invoke"]
+    actions: ["execute"]
+    conditions:
+      - field: "agentType"
+        operator: "equals"
+        value: "support"
+    priority: 50
+
+  - effect: allow
+    roles: [admin, manager, employee, customer]
+    resources: ["ai:ai_chat"]
+    actions: ["send"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [partner]
+    resources: ["ai:ai_chat"]
+    actions: ["send"]
+    conditions:
+      - field: "authMethod"
+        operator: "equals"
+        value: "api_key"
+    priority: 40
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["ai:ai_knowledge"]
+    actions: ["create", "read", "update", "delete", "ingest"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [employee]
+    resources: ["ai:ai_knowledge"]
+    actions: ["read"]
+    conditions: []
+    priority: 70
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["ai:ai_prompts"]
+    actions: ["create", "read", "update"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin]
+    resources: ["ai:ai_prompts"]
+    actions: ["delete"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["ai:ai_prompt_activate"]
+    actions: ["update"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [employee]
+    resources: ["ai:ai_prompts"]
+    actions: ["read"]
+    conditions: []
+    priority: 70
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["ai:ai_interactions"]
+    actions: ["read"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [admin, manager]
+    resources: ["ai:ai_interaction_stats"]
+    actions: ["read"]
+    conditions: []
+    priority: 100
+
+  - effect: allow
+    roles: [employee]
+    resources: ["ai:ai_agents"]
+    actions: ["read"]
+    conditions:
+      - field: "isActive"
+        operator: "equals"
+        value: true
+    priority: 70
+
+  - effect: allow
+    roles: [employee]
+    resources: ["ai:ai_agent_invoke"]
+    actions: ["execute"]
+    conditions:
+      - field: "agentType"
+        operator: "in"
+        value: ["support", "analytics"]
+    priority: 70
+
+  - effect: allow
+    roles: [employee, customer]
+    resources: ["ai:ai_interactions"]
+    actions: ["read"]
+    conditions:
+      - field: "userId"
+        operator: "equals"
+        value: "$caller.id"
+    priority: 50
+
+  - effect: allow
+    roles: [partner]
+    resources: ["ai:ai_interactions"]
+    actions: ["read"]
+    conditions:
+      - field: "userId"
+        operator: "equals"
+        value: "$caller.id"
+    priority: 40
+
+  # ===========================================================================
+  # PUBLIC (unauthenticated) RESOURCES
+  # ===========================================================================
+
+  - effect: allow
+    roles: ["*"]
+    resources: ["service:services"]
+    actions: ["read"]
+    conditions:
+      - field: "isActive"
+        operator: "equals"
+        value: true
+    priority: 10
+
+  - effect: allow
+    roles: ["*"]
+    resources: ["service:service_categories"]
+    actions: ["read"]
+    conditions: []
+    priority: 10
+
+  - effect: allow
+    roles: ["*"]
+    resources: ["commerce:products"]
+    actions: ["read"]
+    conditions:
+      - field: "isActive"
+        operator: "equals"
+        value: true
+    priority: 10
+
+  - effect: allow
+    roles: ["*"]
+    resources: ["commerce:product_categories"]
+    actions: ["read"]
+    conditions: []
+    priority: 10
+
+  - effect: allow
+    roles: ["*"]
+    resources: ["commerce:product_reviews"]
+    actions: ["read"]
+    conditions:
+      - field: "isApproved"
+        operator: "equals"
+        value: true
+    priority: 10
+
+  - effect: allow
+    roles: ["*"]
+    resources: ["support:knowledge_articles"]
+    actions: ["read"]
+    conditions:
+      - field: "isPublished"
+        operator: "equals"
+        value: true
+    priority: 10
+
+  - effect: allow
+    roles: ["*"]
+    resources: ["content:pages"]
+    actions: ["read"]
+    conditions:
+      - field: "isPublished"
+        operator: "equals"
+        value: true
+    priority: 10
+
+  - effect: allow
+    roles: ["*"]
+    resources: ["content:blog_posts"]
+    actions: ["read"]
+    conditions:
+      - field: "isPublished"
+        operator: "equals"
+        value: true
+    priority: 10
+
+  - effect: allow
+    roles: ["*"]
+    resources: ["content:blog_categories"]
+    actions: ["read"]
+    conditions: []
+    priority: 10
+
+  - effect: allow
+    roles: ["*"]
+    resources: ["content:sitemap"]
+    actions: ["read"]
+    conditions: []
+    priority: 10
+
+  - effect: allow
+    roles: ["*"]
+    resources: ["content:menus"]
+    actions: ["read"]
+    conditions: []
+    priority: 10
+
+  - effect: allow
+    roles: ["*"]
+    resources: ["identity:auth"]
+    actions: ["register", "login", "verify_email", "refresh_token", "forgot_password", "reset_password"]
+    conditions: []
+    priority: 5
+
+  - effect: allow
+    roles: ["*"]
+    resources: ["support:knowledge_articles"]
+    actions: ["feedback"]
+    conditions: []
+    priority: 5
+
+  - effect: allow
+    roles: ["*"]
+    resources: ["commerce:cart"]
+    actions: ["read", "create", "update", "delete"]
+    conditions: []
+    priority: 5
+
+  # ===========================================================================
+  # DEFAULT DENY — lowest priority, catches everything not explicitly allowed
+  # ===========================================================================
+
+  - effect: deny
+    roles: ["*"]
+    resources: ["*"]
+    actions: ["*"]
+    priority: 0
+
+# ===========================================================================
+# CONDITION OPERATORS REFERENCE
+# ===========================================================================
+# operator: equals       → value must match exactly
+# operator: in           → value must be one of the array elements
+# operator: contains     → array value must contain the given element
+# operator: regex        → value must match the regex pattern
+# operator: greater_than → numeric comparison
+# operator: less_than    → numeric comparison
+#
+# VARIABLE REFERENCE
+# $caller.id          → authenticated user UUID
+# $caller.role        → authenticated user role
+# $caller.customerId  → linked customer profile UUID (for customer role)
+# $caller.ip          → request IP address
+# $now                → current UTC timestamp
+
+# ===========================================================================
+# RESOURCE MAPPING (domain:resource → API paths)
+# ===========================================================================
+# identity:users              → /api/v1/users, /api/v1/users/{id}
+# identity:roles              → /api/v1/users/{id}/role
+# identity:sessions           → session management
+# identity:auth_tokens        → /api/v1/auth/refresh, /api/v1/auth/logout
+# identity:auth               → /api/v1/auth/register, /api/v1/auth/login, etc.
+# customer:customers          → /api/v1/customers, /api/v1/customers/{id}
+# customer:customer_profiles  → /api/v1/customers/{id}
+# customer:communication_logs → /api/v1/customers/{id}/communications
+# customer:customer_tags      → /api/v1/customers/{id}/tags, /api/v1/customers/tags
+# customer:customer_import    → /api/v1/customers/import
+# customer:customer_export    → /api/v1/customers/export
+# customer:customer_merge     → /api/v1/customers/merge
+# service:services            → /api/v1/services
+# service:service_categories  → /api/v1/services/categories
+# service:service_orders      → /api/v1/orders
+# service:order_assignment    → /api/v1/orders/{id}/assign
+# service:order_documents     → /api/v1/orders/{id}/documents
+# service:order_ratings       → /api/v1/orders/{id}/rate
+# commerce:products           → /api/v1/products
+# commerce:product_categories → /api/v1/categories
+# commerce:carts              → /api/v1/cart
+# commerce:commerce_orders    → /api/v1/commerce/orders
+# commerce:inventory          → /api/v1/inventory
+# commerce:coupons            → /api/v1/coupons
+# commerce:product_reviews    → /api/v1/products/{id}/reviews
+# commerce:price_history      → price history (internal)
+# support:tickets             → /api/v1/tickets
+# support:ticket_status       → /api/v1/tickets/{id}/status
+# support:ticket_assignment   → /api/v1/tickets/{id}/assign
+# support:ticket_messages     → /api/v1/tickets/{id}/messages
+# support:knowledge_articles  → /api/v1/knowledge/articles
+# support:knowledge_article_publish → /api/v1/knowledge/articles/{id}/publish
+# support:ticket_reports      → /api/v1/support/reports
+# support:sla_configuration   → SLA settings
+# content:pages               → /api/v1/pages
+# content:page_publish        → /api/v1/pages/{id}/publish, /api/v1/pages/{id}/unpublish
+# content:page_schedule       → /api/v1/pages/{id}/schedule
+# content:page_versions       → /api/v1/pages/{id}/versions
+# content:media               → /api/v1/media
+# content:blog_posts          → /api/v1/blog
+# content:blog_publish        → /api/v1/blog/{id}/publish
+# content:blog_categories     → /api/v1/blog/categories
+# content:menus               → /api/v1/menus
+# content:sitemap             → /api/v1/sitemap.xml
+# notification:notification_templates   → /api/v1/notifications/templates
+# notification:notification_logs        → /api/v1/notifications/log
+# notification:notification_preferences → /api/v1/users/me/notifications/preferences
+# notification:notification_bulk        → /api/v1/notifications/send
+# analytics:analytics_dashboards        → /api/v1/analytics/dashboards
+# analytics:analytics_reports           → /api/v1/analytics/reports
+# analytics:analytics_report_export     → /api/v1/analytics/reports/{id}/download
+# analytics:analytics_kpis             → /api/v1/analytics/kpis
+# analytics:analytics_metrics          → /api/v1/analytics/metrics
+# ai:ai_agents               → /api/v1/ai/agents
+# ai:ai_agent_invoke         → agent execution
+# ai:ai_chat                 → /api/v1/ai/chat
+# ai:ai_knowledge            → /api/v1/ai/knowledge
+# ai:ai_prompts              → /api/v1/ai/prompts
+# ai:ai_prompt_activate      → /api/v1/ai/prompts/{id}/activate
+# ai:ai_interactions         → /api/v1/ai/interactions
+# ai:ai_interaction_stats    → /api/v1/ai/interactions/stats

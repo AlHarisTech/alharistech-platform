@@ -1,0 +1,3041 @@
+# =============================================================================
+# EVENT SCHEMA REGISTRY — Single Source of Truth
+# JSON Schemas for all 94 domain events across AlharisTech Platform
+# Naming: {domain}.{aggregate}.{action}
+# Version: 1.0 | Generated from event-catalog.yaml + domain specs
+# Valid YAML — testable with Python yaml.safe_load
+# =============================================================================
+
+events:
+
+  # ===========================================================================
+  # IDENTITY DOMAIN (8 events)
+  # ===========================================================================
+
+  identity.user.registered:
+    domain: identity
+    event: UserRegistered
+    version: "1.0"
+    schema:
+      type: object
+      required: [userId, email, role, timestamp]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الفريد"
+        email:
+          type: string
+          format: email
+          description: "البريد الإلكتروني للمستخدم"
+        role:
+          type: string
+          enum: [admin, manager, employee, customer, partner]
+          description: "الدور الوظيفي للمستخدم"
+        timestamp:
+          type: string
+          format: date-time
+          description: "وقت تسجيل الحدث بتوقيت UTC"
+    transport:
+      type: async
+      channel: "bullmq:identity.events"
+    retention: "30 days"
+
+  identity.user.verified:
+    domain: identity
+    event: UserVerified
+    version: "1.0"
+    schema:
+      type: object
+      required: [userId, timestamp]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي تم التحقق منه"
+        timestamp:
+          type: string
+          format: date-time
+          description: "وقت إتمام التحقق"
+    transport:
+      type: async
+      channel: "bullmq:identity.events"
+    retention: "30 days"
+
+  identity.user.logged_in:
+    domain: identity
+    event: UserLoggedIn
+    version: "1.0"
+    schema:
+      type: object
+      required: [userId, ip, device, timestamp]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: "معرف المستخدم"
+        ip:
+          type: string
+          description: "عنوان IP المستخدم في تسجيل الدخول"
+        device:
+          type: string
+          description: "نوع الجهاز والمتصفح"
+        timestamp:
+          type: string
+          format: date-time
+          description: "وقت تسجيل الدخول"
+    transport:
+      type: async
+      channel: "bullmq:identity.events"
+    retention: "90 days"
+
+  identity.user.logged_out:
+    domain: identity
+    event: UserLoggedOut
+    version: "1.0"
+    schema:
+      type: object
+      required: [userId, sessionId, timestamp]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: "معرف المستخدم"
+        sessionId:
+          type: string
+          format: uuid
+          description: "معرف الجلسة المنتهية"
+        timestamp:
+          type: string
+          format: date-time
+          description: "وقت تسجيل الخروج"
+    transport:
+      type: async
+      channel: "bullmq:identity.events"
+    retention: "30 days"
+
+  identity.auth.password_changed:
+    domain: identity
+    event: PasswordChanged
+    version: "1.0"
+    schema:
+      type: object
+      required: [userId, timestamp]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: "معرف المستخدم"
+        timestamp:
+          type: string
+          format: date-time
+          description: "وقت تغيير كلمة المرور"
+    transport:
+      type: async
+      channel: "bullmq:identity.events"
+    retention: "90 days"
+
+  identity.user.role_changed:
+    domain: identity
+    event: RoleChanged
+    version: "1.0"
+    schema:
+      type: object
+      required: [userId, oldRole, newRole, changedBy, timestamp]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي تم تغيير دوره"
+        oldRole:
+          type: string
+          enum: [admin, manager, employee, customer, partner]
+          description: "الدور السابق"
+        newRole:
+          type: string
+          enum: [admin, manager, employee, customer, partner]
+          description: "الدور الجديد"
+        changedBy:
+          type: string
+          format: uuid
+          description: "معرف المدير الذي قام بالتغيير"
+        timestamp:
+          type: string
+          format: date-time
+          description: "وقت تغيير الدور"
+    transport:
+      type: async
+      channel: "bullmq:identity.events"
+    retention: "365 days"
+
+  identity.user.account_locked:
+    domain: identity
+    event: AccountLocked
+    version: "1.0"
+    schema:
+      type: object
+      required: [userId, reason, timestamp]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي تم قفل حسابه"
+        reason:
+          type: string
+          enum: [too_many_attempts, suspicious_activity, admin_action]
+          description: "سبب قفل الحساب"
+        timestamp:
+          type: string
+          format: date-time
+          description: "وقت قفل الحساب"
+    transport:
+      type: async
+      channel: "bullmq:identity.events"
+    retention: "365 days"
+
+  identity.user.account_disabled:
+    domain: identity
+    event: AccountDisabled
+    version: "1.0"
+    schema:
+      type: object
+      required: [userId, disabledBy, timestamp]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي تم تعطيل حسابه"
+        disabledBy:
+          type: string
+          format: uuid
+          description: "معرف المدير الذي قام بالتعطيل"
+        timestamp:
+          type: string
+          format: date-time
+          description: "وقت تعطيل الحساب"
+    transport:
+      type: async
+      channel: "bullmq:identity.events"
+    retention: "365 days"
+
+  # ===========================================================================
+  # CUSTOMER DOMAIN (8 events)
+  # ===========================================================================
+
+  customer.profile.created:
+    domain: customer
+    event: CustomerCreated
+    version: "1.0"
+    schema:
+      type: object
+      required: [customerId, type, source, createdBy, timestamp]
+      properties:
+        customerId:
+          type: string
+          format: uuid
+          description: "معرف العميل"
+        email:
+          type: string
+          format: email
+          description: "البريد الإلكتروني للعميل"
+        type:
+          type: string
+          enum: [individual, company]
+          description: "نوع العميل (فرد/شركة)"
+        source:
+          type: string
+          enum: [manual, import, registration, referral]
+          description: "مصدر العميل"
+        createdBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي أنشأ العميل"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:customer.events"
+    retention: "30 days"
+
+  customer.profile.updated:
+    domain: customer
+    event: CustomerUpdated
+    version: "1.0"
+    schema:
+      type: object
+      required: [customerId, changedFields, updatedBy, timestamp]
+      properties:
+        customerId:
+          type: string
+          format: uuid
+          description: "معرف العميل"
+        changedFields:
+          type: array
+          items:
+            type: string
+          description: "الحقول التي تم تغييرها"
+        updatedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي قام بالتحديث"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:customer.events"
+    retention: "30 days"
+
+  customer.profile.merged:
+    domain: customer
+    event: CustomerMerged
+    version: "1.0"
+    schema:
+      type: object
+      required: [survivorId, absorbedId, mergedBy, timestamp]
+      properties:
+        survivorId:
+          type: string
+          format: uuid
+          description: "معرف العميل الباقي"
+        absorbedId:
+          type: string
+          format: uuid
+          description: "معرف العميل المدمج"
+        mergedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي قام بالدمج"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:customer.events"
+    retention: "365 days"
+
+  customer.communication.logged:
+    domain: customer
+    event: CommunicationLogged
+    version: "1.0"
+    schema:
+      type: object
+      required: [logId, customerId, channel, direction, initiatedBy, timestamp]
+      properties:
+        logId:
+          type: string
+          format: uuid
+          description: "معرف سجل التواصل"
+        customerId:
+          type: string
+          format: uuid
+          description: "معرف العميل"
+        channel:
+          type: string
+          enum: [phone, email, whatsapp, sms, in_person]
+          description: "قناة التواصل"
+        direction:
+          type: string
+          enum: [inbound, outbound]
+          description: "اتجاه التواصل"
+        initiatedBy:
+          type: string
+          format: uuid
+          description: "معرف من بدأ التواصل"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:customer.events"
+    retention: "90 days"
+
+  customer.profile.tagged:
+    domain: customer
+    event: CustomerTagged
+    version: "1.0"
+    schema:
+      type: object
+      required: [customerId, updatedBy, timestamp]
+      properties:
+        customerId:
+          type: string
+          format: uuid
+          description: "معرف العميل"
+        addedTags:
+          type: array
+          items:
+            type: string
+          description: "الوسوم المضافة"
+        removedTags:
+          type: array
+          items:
+            type: string
+          description: "الوسوم المحذوفة"
+        updatedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي قام بالتحديث"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:customer.events"
+    retention: "30 days"
+
+  customer.import.completed:
+    domain: customer
+    event: CustomerImported
+    version: "1.0"
+    schema:
+      type: object
+      required: [importId, totalRows, successCount, failedCount, initiatedBy, timestamp]
+      properties:
+        importId:
+          type: string
+          format: uuid
+          description: "معرف دفعة الاستيراد"
+        totalRows:
+          type: integer
+          minimum: 0
+          description: "إجمالي الصفوف في الملف"
+        successCount:
+          type: integer
+          minimum: 0
+          description: "عدد الصفوف الناجحة"
+        failedCount:
+          type: integer
+          minimum: 0
+          description: "عدد الصفوف الفاشلة"
+        initiatedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي بدأ الاستيراد"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:customer.events"
+    retention: "30 days"
+
+  customer.export.completed:
+    domain: customer
+    event: CustomerExported
+    version: "1.0"
+    schema:
+      type: object
+      required: [exportId, filterCriteria, totalExported, initiatedBy, timestamp]
+      properties:
+        exportId:
+          type: string
+          format: uuid
+          description: "معرف التصدير"
+        filterCriteria:
+          type: object
+          description: "معايير التصفية المستخدمة"
+        totalExported:
+          type: integer
+          minimum: 0
+          description: "عدد السجلات المصدرة"
+        initiatedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي بدأ التصدير"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:customer.events"
+    retention: "7 days"
+
+  customer.profile.soft_deleted:
+    domain: customer
+    event: CustomerSoftDeleted
+    version: "1.0"
+    schema:
+      type: object
+      required: [customerId, deletedBy, timestamp]
+      properties:
+        customerId:
+          type: string
+          format: uuid
+          description: "معرف العميل المحذوف"
+        deletedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي قام بالحذف"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:customer.events"
+    retention: "365 days"
+
+  # ===========================================================================
+  # SERVICE DOMAIN (9 events)
+  # ===========================================================================
+
+  service.order.placed:
+    domain: service
+    event: OrderPlaced
+    version: "1.0"
+    schema:
+      type: object
+      required: [orderId, customerId, serviceId, referenceNumber, totalAmount, timestamp]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: "معرف الطلب"
+        customerId:
+          type: string
+          format: uuid
+          description: "معرف العميل"
+        serviceId:
+          type: string
+          format: uuid
+          description: "معرف الخدمة"
+        referenceNumber:
+          type: string
+          description: "الرقم المرجعي للطلب"
+        totalAmount:
+          type: number
+          description: "المبلغ الإجمالي"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:service.events"
+    retention: "90 days"
+
+  service.order.status_changed:
+    domain: service
+    event: OrderStatusChanged
+    version: "1.0"
+    schema:
+      type: object
+      required: [orderId, oldStatus, newStatus, changedBy, timestamp]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: "معرف الطلب"
+        oldStatus:
+          type: string
+          enum: [pending, in_progress, completed, cancelled, rejected]
+          description: "الحالة السابقة"
+        newStatus:
+          type: string
+          enum: [pending, in_progress, completed, cancelled, rejected]
+          description: "الحالة الجديدة"
+        changedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي غير الحالة"
+        note:
+          type: string
+          description: "ملاحظة حول تغيير الحالة"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:service.events"
+    retention: "90 days"
+
+  service.order.assigned:
+    domain: service
+    event: OrderAssigned
+    version: "1.0"
+    schema:
+      type: object
+      required: [orderId, employeeId, assignedBy, timestamp]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: "معرف الطلب"
+        employeeId:
+          type: string
+          format: uuid
+          description: "معرف الموظف المعين"
+        assignedBy:
+          type: string
+          format: uuid
+          description: "معرف المدير الذي قام بالتعيين"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:service.events"
+    retention: "90 days"
+
+  service.order.completed:
+    domain: service
+    event: OrderCompleted
+    version: "1.0"
+    schema:
+      type: object
+      required: [orderId, customerId, completedBy, completedAt, timestamp]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: "معرف الطلب المكتمل"
+        customerId:
+          type: string
+          format: uuid
+          description: "معرف العميل"
+        completedBy:
+          type: string
+          format: uuid
+          description: "معرف الموظف الذي أكمل الطلب"
+        completedAt:
+          type: string
+          format: date-time
+          description: "وقت اكتمال الطلب"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:service.events"
+    retention: "365 days"
+
+  service.order.cancelled:
+    domain: service
+    event: OrderCancelled
+    version: "1.0"
+    schema:
+      type: object
+      required: [orderId, reason, cancelledBy, timestamp]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: "معرف الطلب الملغي"
+        reason:
+          type: string
+          description: "سبب الإلغاء"
+        cancelledBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي ألغى الطلب"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:service.events"
+    retention: "365 days"
+
+  service.order.rejected:
+    domain: service
+    event: OrderRejected
+    version: "1.0"
+    schema:
+      type: object
+      required: [orderId, reason, rejectedBy, timestamp]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: "معرف الطلب المرفوض"
+        reason:
+          type: string
+          description: "سبب الرفض"
+        rejectedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي رفض الطلب"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:service.events"
+    retention: "365 days"
+
+  service.order.rated:
+    domain: service
+    event: ServiceRated
+    version: "1.0"
+    schema:
+      type: object
+      required: [orderId, serviceId, customerId, rating, timestamp]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: "معرف الطلب"
+        serviceId:
+          type: string
+          format: uuid
+          description: "معرف الخدمة"
+        customerId:
+          type: string
+          format: uuid
+          description: "معرف العميل"
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: "تقييم الخدمة (1-5)"
+        comment:
+          type: string
+          description: "تعليق التقييم"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:service.events"
+    retention: "365 days"
+
+  service.order.documents_uploaded:
+    domain: service
+    event: DocumentsUploaded
+    version: "1.0"
+    schema:
+      type: object
+      required: [orderId, documentCount, timestamp]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: "معرف الطلب"
+        documentCount:
+          type: integer
+          minimum: 1
+          description: "عدد المستندات المرفوعة"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:service.events"
+    retention: "90 days"
+
+  service.order.documents_verified:
+    domain: service
+    event: DocumentsVerified
+    version: "1.0"
+    schema:
+      type: object
+      required: [orderId, verifiedDocumentIds, verifiedBy, timestamp]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: "معرف الطلب"
+        verifiedDocumentIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: "معرفات المستندات الموثقة"
+        verifiedBy:
+          type: string
+          format: uuid
+          description: "معرف الموظف الذي وثق المستندات"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:service.events"
+    retention: "90 days"
+
+  # ===========================================================================
+  # COMMERCE DOMAIN (20 events)
+  # ===========================================================================
+
+  commerce.product.created:
+    domain: commerce
+    event: ProductCreated
+    version: "1.0"
+    schema:
+      type: object
+      required: [productId, sku, name_en, categoryId, createdBy, timestamp]
+      properties:
+        productId:
+          type: string
+          format: uuid
+          description: "معرف المنتج"
+        sku:
+          type: string
+          description: "رمز المنتج التجاري"
+        name_en:
+          type: string
+          description: "اسم المنتج بالإنجليزية"
+        categoryId:
+          type: string
+          format: uuid
+          description: "معرف التصنيف"
+        createdBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم المنشئ"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "30 days"
+
+  commerce.product.updated:
+    domain: commerce
+    event: ProductUpdated
+    version: "1.0"
+    schema:
+      type: object
+      required: [productId, changedFields, updatedBy, timestamp]
+      properties:
+        productId:
+          type: string
+          format: uuid
+          description: "معرف المنتج"
+        changedFields:
+          type: array
+          items:
+            type: string
+          description: "الحقول التي تم تغييرها"
+        updatedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم القائم بالتحديث"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "30 days"
+
+  commerce.product.price_changed:
+    domain: commerce
+    event: ProductPriceChanged
+    version: "1.0"
+    schema:
+      type: object
+      required: [productId, sku, oldPrice, newPrice, changedBy, reason, timestamp]
+      properties:
+        productId:
+          type: string
+          format: uuid
+          description: "معرف المنتج"
+        sku:
+          type: string
+          description: "رمز المنتج التجاري"
+        oldPrice:
+          type: number
+          minimum: 0
+          description: "السعر القديم"
+        newPrice:
+          type: number
+          minimum: 0
+          description: "السعر الجديد"
+        changedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي غير السعر"
+        reason:
+          type: string
+          description: "سبب تغيير السعر"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "365 days"
+
+  commerce.product.deleted:
+    domain: commerce
+    event: ProductDeleted
+    version: "1.0"
+    schema:
+      type: object
+      required: [productId, sku, deletedBy, timestamp]
+      properties:
+        productId:
+          type: string
+          format: uuid
+          description: "معرف المنتج"
+        sku:
+          type: string
+          description: "رمز المنتج التجاري"
+        deletedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي حذف المنتج"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "365 days"
+
+  commerce.product.activated:
+    domain: commerce
+    event: ProductActivated
+    version: "1.0"
+    schema:
+      type: object
+      required: [productId, isActive, changedBy, timestamp]
+      properties:
+        productId:
+          type: string
+          format: uuid
+          description: "معرف المنتج"
+        isActive:
+          type: boolean
+          description: "حالة تفعيل المنتج"
+        changedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم القائم بالتغيير"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "30 days"
+
+  commerce.cart.item_added:
+    domain: commerce
+    event: ItemAddedToCart
+    version: "1.0"
+    schema:
+      type: object
+      required: [cartId, customerId, productId, quantity, unitPrice, timestamp]
+      properties:
+        cartId:
+          type: string
+          format: uuid
+          description: "معرف السلة"
+        customerId:
+          type: string
+          format: uuid
+          description: "معرف العميل"
+        productId:
+          type: string
+          format: uuid
+          description: "معرف المنتج"
+        quantity:
+          type: integer
+          minimum: 1
+          description: "الكمية المضافة"
+        unitPrice:
+          type: number
+          minimum: 0
+          description: "سعر الوحدة وقت الإضافة"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "7 days"
+
+  commerce.cart.item_removed:
+    domain: commerce
+    event: ItemRemovedFromCart
+    version: "1.0"
+    schema:
+      type: object
+      required: [cartId, customerId, productId, timestamp]
+      properties:
+        cartId:
+          type: string
+          format: uuid
+          description: "معرف السلة"
+        customerId:
+          type: string
+          format: uuid
+          description: "معرف العميل"
+        productId:
+          type: string
+          format: uuid
+          description: "معرف المنتج المحذوف"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "7 days"
+
+  commerce.cart.abandoned:
+    domain: commerce
+    event: CartAbandoned
+    version: "1.0"
+    schema:
+      type: object
+      required: [cartId, customerId, items, cartTotal, timestamp]
+      properties:
+        cartId:
+          type: string
+          format: uuid
+          description: "معرف السلة المتروكة"
+        customerId:
+          type: string
+          format: uuid
+          description: "معرف العميل"
+        items:
+          type: array
+          items:
+            type: object
+          description: "المنتجات في السلة"
+        cartTotal:
+          type: number
+          minimum: 0
+          description: "إجمالي قيمة السلة"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "90 days"
+
+  commerce.order.placed:
+    domain: commerce
+    event: CommerceOrderPlaced
+    version: "1.0"
+    schema:
+      type: object
+      required: [orderId, orderNumber, customerId, items, total, currency, paymentMethod, timestamp]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: "معرف الطلب التجاري"
+        orderNumber:
+          type: string
+          description: "الرقم المرجعي للطلب"
+        customerId:
+          type: string
+          format: uuid
+          description: "معرف العميل"
+        items:
+          type: array
+          items:
+            type: object
+          description: "المنتجات المطلوبة"
+        total:
+          type: number
+          minimum: 0
+          description: "المبلغ الإجمالي"
+        currency:
+          type: string
+          enum: [SAR, AED, USD]
+          description: "العملة"
+        shippingAddress:
+          type: object
+          description: "عنوان الشحن"
+        paymentMethod:
+          type: string
+          enum: [credit_card, mada, apple_pay, bank_transfer, cod]
+          description: "طريقة الدفع"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "365 days"
+
+  commerce.order.status_changed:
+    domain: commerce
+    event: CommerceOrderStatusChanged
+    version: "1.0"
+    schema:
+      type: object
+      required: [orderId, orderNumber, oldStatus, newStatus, changedBy, timestamp]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: "معرف الطلب التجاري"
+        orderNumber:
+          type: string
+          description: "الرقم المرجعي للطلب"
+        oldStatus:
+          type: string
+          enum: [pending, confirmed, processing, shipped, delivered, cancelled, refunded]
+          description: "الحالة السابقة"
+        newStatus:
+          type: string
+          enum: [pending, confirmed, processing, shipped, delivered, cancelled, refunded]
+          description: "الحالة الجديدة"
+        changedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم القائم بالتغيير"
+        note:
+          type: string
+          description: "ملاحظة تغيير الحالة"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "365 days"
+
+  commerce.payment.completed:
+    domain: commerce
+    event: PaymentCompleted
+    version: "1.0"
+    schema:
+      type: object
+      required: [orderId, orderNumber, amount, currency, paymentMethod, paymentId, timestamp]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: "معرف الطلب التجاري"
+        orderNumber:
+          type: string
+          description: "الرقم المرجعي للطلب"
+        amount:
+          type: number
+          minimum: 0
+          description: "المبلغ المدفوع"
+        currency:
+          type: string
+          enum: [SAR, AED, USD]
+          description: "العملة"
+        paymentMethod:
+          type: string
+          description: "طريقة الدفع المستخدمة"
+        paymentId:
+          type: string
+          description: "معرف الدفع من بوابة الدفع"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "365 days"
+
+  commerce.payment.failed:
+    domain: commerce
+    event: PaymentFailed
+    version: "1.0"
+    schema:
+      type: object
+      required: [orderId, orderNumber, reason, timestamp]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: "معرف الطلب التجاري"
+        orderNumber:
+          type: string
+          description: "الرقم المرجعي للطلب"
+        reason:
+          type: string
+          description: "سبب فشل الدفع"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "365 days"
+
+  commerce.inventory.reserved:
+    domain: commerce
+    event: InventoryReserved
+    version: "1.0"
+    schema:
+      type: object
+      required: [inventoryId, productId, sku, quantityReserved, remainingAvailable, timestamp]
+      properties:
+        inventoryId:
+          type: string
+          format: uuid
+          description: "معرف سجل المخزون"
+        productId:
+          type: string
+          format: uuid
+          description: "معرف المنتج"
+        sku:
+          type: string
+          description: "رمز المنتج التجاري"
+        quantityReserved:
+          type: integer
+          minimum: 0
+          description: "الكمية المحجوزة"
+        remainingAvailable:
+          type: integer
+          minimum: 0
+          description: "الكمية المتاحة المتبقية"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "30 days"
+
+  commerce.inventory.released:
+    domain: commerce
+    event: InventoryReleased
+    version: "1.0"
+    schema:
+      type: object
+      required: [inventoryId, productId, sku, quantityReleased, timestamp]
+      properties:
+        inventoryId:
+          type: string
+          format: uuid
+          description: "معرف سجل المخزون"
+        productId:
+          type: string
+          format: uuid
+          description: "معرف المنتج"
+        sku:
+          type: string
+          description: "رمز المنتج التجاري"
+        quantityReleased:
+          type: integer
+          minimum: 0
+          description: "الكمية المحررة"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "30 days"
+
+  commerce.inventory.depleted:
+    domain: commerce
+    event: InventoryDepleted
+    version: "1.0"
+    schema:
+      type: object
+      required: [inventoryId, productId, sku, timestamp]
+      properties:
+        inventoryId:
+          type: string
+          format: uuid
+          description: "معرف سجل المخزون"
+        productId:
+          type: string
+          format: uuid
+          description: "معرف المنتج"
+        sku:
+          type: string
+          description: "رمز المنتج التجاري"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "30 days"
+
+  commerce.inventory.low_stock:
+    domain: commerce
+    event: InventoryLowStock
+    version: "1.0"
+    schema:
+      type: object
+      required: [inventoryId, productId, sku, availableQuantity, threshold, timestamp]
+      properties:
+        inventoryId:
+          type: string
+          format: uuid
+          description: "معرف سجل المخزون"
+        productId:
+          type: string
+          format: uuid
+          description: "معرف المنتج"
+        sku:
+          type: string
+          description: "رمز المنتج التجاري"
+        availableQuantity:
+          type: integer
+          minimum: 0
+          description: "الكمية المتاحة"
+        threshold:
+          type: integer
+          minimum: 0
+          description: "حد إعادة الطلب"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "30 days"
+
+  commerce.shipment.created:
+    domain: commerce
+    event: ShipmentCreated
+    version: "1.0"
+    schema:
+      type: object
+      required: [orderId, orderNumber, trackingNumber, carrier, items, shippingAddress, timestamp]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: "معرف الطلب التجاري"
+        orderNumber:
+          type: string
+          description: "الرقم المرجعي للطلب"
+        trackingNumber:
+          type: string
+          description: "رقم التتبع"
+        carrier:
+          type: string
+          description: "شركة الشحن"
+        estimatedDelivery:
+          type: string
+          format: date
+          description: "تاريخ التسليم المتوقع"
+        items:
+          type: array
+          items:
+            type: object
+          description: "المنتجات المشحونة"
+        shippingAddress:
+          type: object
+          description: "عنوان الشحن"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "365 days"
+
+  commerce.shipment.delivered:
+    domain: commerce
+    event: ShipmentDelivered
+    version: "1.0"
+    schema:
+      type: object
+      required: [orderId, orderNumber, deliveredAt, timestamp]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: "معرف الطلب التجاري"
+        orderNumber:
+          type: string
+          description: "الرقم المرجعي للطلب"
+        deliveredAt:
+          type: string
+          format: date-time
+          description: "وقت التسليم"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "365 days"
+
+  commerce.order.refunded:
+    domain: commerce
+    event: OrderRefunded
+    version: "1.0"
+    schema:
+      type: object
+      required: [orderId, orderNumber, refundAmount, reason, refundedBy, timestamp]
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: "معرف الطلب التجاري"
+        orderNumber:
+          type: string
+          description: "الرقم المرجعي للطلب"
+        refundAmount:
+          type: number
+          minimum: 0
+          description: "مبلغ الاسترداد"
+        reason:
+          type: string
+          description: "سبب الاسترداد"
+        refundedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم القائم بالاسترداد"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "365 days"
+
+  commerce.product.review_submitted:
+    domain: commerce
+    event: ProductReviewSubmitted
+    version: "1.0"
+    schema:
+      type: object
+      required: [reviewId, productId, customerId, rating, timestamp]
+      properties:
+        reviewId:
+          type: string
+          format: uuid
+          description: "معرف التقييم"
+        productId:
+          type: string
+          format: uuid
+          description: "معرف المنتج"
+        customerId:
+          type: string
+          format: uuid
+          description: "معرف العميل"
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: "التقييم (1-5)"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:commerce.events"
+    retention: "365 days"
+
+  # ===========================================================================
+  # SUPPORT DOMAIN (16 events)
+  # ===========================================================================
+
+  support.ticket.opened:
+    domain: support
+    event: TicketOpened
+    version: "1.0"
+    schema:
+      type: object
+      required: [ticketId, ticketNumber, customerId, title, category, priority, source, timestamp]
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+          description: "معرف التذكرة"
+        ticketNumber:
+          type: string
+          description: "الرقم المرجعي للتذكرة"
+        customerId:
+          type: string
+          format: uuid
+          description: "معرف العميل"
+        title:
+          type: string
+          description: "عنوان التذكرة"
+        category:
+          type: string
+          description: "تصنيف التذكرة"
+        priority:
+          type: string
+          enum: [low, medium, high, urgent]
+          description: "أولوية التذكرة"
+        source:
+          type: string
+          enum: [web, email, phone, whatsapp, api]
+          description: "مصدر التذكرة"
+        slaResponseDeadline:
+          type: string
+          format: date-time
+          description: "موعد الرد المطلوب حسب SLA"
+        slaResolutionDeadline:
+          type: string
+          format: date-time
+          description: "موعد الحل المطلوب حسب SLA"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:support.events"
+    retention: "365 days"
+
+  support.ticket.assigned:
+    domain: support
+    event: TicketAssigned
+    version: "1.0"
+    schema:
+      type: object
+      required: [ticketId, ticketNumber, assignedTo, assignedBy, timestamp]
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+          description: "معرف التذكرة"
+        ticketNumber:
+          type: string
+          description: "الرقم المرجعي للتذكرة"
+        assignedTo:
+          type: string
+          format: uuid
+          description: "معرف الموظف المعين"
+        assignedBy:
+          type: string
+          format: uuid
+          description: "معرف المدير القائم بالتعيين"
+        previousAssignee:
+          type: string
+          format: uuid
+          description: "معرف الموظف السابق إن وجد"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:support.events"
+    retention: "365 days"
+
+  support.ticket.message_added:
+    domain: support
+    event: TicketMessageAdded
+    version: "1.0"
+    schema:
+      type: object
+      required: [ticketId, ticketNumber, messageId, senderId, senderType, isInternal, timestamp]
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+          description: "معرف التذكرة"
+        ticketNumber:
+          type: string
+          description: "الرقم المرجعي للتذكرة"
+        messageId:
+          type: string
+          format: uuid
+          description: "معرف الرسالة"
+        senderId:
+          type: string
+          format: uuid
+          description: "معرف المرسل"
+        senderType:
+          type: string
+          enum: [customer, employee, system]
+          description: "نوع المرسل"
+        isInternal:
+          type: boolean
+          description: "هل الرسالة داخلية (فريق الدعم فقط)"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:support.events"
+    retention: "365 days"
+
+  support.ticket.internal_note_added:
+    domain: support
+    event: TicketInternalNoteAdded
+    version: "1.0"
+    schema:
+      type: object
+      required: [ticketId, ticketNumber, messageId, senderId, timestamp]
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+          description: "معرف التذكرة"
+        ticketNumber:
+          type: string
+          description: "الرقم المرجعي للتذكرة"
+        messageId:
+          type: string
+          format: uuid
+          description: "معرف الملاحظة الداخلية"
+        senderId:
+          type: string
+          format: uuid
+          description: "معرف الموظف الذي أضاف الملاحظة"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:support.events"
+    retention: "365 days"
+
+  support.ticket.status_changed:
+    domain: support
+    event: TicketStatusChanged
+    version: "1.0"
+    schema:
+      type: object
+      required: [ticketId, ticketNumber, oldStatus, newStatus, changedBy, isAutomatic, timestamp]
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+          description: "معرف التذكرة"
+        ticketNumber:
+          type: string
+          description: "الرقم المرجعي للتذكرة"
+        oldStatus:
+          type: string
+          enum: [open, in_progress, waiting_customer, resolved, closed]
+          description: "الحالة السابقة"
+        newStatus:
+          type: string
+          enum: [open, in_progress, waiting_customer, resolved, closed]
+          description: "الحالة الجديدة"
+        changedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم القائم بالتغيير"
+        isAutomatic:
+          type: boolean
+          description: "هل التغيير تلقائي (SLA مثلاً)"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:support.events"
+    retention: "365 days"
+
+  support.ticket.resolved:
+    domain: support
+    event: TicketResolved
+    version: "1.0"
+    schema:
+      type: object
+      required: [ticketId, ticketNumber, resolvedBy, resolutionTimeMinutes, timestamp]
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+          description: "معرف التذكرة"
+        ticketNumber:
+          type: string
+          description: "الرقم المرجعي للتذكرة"
+        resolvedBy:
+          type: string
+          format: uuid
+          description: "معرف الموظف الذي حل التذكرة"
+        firstResponseAt:
+          type: string
+          format: date-time
+          description: "وقت أول رد على التذكرة"
+        resolutionTimeMinutes:
+          type: integer
+          minimum: 0
+          description: "وقت الحل بالدقائق"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:support.events"
+    retention: "365 days"
+
+  support.ticket.closed:
+    domain: support
+    event: TicketClosed
+    version: "1.0"
+    schema:
+      type: object
+      required: [ticketId, ticketNumber, closedBy, totalMessages, resolutionTimeMinutes, timestamp]
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+          description: "معرف التذكرة"
+        ticketNumber:
+          type: string
+          description: "الرقم المرجعي للتذكرة"
+        closedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي أغلق التذكرة"
+        totalMessages:
+          type: integer
+          minimum: 0
+          description: "إجمالي عدد الرسائل في التذكرة"
+        resolutionTimeMinutes:
+          type: integer
+          minimum: 0
+          description: "إجمالي وقت الحل بالدقائق"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:support.events"
+    retention: "365 days"
+
+  support.ticket.reopened:
+    domain: support
+    event: TicketReopened
+    version: "1.0"
+    schema:
+      type: object
+      required: [ticketId, ticketNumber, reopenedBy, originalClosedAt, timestamp]
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+          description: "معرف التذكرة"
+        ticketNumber:
+          type: string
+          description: "الرقم المرجعي للتذكرة"
+        reopenedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي أعاد فتح التذكرة"
+        originalClosedAt:
+          type: string
+          format: date-time
+          description: "وقت الإغلاق الأصلي"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:support.events"
+    retention: "365 days"
+
+  support.ticket.rated:
+    domain: support
+    event: TicketRated
+    version: "1.0"
+    schema:
+      type: object
+      required: [ticketId, ticketNumber, rating, customerId, timestamp]
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+          description: "معرف التذكرة"
+        ticketNumber:
+          type: string
+          description: "الرقم المرجعي للتذكرة"
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: "تقييم الرضا (1-5)"
+        comment:
+          type: string
+          description: "تعليق التقييم"
+        customerId:
+          type: string
+          format: uuid
+          description: "معرف العميل"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:support.events"
+    retention: "365 days"
+
+  support.sla.breach_warning:
+    domain: support
+    event: SLABreachWarning
+    version: "1.0"
+    schema:
+      type: object
+      required: [ticketId, ticketNumber, slaType, deadline, timestamp]
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+          description: "معرف التذكرة"
+        ticketNumber:
+          type: string
+          description: "الرقم المرجعي للتذكرة"
+        slaType:
+          type: string
+          enum: [response, resolution]
+          description: "نوع SLA (وقت الرد / وقت الحل)"
+        deadline:
+          type: string
+          format: date-time
+          description: "موعد SLA النهائي"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:support.events"
+    retention: "90 days"
+
+  support.sla.breach_escalation:
+    domain: support
+    event: SLABreachEscalation
+    version: "1.0"
+    schema:
+      type: object
+      required: [ticketId, ticketNumber, slaType, exceededByMinutes, assignedTo, timestamp]
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+          description: "معرف التذكرة"
+        ticketNumber:
+          type: string
+          description: "الرقم المرجعي للتذكرة"
+        slaType:
+          type: string
+          enum: [response, resolution]
+          description: "نوع SLA المخترق"
+        exceededByMinutes:
+          type: integer
+          minimum: 0
+          description: "عدد دقائق تجاوز SLA"
+        assignedTo:
+          type: string
+          format: uuid
+          description: "معرف الموظف المعين للتذكرة"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:support.events"
+    retention: "365 days"
+
+  support.knowledge.article_created:
+    domain: support
+    event: ArticleCreated
+    version: "1.0"
+    schema:
+      type: object
+      required: [articleId, title_en, authorId, category, timestamp]
+      properties:
+        articleId:
+          type: string
+          format: uuid
+          description: "معرف المقال"
+        title_en:
+          type: string
+          description: "عنوان المقال بالإنجليزية"
+        authorId:
+          type: string
+          format: uuid
+          description: "معرف المؤلف"
+        category:
+          type: string
+          description: "تصنيف المقال المعرفي"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:support.events"
+    retention: "30 days"
+
+  support.knowledge.article_published:
+    domain: support
+    event: ArticlePublished
+    version: "1.0"
+    schema:
+      type: object
+      required: [articleId, title_ar, title_en, category, tags, publishedBy, timestamp]
+      properties:
+        articleId:
+          type: string
+          format: uuid
+          description: "معرف المقال"
+        title_ar:
+          type: string
+          description: "عنوان المقال بالعربية"
+        title_en:
+          type: string
+          description: "عنوان المقال بالإنجليزية"
+        category:
+          type: string
+          description: "تصنيف المقال المعرفي"
+        tags:
+          type: array
+          items:
+            type: string
+          description: "وسوم المقال"
+        publishedBy:
+          type: string
+          format: uuid
+          description: "معرف الناشر"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:support.events"
+    retention: "365 days"
+
+  support.knowledge.article_updated:
+    domain: support
+    event: ArticleUpdated
+    version: "1.0"
+    schema:
+      type: object
+      required: [articleId, title_en, updatedBy, changedFields, timestamp]
+      properties:
+        articleId:
+          type: string
+          format: uuid
+          description: "معرف المقال"
+        title_en:
+          type: string
+          description: "عنوان المقال بالإنجليزية"
+        updatedBy:
+          type: string
+          format: uuid
+          description: "معرف المحرر"
+        changedFields:
+          type: array
+          items:
+            type: string
+          description: "الحقول التي تم تغييرها"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:support.events"
+    retention: "30 days"
+
+  support.knowledge.article_archived:
+    domain: support
+    event: ArticleArchived
+    version: "1.0"
+    schema:
+      type: object
+      required: [articleId, title_en, archivedBy, timestamp]
+      properties:
+        articleId:
+          type: string
+          format: uuid
+          description: "معرف المقال المؤرشف"
+        title_en:
+          type: string
+          description: "عنوان المقال بالإنجليزية"
+        archivedBy:
+          type: string
+          format: uuid
+          description: "معرف القائم بالأرشفة"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:support.events"
+    retention: "365 days"
+
+  support.knowledge.article_helpful_rated:
+    domain: support
+    event: ArticleHelpfulRated
+    version: "1.0"
+    schema:
+      type: object
+      required: [articleId, isHelpful, timestamp]
+      properties:
+        articleId:
+          type: string
+          format: uuid
+          description: "معرف المقال"
+        isHelpful:
+          type: boolean
+          description: "هل المقال مفيد"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:support.events"
+    retention: "90 days"
+
+  # ===========================================================================
+  # CONTENT DOMAIN (7 events)
+  # ===========================================================================
+
+  content.page.published:
+    domain: content
+    event: PagePublished
+    version: "1.0"
+    schema:
+      type: object
+      required: [pageId, slug, title_ar, title_en, publishedBy, publishedAt]
+      properties:
+        pageId:
+          type: string
+          format: uuid
+          description: "معرف الصفحة"
+        slug:
+          type: string
+          description: "المعرف النصي للصفحة في الرابط"
+        title_ar:
+          type: string
+          description: "عنوان الصفحة بالعربية"
+        title_en:
+          type: string
+          description: "عنوان الصفحة بالإنجليزية"
+        publishedBy:
+          type: string
+          format: uuid
+          description: "معرف الناشر"
+        publishedAt:
+          type: string
+          format: date-time
+          description: "وقت النشر"
+    transport:
+      type: async
+      channel: "bullmq:content.events"
+    retention: "365 days"
+
+  content.page.unpublished:
+    domain: content
+    event: PageUnpublished
+    version: "1.0"
+    schema:
+      type: object
+      required: [pageId, slug, title_ar, unpublishedBy, unpublishedAt]
+      properties:
+        pageId:
+          type: string
+          format: uuid
+          description: "معرف الصفحة"
+        slug:
+          type: string
+          description: "المعرف النصي للصفحة"
+        title_ar:
+          type: string
+          description: "عنوان الصفحة بالعربية"
+        unpublishedBy:
+          type: string
+          format: uuid
+          description: "معرف القائم بإلغاء النشر"
+        unpublishedAt:
+          type: string
+          format: date-time
+          description: "وقت إلغاء النشر"
+    transport:
+      type: async
+      channel: "bullmq:content.events"
+    retention: "90 days"
+
+  content.page.scheduled:
+    domain: content
+    event: PageScheduled
+    version: "1.0"
+    schema:
+      type: object
+      required: [pageId, slug, title_ar, scheduledBy, scheduledAt, jobId]
+      properties:
+        pageId:
+          type: string
+          format: uuid
+          description: "معرف الصفحة"
+        slug:
+          type: string
+          description: "المعرف النصي للصفحة"
+        title_ar:
+          type: string
+          description: "عنوان الصفحة بالعربية"
+        scheduledBy:
+          type: string
+          format: uuid
+          description: "معرف القائم بالجدولة"
+        scheduledAt:
+          type: string
+          format: date-time
+          description: "وقت النشر المجدول"
+        jobId:
+          type: string
+          description: "معرف مهمة BullMQ المجدولة"
+    transport:
+      type: async
+      channel: "bullmq:content.events"
+    retention: "30 days"
+
+  content.media.uploaded:
+    domain: content
+    event: MediaUploaded
+    version: "1.0"
+    schema:
+      type: object
+      required: [mediaId, filename, mimeType, sizeBytes, uploadedBy, uploadedAt]
+      properties:
+        mediaId:
+          type: string
+          format: uuid
+          description: "معرف الملف"
+        filename:
+          type: string
+          description: "اسم الملف الأصلي"
+        mimeType:
+          type: string
+          description: "نوع الملف MIME"
+        sizeBytes:
+          type: integer
+          minimum: 0
+          description: "حجم الملف بالبايت"
+        uploadedBy:
+          type: string
+          format: uuid
+          description: "معرف الرافع"
+        uploadedAt:
+          type: string
+          format: date-time
+          description: "وقت الرفع"
+    transport:
+      type: async
+      channel: "bullmq:content.events"
+    retention: "30 days"
+
+  content.media.deleted:
+    domain: content
+    event: MediaDeleted
+    version: "1.0"
+    schema:
+      type: object
+      required: [mediaId, filename, deletedBy, deletedAt]
+      properties:
+        mediaId:
+          type: string
+          format: uuid
+          description: "معرف الملف المحذوف"
+        filename:
+          type: string
+          description: "اسم الملف الأصلي"
+        deletedBy:
+          type: string
+          format: uuid
+          description: "معرف القائم بالحذف"
+        deletedAt:
+          type: string
+          format: date-time
+          description: "وقت الحذف"
+    transport:
+      type: async
+      channel: "bullmq:content.events"
+    retention: "90 days"
+
+  content.blog.post_published:
+    domain: content
+    event: BlogPostPublished
+    version: "1.0"
+    schema:
+      type: object
+      required: [postId, slug, title_ar, categoryId, tags, publishedBy, publishedAt]
+      properties:
+        postId:
+          type: string
+          format: uuid
+          description: "معرف المقال"
+        slug:
+          type: string
+          description: "المعرف النصي للمقال في الرابط"
+        title_ar:
+          type: string
+          description: "عنوان المقال بالعربية"
+        categoryId:
+          type: string
+          format: uuid
+          description: "معرف تصنيف المدونة"
+        tags:
+          type: array
+          items:
+            type: string
+          description: "وسوم المقال"
+        publishedBy:
+          type: string
+          format: uuid
+          description: "معرف الناشر"
+        publishedAt:
+          type: string
+          format: date-time
+          description: "وقت النشر"
+    transport:
+      type: async
+      channel: "bullmq:content.events"
+    retention: "365 days"
+
+  content.menu.updated:
+    domain: content
+    event: MenuUpdated
+    version: "1.0"
+    schema:
+      type: object
+      required: [menuId, name, location, updatedBy, updatedAt]
+      properties:
+        menuId:
+          type: string
+          format: uuid
+          description: "معرف القائمة"
+        name:
+          type: string
+          description: "اسم القائمة"
+        location:
+          type: string
+          enum: [header, footer, sidebar, mobile]
+          description: "موقع القائمة في الواجهة"
+        updatedBy:
+          type: string
+          format: uuid
+          description: "معرف المعدل"
+        updatedAt:
+          type: string
+          format: date-time
+          description: "وقت التعديل"
+    transport:
+      type: async
+      channel: "bullmq:content.events"
+    retention: "30 days"
+
+  # ===========================================================================
+  # NOTIFICATION DOMAIN (6 events)
+  # ===========================================================================
+
+  notification.delivery.sent:
+    domain: notification
+    event: NotificationSent
+    version: "1.0"
+    schema:
+      type: object
+      required: [logId, templateCode, userId, channel, recipient, sentAt]
+      properties:
+        logId:
+          type: string
+          format: uuid
+          description: "معرف سجل الإرسال"
+        templateCode:
+          type: string
+          description: "رمز القالب المستخدم"
+        userId:
+          type: string
+          format: uuid
+          description: "معرف المستخدم المستلم"
+        channel:
+          type: string
+          enum: [email, sms, push, whatsapp]
+          description: "قناة الإرسال"
+        recipient:
+          type: string
+          description: "عنوان المستلم (بريد/رقم هاتف)"
+        sentAt:
+          type: string
+          format: date-time
+          description: "وقت الإرسال"
+    transport:
+      type: async
+      channel: "bullmq:notification.events"
+    retention: "90 days"
+
+  notification.delivery.failed:
+    domain: notification
+    event: NotificationFailed
+    version: "1.0"
+    schema:
+      type: object
+      required: [logId, templateCode, userId, channel, recipient, errorMessage, retryCount, nextRetryAt]
+      properties:
+        logId:
+          type: string
+          format: uuid
+          description: "معرف سجل الإرسال"
+        templateCode:
+          type: string
+          description: "رمز القالب"
+        userId:
+          type: string
+          format: uuid
+          description: "معرف المستخدم"
+        channel:
+          type: string
+          enum: [email, sms, push, whatsapp]
+          description: "قناة الإرسال"
+        recipient:
+          type: string
+          description: "عنوان المستلم"
+        errorMessage:
+          type: string
+          description: "رسالة الخطأ"
+        retryCount:
+          type: integer
+          minimum: 0
+          description: "عدد المحاولات الحالية"
+        nextRetryAt:
+          type: string
+          format: date-time
+          description: "موعد المحاولة التالية"
+    transport:
+      type: async
+      channel: "bullmq:notification.events"
+    retention: "30 days"
+
+  notification.delivery.permanently_failed:
+    domain: notification
+    event: NotificationPermanentlyFailed
+    version: "1.0"
+    schema:
+      type: object
+      required: [logId, templateCode, userId, channel, recipient, errorMessage, totalRetries]
+      properties:
+        logId:
+          type: string
+          format: uuid
+          description: "معرف سجل الإرسال"
+        templateCode:
+          type: string
+          description: "رمز القالب"
+        userId:
+          type: string
+          format: uuid
+          description: "معرف المستخدم"
+        channel:
+          type: string
+          enum: [email, sms, push, whatsapp]
+          description: "قناة الإرسال"
+        recipient:
+          type: string
+          description: "عنوان المستلم"
+        errorMessage:
+          type: string
+          description: "رسالة الخطأ النهائية"
+        totalRetries:
+          type: integer
+          minimum: 0
+          description: "إجمالي عدد المحاولات"
+    transport:
+      type: async
+      channel: "bullmq:notification.events"
+    retention: "90 days"
+
+  notification.preference.opted_out:
+    domain: notification
+    event: UserOptedOut
+    version: "1.0"
+    schema:
+      type: object
+      required: [userId, channel, notificationType, timestamp]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: "معرف المستخدم"
+        channel:
+          type: string
+          enum: [email, sms, push, whatsapp]
+          description: "قناة الإشعار"
+        notificationType:
+          type: string
+          description: "نوع الإشعار"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:notification.events"
+    retention: "365 days"
+
+  notification.preference.opted_in:
+    domain: notification
+    event: UserOptedIn
+    version: "1.0"
+    schema:
+      type: object
+      required: [userId, channel, notificationType, timestamp]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: "معرف المستخدم"
+        channel:
+          type: string
+          enum: [email, sms, push, whatsapp]
+          description: "قناة الإشعار"
+        notificationType:
+          type: string
+          description: "نوع الإشعار"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:notification.events"
+    retention: "365 days"
+
+  notification.rate_limited:
+    domain: notification
+    event: NotificationRateLimited
+    version: "1.0"
+    schema:
+      type: object
+      required: [userId, channel, templateCode, recipient, reason]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: "معرف المستخدم"
+        channel:
+          type: string
+          enum: [email, sms, push, whatsapp]
+          description: "قناة الإشعار"
+        templateCode:
+          type: string
+          description: "رمز القالب المحظور"
+        recipient:
+          type: string
+          description: "عنوان المستلم"
+        reason:
+          type: string
+          description: "سبب تحديد المعدل"
+    transport:
+      type: async
+      channel: "bullmq:notification.events"
+    retention: "30 days"
+
+  # ===========================================================================
+  # ANALYTICS DOMAIN (7 events)
+  # ===========================================================================
+
+  analytics.report.generated:
+    domain: analytics
+    event: ReportGenerated
+    version: "1.0"
+    schema:
+      type: object
+      required: [reportId, type, generatedBy, s3Url, format, timestamp]
+      properties:
+        reportId:
+          type: string
+          format: uuid
+          description: "معرف التقرير"
+        type:
+          type: string
+          description: "نوع التقرير"
+        generatedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الطالب"
+        s3Url:
+          type: string
+          format: uri
+          description: "رابط ملف التقرير في S3"
+        format:
+          type: string
+          enum: [pdf, xlsx, csv]
+          description: "صيغة التقرير"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:analytics.events"
+    retention: "30 days"
+
+  analytics.report.generation_failed:
+    domain: analytics
+    event: ReportGenerationFailed
+    version: "1.0"
+    schema:
+      type: object
+      required: [reportId, type, generatedBy, error, timestamp]
+      properties:
+        reportId:
+          type: string
+          format: uuid
+          description: "معرف التقرير"
+        type:
+          type: string
+          description: "نوع التقرير"
+        generatedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الطالب"
+        error:
+          type: string
+          description: "رسالة الخطأ"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:analytics.events"
+    retention: "30 days"
+
+  analytics.kpi.threshold_breached:
+    domain: analytics
+    event: KpiThresholdBreached
+    version: "1.0"
+    schema:
+      type: object
+      required: [kpiId, name, domain, targetValue, currentValue, direction, timestamp]
+      properties:
+        kpiId:
+          type: string
+          format: uuid
+          description: "معرف مؤشر الأداء"
+        name:
+          type: string
+          description: "اسم المؤشر"
+        domain:
+          type: string
+          description: "النطاق التجاري للمؤشر"
+        targetValue:
+          type: number
+          description: "القيمة المستهدفة"
+        currentValue:
+          type: number
+          description: "القيمة الحالية"
+        direction:
+          type: string
+          enum: [above_threshold, below_threshold]
+          description: "اتجاه الاختراق (فوق/تحت الحد)"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:analytics.events"
+    retention: "90 days"
+
+  analytics.dashboard.shared:
+    domain: analytics
+    event: DashboardShared
+    version: "1.0"
+    schema:
+      type: object
+      required: [dashboardId, sharedBy, sharedWith, permissions, timestamp]
+      properties:
+        dashboardId:
+          type: string
+          format: uuid
+          description: "معرف لوحة التحكم"
+        sharedBy:
+          type: string
+          format: uuid
+          description: "معرف المستخدم القائم بالمشاركة"
+        sharedWith:
+          type: string
+          format: uuid
+          description: "معرف المستخدم الذي تمت المشاركة معه"
+        permissions:
+          type: string
+          enum: [view, edit]
+          description: "صلاحيات المشاركة"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:analytics.events"
+    retention: "30 days"
+
+  analytics.export.completed:
+    domain: analytics
+    event: ExportCompleted
+    version: "1.0"
+    schema:
+      type: object
+      required: [reportId, format, s3Url, fileSize, timestamp]
+      properties:
+        reportId:
+          type: string
+          format: uuid
+          description: "معرف التقرير"
+        format:
+          type: string
+          enum: [pdf, xlsx, csv]
+          description: "صيغة التصدير"
+        s3Url:
+          type: string
+          format: uri
+          description: "رابط الملف المصدر في S3"
+        fileSize:
+          type: integer
+          minimum: 0
+          description: "حجم الملف بالبايت"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:analytics.events"
+    retention: "30 days"
+
+  analytics.export.expired:
+    domain: analytics
+    event: ExportExpired
+    version: "1.0"
+    schema:
+      type: object
+      required: [reportId, s3Url, timestamp]
+      properties:
+        reportId:
+          type: string
+          format: uuid
+          description: "معرف التقرير المنتهي"
+        s3Url:
+          type: string
+          format: uri
+          description: "رابط الملف المنتهي"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:analytics.events"
+    retention: "7 days"
+
+  analytics.kpi.recalculated:
+    domain: analytics
+    event: KpiRecalculated
+    version: "1.0"
+    schema:
+      type: object
+      required: [kpiId, oldValue, newValue, timestamp]
+      properties:
+        kpiId:
+          type: string
+          format: uuid
+          description: "معرف مؤشر الأداء"
+        oldValue:
+          type: number
+          description: "القيمة السابقة"
+        newValue:
+          type: number
+          description: "القيمة الجديدة"
+        timestamp:
+          type: string
+          format: date-time
+    transport:
+      type: async
+      channel: "bullmq:analytics.events"
+    retention: "90 days"
+
+  # ===========================================================================
+  # AI DOMAIN (13 events)
+  # ===========================================================================
+
+  ai.interaction.completed:
+    domain: ai
+    event: AiInteractionCompleted
+    version: "1.0"
+    schema:
+      type: object
+      required: [interactionId, agentId, userId, tokensTotal, latencyMs, costUsd, modelUsed, hasError]
+      properties:
+        interactionId:
+          type: string
+          format: uuid
+          description: "معرف التفاعل"
+        agentId:
+          type: string
+          format: uuid
+          description: "معرف الوكيل الذكي"
+        userId:
+          type: string
+          format: uuid
+          description: "معرف المستخدم"
+        tokensTotal:
+          type: integer
+          minimum: 0
+          description: "إجمالي الرموز المستخدمة"
+        latencyMs:
+          type: integer
+          minimum: 0
+          description: "زمن الاستجابة بالميلي ثانية"
+        costUsd:
+          type: number
+          minimum: 0
+          description: "التكلفة بالدولار"
+        modelUsed:
+          type: string
+          description: "النموذج المستخدم"
+        hasError:
+          type: boolean
+          description: "هل حدث خطأ"
+    transport:
+      type: async
+      channel: "bullmq:ai.events"
+    retention: "365 days"
+
+  ai.interaction.failed:
+    domain: ai
+    event: AiInteractionFailed
+    version: "1.0"
+    schema:
+      type: object
+      required: [interactionId, agentId, userId, error, modelUsed, attemptCount]
+      properties:
+        interactionId:
+          type: string
+          format: uuid
+          description: "معرف التفاعل الفاشل"
+        agentId:
+          type: string
+          format: uuid
+          description: "معرف الوكيل الذكي"
+        userId:
+          type: string
+          format: uuid
+          description: "معرف المستخدم"
+        error:
+          type: string
+          description: "رسالة الخطأ"
+        modelUsed:
+          type: string
+          description: "النموذج المستخدم"
+        attemptCount:
+          type: integer
+          minimum: 1
+          description: "عدد المحاولات"
+    transport:
+      type: async
+      channel: "bullmq:ai.events"
+    retention: "90 days"
+
+  ai.knowledge.ingested:
+    domain: ai
+    event: KnowledgeIngested
+    version: "1.0"
+    schema:
+      type: object
+      required: [knowledgeSourceId, documentCount, chunkCount, embeddingModel, durationMs]
+      properties:
+        knowledgeSourceId:
+          type: string
+          format: uuid
+          description: "معرف مصدر المعرفة"
+        documentCount:
+          type: integer
+          minimum: 1
+          description: "عدد المستندات المعالجة"
+        chunkCount:
+          type: integer
+          minimum: 1
+          description: "عدد الأجزاء الناتجة"
+        embeddingModel:
+          type: string
+          description: "نموذج التضمين المستخدم"
+        durationMs:
+          type: integer
+          minimum: 0
+          description: "مدة المعالجة بالميلي ثانية"
+    transport:
+      type: async
+      channel: "bullmq:ai.events"
+    retention: "30 days"
+
+  ai.knowledge.ingestion_failed:
+    domain: ai
+    event: KnowledgeIngestionFailed
+    version: "1.0"
+    schema:
+      type: object
+      required: [knowledgeSourceId, error, failedAt, documentId]
+      properties:
+        knowledgeSourceId:
+          type: string
+          format: uuid
+          description: "معرف مصدر المعرفة"
+        error:
+          type: string
+          description: "رسالة الخطأ"
+        failedAt:
+          type: string
+          format: date-time
+          description: "وقت الفشل"
+        documentId:
+          type: string
+          format: uuid
+          description: "معرف المستند الذي فشلت معالجته"
+    transport:
+      type: async
+      channel: "bullmq:ai.events"
+    retention: "90 days"
+
+  ai.agent.activated:
+    domain: ai
+    event: AgentActivated
+    version: "1.0"
+    schema:
+      type: object
+      required: [agentId, agentName, agentType, activatedBy]
+      properties:
+        agentId:
+          type: string
+          format: uuid
+          description: "معرف الوكيل الذكي"
+        agentName:
+          type: string
+          description: "اسم الوكيل"
+        agentType:
+          type: string
+          enum: [chat, support, analytics, automation, content]
+          description: "نوع الوكيل"
+        activatedBy:
+          type: string
+          format: uuid
+          description: "معرف المفعل"
+    transport:
+      type: async
+      channel: "bullmq:ai.events"
+    retention: "365 days"
+
+  ai.agent.deactivated:
+    domain: ai
+    event: AgentDeactivated
+    version: "1.0"
+    schema:
+      type: object
+      required: [agentId, agentName, agentType, deactivatedBy]
+      properties:
+        agentId:
+          type: string
+          format: uuid
+          description: "معرف الوكيل الذكي"
+        agentName:
+          type: string
+          description: "اسم الوكيل"
+        agentType:
+          type: string
+          enum: [chat, support, analytics, automation, content]
+          description: "نوع الوكيل"
+        deactivatedBy:
+          type: string
+          format: uuid
+          description: "معرف المعطل"
+    transport:
+      type: async
+      channel: "bullmq:ai.events"
+    retention: "365 days"
+
+  ai.embedding.generated:
+    domain: ai
+    event: EmbeddingGenerated
+    version: "1.0"
+    schema:
+      type: object
+      required: [documentId, chunkCount, modelUsed, modelVersion, durationMs]
+      properties:
+        documentId:
+          type: string
+          format: uuid
+          description: "معرف المستند"
+        chunkCount:
+          type: integer
+          minimum: 1
+          description: "عدد الأجزاء"
+        modelUsed:
+          type: string
+          description: "نموذج التضمين المستخدم"
+        modelVersion:
+          type: string
+          description: "إصدار نموذج التضمين"
+        durationMs:
+          type: integer
+          minimum: 0
+          description: "المدة بالميلي ثانية"
+    transport:
+      type: async
+      channel: "bullmq:ai.events"
+    retention: "30 days"
+
+  ai.prompt.versioned:
+    domain: ai
+    event: PromptVersioned
+    version: "1.0"
+    schema:
+      type: object
+      required: [promptId, name, oldVersion, newVersion, createdBy]
+      properties:
+        promptId:
+          type: string
+          format: uuid
+          description: "معرف الموجه"
+        name:
+          type: string
+          description: "اسم الموجه"
+        oldVersion:
+          type: integer
+          minimum: 0
+          description: "رقم الإصدار السابق"
+        newVersion:
+          type: integer
+          minimum: 1
+          description: "رقم الإصدار الجديد"
+        createdBy:
+          type: string
+          format: uuid
+          description: "معرف المنشئ"
+    transport:
+      type: async
+      channel: "bullmq:ai.events"
+    retention: "365 days"
+
+  ai.prompt.activated:
+    domain: ai
+    event: PromptActivated
+    version: "1.0"
+    schema:
+      type: object
+      required: [promptId, name, version, activatedBy]
+      properties:
+        promptId:
+          type: string
+          format: uuid
+          description: "معرف الموجه"
+        name:
+          type: string
+          description: "اسم الموجه"
+        version:
+          type: integer
+          minimum: 1
+          description: "رقم الإصدار المفعل"
+        activatedBy:
+          type: string
+          format: uuid
+          description: "معرف المفعل"
+    transport:
+      type: async
+      channel: "bullmq:ai.events"
+    retention: "365 days"
+
+  ai.prompt.deprecated:
+    domain: ai
+    event: PromptDeprecated
+    version: "1.0"
+    schema:
+      type: object
+      required: [promptId, name, version, replacedBy, deprecatedBy]
+      properties:
+        promptId:
+          type: string
+          format: uuid
+          description: "معرف الموجه"
+        name:
+          type: string
+          description: "اسم الموجه"
+        version:
+          type: integer
+          minimum: 1
+          description: "رقم الإصدار الملغي"
+        replacedBy:
+          type: string
+          format: uuid
+          description: "معرف الموجه البديل"
+        deprecatedBy:
+          type: string
+          format: uuid
+          description: "معرف القائم بالإلغاء"
+    transport:
+      type: async
+      channel: "bullmq:ai.events"
+    retention: "365 days"
+
+  ai.moderation.content_flagged:
+    domain: ai
+    event: ContentModerated
+    version: "1.0"
+    schema:
+      type: object
+      required: [interactionId, direction, flaggedCategories, confidenceScores]
+      properties:
+        interactionId:
+          type: string
+          format: uuid
+          description: "معرف التفاعل"
+        direction:
+          type: string
+          enum: [input, output]
+          description: "اتجاه المحتوى المبلغ عنه"
+        flaggedCategories:
+          type: array
+          items:
+            type: string
+          description: "فئات المحتوى المبلغ عنه"
+        confidenceScores:
+          type: object
+          description: "درجات الثقة لكل فئة"
+    transport:
+      type: async
+      channel: "bullmq:ai.events"
+    retention: "365 days"
+
+  ai.security.pii_detected:
+    domain: ai
+    event: PiiDetected
+    version: "1.0"
+    schema:
+      type: object
+      required: [interactionId, direction, piiTypes, userId]
+      properties:
+        interactionId:
+          type: string
+          format: uuid
+          description: "معرف التفاعل"
+        direction:
+          type: string
+          enum: [input, output]
+          description: "اتجاه البيانات الحساسة"
+        piiTypes:
+          type: array
+          items:
+            type: string
+          description: "أنواع البيانات الشخصية المكتشفة"
+        userId:
+          type: string
+          format: uuid
+          description: "معرف المستخدم"
+    transport:
+      type: async
+      channel: "bullmq:ai.events"
+    retention: "365 days"
+
+  ai.automation.triggered:
+    domain: ai
+    event: AutomationTriggered
+    version: "1.0"
+    schema:
+      type: object
+      required: [agentId, triggerEvent, actionType, targetDomain, payload, status]
+      properties:
+        agentId:
+          type: string
+          format: uuid
+          description: "معرف الوكيل الآلي"
+        triggerEvent:
+          type: string
+          description: "الحدث المحفز"
+        actionType:
+          type: string
+          description: "نوع الإجراء المنفذ"
+        targetDomain:
+          type: string
+          description: "النطاق المستهدف"
+        payload:
+          type: object
+          description: "بيانات الإجراء"
+        status:
+          type: string
+          enum: [success, failure, pending]
+          description: "حالة التنفيذ"
+    transport:
+      type: async
+      channel: "bullmq:ai.events"
+    retention: "365 days"

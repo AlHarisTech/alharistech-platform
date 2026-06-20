@@ -1,0 +1,2114 @@
+openapi: "3.1.0"
+info:
+  title: AlharisTech AI API
+  version: "1.0.0"
+  description: |
+    AI Domain API — AlharisTech Platform (Phase 5).
+    AI agent orchestration, RAG pipeline with pgvector, prompt management with
+    versioning, knowledge source ingestion, and interaction logging with observability.
+  contact:
+    name: AlharisTech Platform Team
+    email: platform@alharistech.com
+
+servers:
+  - url: https://api.alharistech.com/api/v1
+    description: Production
+  - url: https://api.staging.alharistech.com/api/v1
+    description: Staging
+  - url: http://localhost:4000/api/v1
+    description: Development
+
+tags:
+  - name: Agents
+    description: AI agent CRUD and lifecycle
+  - name: Chat
+    description: Agent chat interactions and streaming
+  - name: Knowledge
+    description: Knowledge source ingestion and management
+  - name: Prompts
+    description: Prompt template versioning and management
+  - name: Interactions
+    description: AI interaction history and statistics
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ─── AGENTS ────────────────────────────────────────────────────────────
+  /ai/agents:
+    get:
+      tags:
+        - Agents
+      summary: List AI agents
+      description: Returns the list of configured AI agents. Admin sees all, Manager sees active agents.
+      operationId: listAiAgents
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: type
+          in: query
+          description: Filter by agent type
+          schema:
+            $ref: "#/components/schemas/AgentType"
+        - name: is_active
+          in: query
+          description: Filter by active status
+          schema:
+            type: boolean
+        - $ref: "#/components/parameters/SortByParam"
+      responses:
+        "200":
+          description: List of AI agents
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiAgentListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags:
+        - Agents
+      summary: Create AI agent
+      description: Creates a new AI agent with model configuration, system prompt, and tools.
+      operationId: createAiAgent
+      security:
+        - bearerAuth:
+            - admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiAgentCreate"
+      responses:
+        "201":
+          description: Agent created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiAgentDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  /ai/agents/{id}:
+    get:
+      tags:
+        - Agents
+      summary: Get agent details
+      description: Returns full agent configuration including tools, config, and model settings.
+      operationId: getAiAgent
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - $ref: "#/components/parameters/AgentIdParam"
+      responses:
+        "200":
+          description: Agent details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiAgentDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Agents
+      summary: Update AI agent
+      description: Partially updates an AI agent configuration. Admin only.
+      operationId: updateAiAgent
+      security:
+        - bearerAuth:
+            - admin
+      parameters:
+        - $ref: "#/components/parameters/AgentIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiAgentUpdate"
+      responses:
+        "200":
+          description: Agent updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiAgentDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+    delete:
+      tags:
+        - Agents
+      summary: Delete AI agent
+      description: Deletes an AI agent. Admin only.
+      operationId: deleteAiAgent
+      security:
+        - bearerAuth:
+            - admin
+      parameters:
+        - $ref: "#/components/parameters/AgentIdParam"
+      responses:
+        "200":
+          description: Agent deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ─── CHAT ──────────────────────────────────────────────────────────────
+  /ai/chat:
+    post:
+      tags:
+        - Chat
+      summary: Send message to an AI agent
+      description: |
+        Sends a message to an AI agent for processing. The agent may use RAG
+        (retrieval-augmented generation), call tools, or respond directly.
+        Supports multi-turn conversations via conversation_id.
+
+        Input safety pipeline: sanitization → PII detection → content moderation → jailbreak detection.
+        Output safety pipeline: PII leakage check → content moderation → citation verification.
+      operationId: aiChat
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+            - employee
+            - customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiChatRequest"
+      responses:
+        "200":
+          description: AI response with sources and metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiChatResponse"
+        "400":
+          description: Agent inactive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "AI_AGENT_INACTIVE"
+                  message: "This AI agent is not active"
+                  message_en: "This AI agent is not active"
+                  statusCode: 400
+                meta:
+                  timestamp: "2026-06-20T10:00:00.000Z"
+                  requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          description: Content moderated or PII blocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "AI_CONTENT_MODERATED"
+                  message: "تم حظر المحتوى لاحتوائه على محتوى غير مناسب"
+                  message_en: "Content blocked due to policy violation"
+                  statusCode: 422
+                  details:
+                    categories:
+                      - hate
+                      - violence
+                meta:
+                  timestamp: "2026-06-20T10:00:00.000Z"
+                  requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds until retry
+        "503":
+          description: AI model provider unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /ai/chat/stream:
+    get:
+      tags:
+        - Chat
+      summary: Stream AI chat response (SSE)
+      description: |
+        Opens a Server-Sent Events stream for receiving an AI agent response
+        token by token. Supports the same input safety pipeline as the sync endpoint.
+        Pass parameters as query parameters.
+      operationId: aiChatStream
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+            - employee
+            - customer
+      parameters:
+        - name: agent_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: AI agent ID
+        - name: message
+          in: query
+          required: true
+          schema:
+            type: string
+            maxLength: 4000
+          description: User's input message
+        - name: conversation_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Existing conversation ID for multi-turn
+      responses:
+        "200":
+          description: SSE stream of AI response events
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/AiChatStreamEvent"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          description: Content moderated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  # ─── KNOWLEDGE ─────────────────────────────────────────────────────────
+  /ai/knowledge:
+    post:
+      tags:
+        - Knowledge
+      summary: Create knowledge source
+      description: |
+        Creates a new knowledge source for RAG ingestion. Source can be a document
+        URL, FAQ dataset, or API endpoint. Ingestion runs asynchronously via BullMQ.
+
+        Supported file types: PDF, HTML, Markdown, TXT (max 50MB).
+      operationId: createKnowledgeSource
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KnowledgeSourceCreate"
+      responses:
+        "202":
+          description: Knowledge source created, ingestion started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeSourceIngestResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "413":
+          description: File too large (>50MB)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Unsupported file type or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - Knowledge
+      summary: List knowledge sources
+      description: Returns a paginated list of knowledge sources with ingestion status.
+      operationId: listKnowledgeSources
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+            - employee
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: type
+          in: query
+          description: Filter by source type
+          schema:
+            $ref: "#/components/schemas/KnowledgeSourceType"
+        - name: ingestion_status
+          in: query
+          description: Filter by ingestion status
+          schema:
+            $ref: "#/components/schemas/IngestionStatus"
+        - name: is_active
+          in: query
+          description: Filter by active status
+          schema:
+            type: boolean
+        - $ref: "#/components/parameters/SortByParam"
+      responses:
+        "200":
+          description: List of knowledge sources
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeSourceListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /ai/knowledge/{id}:
+    get:
+      tags:
+        - Knowledge
+      summary: Get knowledge source detail
+      description: Returns full details of a knowledge source including document and chunk counts.
+      operationId: getKnowledgeSource
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+            - employee
+      parameters:
+        - $ref: "#/components/parameters/KnowledgeSourceIdParam"
+      responses:
+        "200":
+          description: Knowledge source detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeSourceDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags:
+        - Knowledge
+      summary: Delete knowledge source
+      description: |
+        Deletes a knowledge source and all its documents, embeddings (CASCADE),
+        and S3 files. Cascade delete removes all related data. S3 raw files
+        are retained for 30 days with a soft-delete marker.
+      operationId: deleteKnowledgeSource
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - $ref: "#/components/parameters/KnowledgeSourceIdParam"
+      responses:
+        "200":
+          description: Knowledge source deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /ai/knowledge/{id}/reingest:
+    post:
+      tags:
+        - Knowledge
+      summary: Re-ingest knowledge source
+      description: |
+        Triggers a re-ingestion of the knowledge source. Changed content
+        (detected by content_hash) generates new embeddings. Unchanged
+        content is skipped. Returns 409 if ingestion is already in progress.
+      operationId: reingestKnowledgeSource
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - $ref: "#/components/parameters/KnowledgeSourceIdParam"
+      responses:
+        "202":
+          description: Re-ingestion accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeSourceIngestResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Ingestion already in progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ─── PROMPTS ───────────────────────────────────────────────────────────
+  /ai/prompts:
+    post:
+      tags:
+        - Prompts
+      summary: Create prompt (version 1)
+      description: |
+        Creates a new prompt template with version=1. Template variables
+        must match `{{variable}}` references in the template string.
+        Missing or extra variables cause a 422 rejection.
+      operationId: createPrompt
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PromptCreate"
+      responses:
+        "201":
+          description: Prompt created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PromptDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          description: Template variable mismatch or invalid syntax
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - Prompts
+      summary: List prompts (latest versions)
+      description: Returns a list of prompts showing only the latest version for each name.
+      operationId: listPrompts
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+            - employee
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: search
+          in: query
+          description: Search by prompt name
+          schema:
+            type: string
+        - name: domain
+          in: query
+          description: Filter by domain
+          schema:
+            type: string
+        - $ref: "#/components/parameters/SortByParam"
+      responses:
+        "200":
+          description: List of prompts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PromptListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /ai/prompts/{id}:
+    get:
+      tags:
+        - Prompts
+      summary: Get prompt version detail
+      description: Returns a single prompt version with all metadata and stats.
+      operationId: getPrompt
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - $ref: "#/components/parameters/PromptIdParam"
+      responses:
+        "200":
+          description: Prompt detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PromptDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Prompts
+      summary: Update prompt
+      description: Updates prompt metadata. Creates a new version if template changes.
+      operationId: updatePrompt
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - $ref: "#/components/parameters/PromptIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PromptUpdate"
+      responses:
+        "200":
+          description: Prompt updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PromptDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+    delete:
+      tags:
+        - Prompts
+      summary: Delete prompt
+      description: Deletes a prompt version. Admin only.
+      operationId: deletePrompt
+      security:
+        - bearerAuth:
+            - admin
+      parameters:
+        - $ref: "#/components/parameters/PromptIdParam"
+      responses:
+        "200":
+          description: Prompt deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /ai/prompts/{id}/versions:
+    get:
+      tags:
+        - Prompts
+      summary: List all versions of a prompt
+      description: Returns all versions of a prompt grouped by name, ordered by version descending.
+      operationId: listPromptVersions
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - $ref: "#/components/parameters/PromptIdParam"
+      responses:
+        "200":
+          description: List of prompt versions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PromptVersionListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /ai/prompts/{id}/versions/{version}/activate:
+    post:
+      tags:
+        - Prompts
+      summary: Activate a prompt version
+      description: |
+        Activates a specific prompt version. Only one version per prompt name
+        can be active at a time. Activating a new version automatically
+        deactivates the previously active version.
+      operationId: activatePromptVersion
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+      parameters:
+        - $ref: "#/components/parameters/PromptIdParam"
+        - name: version
+          in: path
+          required: true
+          description: Version number to activate
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Version activated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PromptStatusResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ─── INTERACTIONS ──────────────────────────────────────────────────────
+  /ai/interactions:
+    get:
+      tags:
+        - Interactions
+      summary: List interactions
+      description: |
+        Returns a paginated, filterable list of AI interactions. Users see only
+        their own interactions. Admins and Managers see all interactions.
+      operationId: listAiInteractions
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+            - employee
+            - customer
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: agent_id
+          in: query
+          description: Filter by agent
+          schema:
+            type: string
+            format: uuid
+        - name: user_id
+          in: query
+          description: Filter by user (admin/manager only)
+          schema:
+            type: string
+            format: uuid
+        - name: model_used
+          in: query
+          description: Filter by model
+          schema:
+            type: string
+        - name: created_at[gte]
+          in: query
+          description: Filter start date
+          schema:
+            type: string
+            format: date-time
+        - name: created_at[lte]
+          in: query
+          description: Filter end date
+          schema:
+            type: string
+            format: date-time
+        - name: has_rating
+          in: query
+          description: Filter rated/unrated
+          schema:
+            type: boolean
+        - $ref: "#/components/parameters/SortByParam"
+      responses:
+        "200":
+          description: Paginated list of interactions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiInteractionListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /ai/interactions/{id}:
+    get:
+      tags:
+        - Interactions
+      summary: Get interaction detail
+      description: |
+        Returns full details of a single AI interaction including prompt, response,
+        retrieved chunks, tool calls, and moderation results.
+      operationId: getAiInteraction
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+            - employee
+            - customer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Interaction ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Interaction detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiInteractionDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /ai/interactions/{id}/rate:
+    post:
+      tags:
+        - Interactions
+      summary: Rate an AI response
+      description: Submits a rating (1-5) and optional comment for an AI interaction. Only the interaction owner can rate.
+      operationId: rateAiInteraction
+      security:
+        - bearerAuth:
+            - admin
+            - manager
+            - employee
+            - customer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Interaction ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiInteractionRate"
+      responses:
+        "200":
+          description: Rating submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiInteractionRatingResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Standard user JWT authentication
+
+  parameters:
+    AgentIdParam:
+      name: id
+      in: path
+      required: true
+      description: AI agent ID (UUID v7)
+      schema:
+        type: string
+        format: uuid
+    KnowledgeSourceIdParam:
+      name: id
+      in: path
+      required: true
+      description: Knowledge source ID (UUID v7)
+      schema:
+        type: string
+        format: uuid
+    PromptIdParam:
+      name: id
+      in: path
+      required: true
+      description: Prompt version ID (UUID v7)
+      schema:
+        type: string
+        format: uuid
+    PageParam:
+      name: page
+      in: query
+      description: Page number for offset pagination
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      description: Items per page (max 100)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    SortByParam:
+      name: sortBy
+      in: query
+      description: Sort field (prefix with `-` for descending)
+      schema:
+        type: string
+        example: "-created_at"
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid JWT
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UnprocessableEntity:
+      description: Validation or business rule violation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    # ── Enums ────────────────────────────────────────────────────────────
+    AgentType:
+      type: string
+      enum:
+        - support
+        - content
+        - analytics
+        - automation
+      description: AI agent functional type
+
+    ModelId:
+      type: string
+      enum:
+        - gpt-4o
+        - "gpt-4o-mini"
+        - gpt-4-turbo
+        - claude-sonnet-4
+        - claude-haiku-3
+        - "text-embedding-3-large"
+        - "text-embedding-3-small"
+        - "text-embedding-ada-002"
+      description: Supported LLM and embedding model identifiers
+
+    EmbeddingModelId:
+      type: string
+      enum:
+        - "text-embedding-3-large"
+        - "text-embedding-3-small"
+        - "text-embedding-ada-002"
+      description: Embedding models for vector generation
+
+    KnowledgeSourceType:
+      type: string
+      enum:
+        - document
+        - faq
+        - api
+      description: Type of knowledge source for RAG ingestion
+
+    IngestionStatus:
+      type: string
+      enum:
+        - pending
+        - processing
+        - completed
+        - failed
+      description: Knowledge source ingestion pipeline status
+
+    PromptVariableType:
+      type: string
+      enum:
+        - string
+        - number
+        - boolean
+        - array
+        - object
+      description: Data type of a prompt template variable
+
+    # ── AI Agent ─────────────────────────────────────────────────────────
+    AgentTool:
+      type: object
+      required:
+        - name
+        - description
+        - parameters
+        - endpoint
+        - method
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          description: Tool name passed to the LLM
+          example: "search_knowledge_base"
+        description:
+          type: string
+          maxLength: 500
+          description: Human-readable tool purpose (included in system prompt)
+          example: "Search the knowledge base for relevant articles"
+        parameters:
+          type: object
+          description: JSON Schema for tool parameters
+          required:
+            - type
+            - properties
+          properties:
+            type:
+              type: string
+              enum:
+                - object
+            properties:
+              type: object
+              additionalProperties: true
+            required:
+              type: array
+              items:
+                type: string
+        endpoint:
+          type: string
+          description: API endpoint this tool calls
+          example: "/api/v1/ai/knowledge/search"
+        method:
+          type: string
+          enum:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+
+    AgentConfig:
+      type: object
+      description: Agent operational configuration
+      properties:
+        rate_limit_per_user_per_hour:
+          type: integer
+          minimum: 1
+          default: 50
+        rate_limit_per_agent_per_day:
+          type: integer
+          minimum: 1
+          default: 1000
+        require_human_review:
+          type: boolean
+          default: false
+          description: If true, actions require human approval before execution
+        allowed_domains:
+          type: array
+          items:
+            type: string
+          description: Business domains this agent can interact with
+          example:
+            - support
+            - knowledge
+        content_filter_enabled:
+          type: boolean
+          default: true
+          description: Enable content moderation on input and output
+        pii_detection_enabled:
+          type: boolean
+          default: true
+          description: Enable PII detection and masking
+        max_conversation_turns:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 10
+          description: Maximum conversation turns retained for multi-turn chat
+        response_language:
+          type: string
+          default: "auto"
+          enum:
+            - auto
+            - ar
+            - en
+        additionalProperties: true
+
+    AiAgent:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - model
+        - system_prompt
+        - tools
+        - is_active
+        - created_by
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 255
+          example: "Support Assistant"
+        type:
+          $ref: "#/components/schemas/AgentType"
+        description:
+          type: string
+          maxLength: 2000
+        model:
+          $ref: "#/components/schemas/ModelId"
+          description: Primary LLM model
+        fallback_model:
+          $ref: "#/components/schemas/ModelId"
+          nullable: true
+          description: Fallback model used when circuit breaker opens
+        system_prompt:
+          type: string
+          maxLength: 8000
+          description: Defines agent persona, behavior, and constraints
+          example: "You are a helpful support agent for AlharisTech. Answer customer questions using the provided knowledge base. Be professional and empathetic. Always respond in the customer's language."
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentTool"
+          description: Tool definitions the agent can call
+        is_active:
+          type: boolean
+        config:
+          $ref: "#/components/schemas/AgentConfig"
+        max_tokens:
+          type: integer
+          minimum: 256
+          maximum: 32768
+          default: 4096
+        temperature:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 2
+          default: 0.7
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AiAgentCreate:
+      type: object
+      required:
+        - name
+        - type
+        - model
+        - system_prompt
+        - tools
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        type:
+          $ref: "#/components/schemas/AgentType"
+        description:
+          type: string
+          maxLength: 2000
+        model:
+          $ref: "#/components/schemas/ModelId"
+        fallback_model:
+          $ref: "#/components/schemas/ModelId"
+          nullable: true
+        system_prompt:
+          type: string
+          minLength: 1
+          maxLength: 8000
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentTool"
+        config:
+          $ref: "#/components/schemas/AgentConfig"
+        max_tokens:
+          type: integer
+          minimum: 256
+          maximum: 32768
+          default: 4096
+        temperature:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 2
+          default: 0.7
+
+    AiAgentUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        type:
+          $ref: "#/components/schemas/AgentType"
+        description:
+          type: string
+          maxLength: 2000
+        model:
+          $ref: "#/components/schemas/ModelId"
+        fallback_model:
+          $ref: "#/components/schemas/ModelId"
+          nullable: true
+        system_prompt:
+          type: string
+          maxLength: 8000
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentTool"
+        is_active:
+          type: boolean
+        config:
+          $ref: "#/components/schemas/AgentConfig"
+        max_tokens:
+          type: integer
+          minimum: 256
+          maximum: 32768
+        temperature:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 2
+
+    # ── Chat ─────────────────────────────────────────────────────────────
+    AiChatRequest:
+      type: object
+      required:
+        - agent_id
+        - message
+      properties:
+        agent_id:
+          type: string
+          format: uuid
+          description: AI agent to invoke
+        message:
+          type: string
+          maxLength: 4000
+          description: User's input message or query
+          example: "كيف يمكنني استرجاع كلمة المرور؟"
+        conversation_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Existing conversation ID for multi-turn chat
+        context:
+          type: object
+          description: Optional domain context (e.g., ticket/order IDs)
+          properties:
+            ticket_id:
+              type: string
+              format: uuid
+            order_id:
+              type: string
+              format: uuid
+            product_id:
+              type: string
+              format: uuid
+          additionalProperties: true
+        language:
+          type: string
+          enum:
+            - ar
+            - en
+            - auto
+          default: auto
+
+    ChatSource:
+      type: object
+      description: Knowledge source citation for RAG responses
+      properties:
+        title:
+          type: string
+          example: "كيفية استرجاع كلمة المرور"
+        url:
+          type: string
+          format: uri
+          example: "/help/reset-password"
+        relevance_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Cosine similarity score (threshold 0.7)
+          example: 0.94
+        chunk_index:
+          type: integer
+          description: Chunk position in source document
+        content_snippet:
+          type: string
+          description: Sample text from the retrieved chunk
+
+    AiChatResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            interaction_id:
+              type: string
+              format: uuid
+            agent_id:
+              type: string
+              format: uuid
+            agent_name:
+              type: string
+            conversation_id:
+              type: string
+              format: uuid
+            response:
+              type: string
+              description: The AI's generated response text
+            sources:
+              type: array
+              items:
+                $ref: "#/components/schemas/ChatSource"
+              description: Knowledge sources used (RAG citations)
+            tokens_used:
+              type: integer
+              description: Total tokens consumed (input + output)
+            latency_ms:
+              type: integer
+              description: Round-trip response time in milliseconds
+            model_used:
+              type: string
+              description: Actual model that generated the response
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    AiChatStreamEvent:
+      type: object
+      description: SSE event for streaming AI chat
+      properties:
+        id:
+          type: string
+          description: Event ID
+        event:
+          type: string
+          enum:
+            - token
+            - source
+            - metadata
+            - error
+            - done
+          description: SSE event type
+        data:
+          type: string
+          description: Event data (JSON string)
+      examples:
+        - event: token
+          data: '{"token": "لا", "index": 0}'
+        - event: source
+          data: '{"source": {"title": "FAQ", "url": "/help", "relevance_score": 0.94}}'
+        - event: metadata
+          data: '{"interaction_id": "uuid", "conversation_id": "uuid"}'
+        - event: done
+          data: '{"tokens_used": 450, "latency_ms": 1200, "model_used": "gpt-4o"}'
+
+    # ── Knowledge Source ─────────────────────────────────────────────────
+    KnowledgeSource:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - ingestion_status
+        - is_active
+        - created_by
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 255
+          example: "User Guide Documents"
+        type:
+          $ref: "#/components/schemas/KnowledgeSourceType"
+        description:
+          type: string
+          maxLength: 2000
+        source_url:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: S3 URL or HTTP endpoint for the source content
+          example: "s3://alharistech-prod/ai-knowledge/user-guide/"
+        language:
+          type: string
+          default: "ar"
+          description: Language code(s), comma-separated for multilingual
+          example: "ar,en"
+        ingestion_status:
+          $ref: "#/components/schemas/IngestionStatus"
+        document_count:
+          type: integer
+          minimum: 0
+          description: Number of sub-documents in the source
+        chunk_count:
+          type: integer
+          minimum: 0
+          description: Total embedding chunks across all documents
+        last_ingested_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_error:
+          type: string
+          nullable: true
+          description: Error message if last ingestion failed
+        refresh_cron:
+          type: string
+          maxLength: 50
+          nullable: true
+          description: Cron expression for scheduled re-ingestion
+          example: "0 2 * * *"
+        is_active:
+          type: boolean
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    KnowledgeSourceCreate:
+      type: object
+      required:
+        - name
+        - type
+        - source_url
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        type:
+          $ref: "#/components/schemas/KnowledgeSourceType"
+        description:
+          type: string
+          maxLength: 2000
+        source_url:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: S3 URL of the document(s) or external API endpoint
+        language:
+          type: string
+          default: "ar"
+          example: "ar"
+        refresh_cron:
+          type: string
+          maxLength: 50
+          nullable: true
+          description: Optional cron schedule for automatic re-ingestion
+
+    KnowledgeSourceIngestResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              description: Knowledge source ID
+            name:
+              type: string
+            ingestion_status:
+              $ref: "#/components/schemas/IngestionStatus"
+            job_id:
+              type: string
+              description: BullMQ job ID for tracking
+            estimated_completion_seconds:
+              type: integer
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    # ── Prompt ───────────────────────────────────────────────────────────
+    PromptVariable:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+          pattern: "^[a-zA-Z_][a-zA-Z0-9_]*$"
+          maxLength: 100
+          description: Variable name used in `{{variable}}` template syntax
+          example: "customerName"
+        type:
+          $ref: "#/components/schemas/PromptVariableType"
+        description:
+          type: string
+          maxLength: 500
+        required:
+          type: boolean
+          default: true
+        default:
+          description: Default value if not provided
+        validation:
+          type: object
+          description: Optional validation constraints
+          properties:
+            min_length:
+              type: integer
+            max_length:
+              type: integer
+            min_value:
+              type: number
+            max_value:
+              type: number
+            pattern:
+              type: string
+            enum:
+              type: array
+              items: {}
+          additionalProperties: true
+
+    Prompt:
+      type: object
+      required:
+        - id
+        - name
+        - version
+        - template
+        - variables
+        - model
+        - is_active
+        - created_by
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 255
+          description: Prompt name (shared across versions)
+          example: "support-ticket-response"
+        version:
+          type: integer
+          minimum: 1
+          description: Auto-incremented version number per name
+        description:
+          type: string
+          maxLength: 2000
+        template:
+          type: string
+          maxLength: 32000
+          description: Template string with {{variable}} placeholders
+          example: "You are a support agent. Customer: {{customerName}}. Issue: {{issueSummary}}. Respond in {{language}}."
+        variables:
+          type: array
+          items:
+            $ref: "#/components/schemas/PromptVariable"
+        model:
+          $ref: "#/components/schemas/ModelId"
+        temperature:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 2
+          default: 0.7
+        max_tokens:
+          type: integer
+          minimum: 256
+          maximum: 32768
+          default: 2048
+        is_active:
+          type: boolean
+          description: Whether this version is the currently active one
+        is_deprecated:
+          type: boolean
+          default: false
+        deprecation_replaced_by:
+          type: string
+          format: uuid
+          nullable: true
+        usage_count:
+          type: integer
+          minimum: 0
+          description: Denormalized usage count
+        avg_latency_ms:
+          type: integer
+          nullable: true
+        success_rate:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          maximum: 100
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PromptCreate:
+      type: object
+      required:
+        - name
+        - template
+        - variables
+        - model
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 2000
+        template:
+          type: string
+          minLength: 1
+          maxLength: 32000
+        variables:
+          type: array
+          items:
+            $ref: "#/components/schemas/PromptVariable"
+        model:
+          $ref: "#/components/schemas/ModelId"
+        temperature:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 2
+          default: 0.7
+        max_tokens:
+          type: integer
+          minimum: 256
+          maximum: 32768
+          default: 2048
+
+    PromptUpdate:
+      type: object
+      properties:
+        description:
+          type: string
+          maxLength: 2000
+        template:
+          type: string
+          maxLength: 32000
+        variables:
+          type: array
+          items:
+            $ref: "#/components/schemas/PromptVariable"
+        model:
+          $ref: "#/components/schemas/ModelId"
+        temperature:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 2
+        max_tokens:
+          type: integer
+          minimum: 256
+          maximum: 32768
+
+    # ── AI Interaction ───────────────────────────────────────────────────
+    ToolCall:
+      type: object
+      description: Record of a tool invocation during an AI interaction
+      properties:
+        tool_name:
+          type: string
+          example: "search_knowledge_base"
+        input:
+          type: object
+          additionalProperties: true
+        output:
+          type: object
+          additionalProperties: true
+        duration_ms:
+          type: integer
+        error:
+          type: string
+          nullable: true
+
+    RetrievedChunk:
+      type: object
+      description: Retrieved RAG chunk metadata
+      properties:
+        chunk_id:
+          type: string
+          format: uuid
+        similarity_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        content_snippet:
+          type: string
+          maxLength: 500
+          description: Preview of the chunk text
+        source_title:
+          type: string
+        source_url:
+          type: string
+
+    ModerationResult:
+      type: object
+      description: Content moderation API result
+      properties:
+        flagged:
+          type: boolean
+        categories:
+          type: object
+          additionalProperties:
+            type: boolean
+          description: Flagged category keys
+        scores:
+          type: object
+          additionalProperties:
+            type: number
+          description: Confidence scores per category (0-1)
+
+    AiInteraction:
+      type: object
+      required:
+        - id
+        - agent_id
+        - user_id
+        - prompt
+        - response
+        - tokens_total
+        - model_used
+        - model_provider
+        - latency_ms
+        - cost_usd
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        agent_id:
+          type: string
+          format: uuid
+        prompt_id:
+          type: string
+          format: uuid
+          nullable: true
+        user_id:
+          type: string
+          format: uuid
+        conversation_id:
+          type: string
+          format: uuid
+          description: Groups multi-turn interactions
+        prompt:
+          type: string
+          description: The user's input/query (may have PII masked)
+        response:
+          type: string
+          description: The AI's generated response
+        retrieved_chunks:
+          type: array
+          items:
+            $ref: "#/components/schemas/RetrievedChunk"
+          description: RAG chunks used for this response
+        tokens_input:
+          type: integer
+          minimum: 0
+        tokens_output:
+          type: integer
+          minimum: 0
+        tokens_total:
+          type: integer
+          minimum: 0
+        model_used:
+          type: string
+          example: "gpt-4o"
+        model_provider:
+          type: string
+          description: Provider name (openai, anthropic, self-hosted)
+          example: "openai"
+        latency_ms:
+          type: integer
+          minimum: 0
+          description: Total round-trip time in milliseconds
+        cost_usd:
+          type: number
+          format: double
+          description: Calculated cost from token usage x model pricing
+          example: 0.0045
+        rating:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 5
+          description: User feedback rating (1-5)
+        rating_comment:
+          type: string
+          maxLength: 1000
+          nullable: true
+        was_moderated:
+          type: boolean
+          description: Whether content moderation was applied
+        moderation_result:
+          $ref: "#/components/schemas/ModerationResult"
+          nullable: true
+        tool_calls:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolCall"
+          description: Tool invocations during this interaction
+        error_message:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    AiInteractionRate:
+      type: object
+      required:
+        - rating
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Rating score (1-5)
+        comment:
+          type: string
+          maxLength: 1000
+          description: Optional feedback comment
+
+    # ── Response Envelopes ───────────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - meta
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+            - message_en
+            - statusCode
+          properties:
+            code:
+              type: string
+              example: "AI_CONTENT_MODERATED"
+            message:
+              type: string
+              example: "تم حظر المحتوى لاحتوائه على محتوى غير مناسب"
+            message_en:
+              type: string
+              example: "Content blocked due to policy violation"
+            statusCode:
+              type: integer
+            details:
+              type: object
+              additionalProperties: true
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    ResponseMeta:
+      type: object
+      required:
+        - timestamp
+        - requestId
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: uuid
+        pagination:
+          $ref: "#/components/schemas/PaginationMeta"
+        apiVersion:
+          type: string
+          example: "1.0.0"
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        hasNextPage:
+          type: boolean
+        hasPreviousPage:
+          type: boolean
+
+    DeleteResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            deleted:
+              type: boolean
+              enum:
+                - true
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    # ── Wrapped Response Schemas ─────────────────────────────────────────
+    AiAgentListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AiAgent"
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/ResponseMeta"
+            - type: object
+              properties:
+                pagination:
+                  $ref: "#/components/schemas/PaginationMeta"
+
+    AiAgentDetailResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/AiAgent"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    KnowledgeSourceListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/KnowledgeSource"
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/ResponseMeta"
+            - type: object
+              properties:
+                pagination:
+                  $ref: "#/components/schemas/PaginationMeta"
+
+    KnowledgeSourceDetailResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/KnowledgeSource"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    PromptListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Prompt"
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/ResponseMeta"
+            - type: object
+              properties:
+                pagination:
+                  $ref: "#/components/schemas/PaginationMeta"
+
+    PromptDetailResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Prompt"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    PromptVersionListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Prompt"
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/ResponseMeta"
+            - type: object
+              properties:
+                pagination:
+                  $ref: "#/components/schemas/PaginationMeta"
+
+    PromptStatusResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            version:
+              type: integer
+            is_active:
+              type: boolean
+            activated_at:
+              type: string
+              format: date-time
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    AiInteractionListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AiInteraction"
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/ResponseMeta"
+            - type: object
+              properties:
+                pagination:
+                  $ref: "#/components/schemas/PaginationMeta"
+
+    AiInteractionDetailResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/AiInteraction"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    AiInteractionRatingResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            interaction_id:
+              type: string
+              format: uuid
+            rating:
+              type: integer
+            rating_updated:
+              type: boolean
+              enum:
+                - true
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"

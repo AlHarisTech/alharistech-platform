@@ -1,0 +1,1415 @@
+openapi: "3.1.0"
+info:
+  title: AlharisTech Identity API
+  description: |
+    Identity Domain API — Authentication, authorization, and user management
+    for the AlharisTech Platform. Covers user registration, login, token
+    management, password reset, profile management, and admin user operations.
+
+    Base URL: `https://api.alharistech.com`
+  version: "1.0.0"
+  contact:
+    name: AlharisTech Platform Team
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://api.alharistech.com/api/v1
+    description: Production
+  - url: https://api.staging.alharistech.com/api/v1
+    description: Staging
+  - url: http://localhost:4000/api/v1
+    description: Development
+
+tags:
+  - name: Auth
+    description: Authentication endpoints (register, login, logout, token management, password reset)
+  - name: Users
+    description: User management endpoints (profile, listing, role changes, account enable/disable)
+
+security:
+  - bearerAuth: []
+
+paths:
+  # =========================================================================
+  # AUTH ENDPOINTS
+  # =========================================================================
+
+  /auth/register:
+    post:
+      operationId: registerUser
+      summary: Register new user account
+      description: |
+        Creates a new user account with role "customer". The user receives a
+        verification email. Password must meet complexity requirements:
+        minimum 8 characters, at least 1 uppercase, 1 lowercase, 1 digit,
+        and 1 special character.
+
+        Rate limit: 3 requests per hour per IP.
+      tags:
+        - Auth
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "EMAIL_ALREADY_EXISTS"
+                  message: "البريد الإلكتروني مسجل مسبقاً"
+                  message_en: "Email already registered"
+                  statusCode: 409
+                  details:
+                    email: "user@example.com"
+                meta:
+                  timestamp: "2026-06-20T12:00:00Z"
+                  requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        "422":
+          description: Validation failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "VALIDATION_ERROR"
+                  message: "فشل التحقق من صحة الطلب"
+                  message_en: "Request validation failed"
+                  statusCode: 422
+                  details:
+                    - field: "password"
+                      code: "PASSWORD_TOO_WEAK"
+                      message: "Password must contain at least 1 uppercase, 1 lowercase, 1 digit, and 1 special character"
+                meta:
+                  timestamp: "2026-06-20T12:00:00Z"
+                  requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/verify-email:
+    post:
+      operationId: verifyEmail
+      summary: Verify email address with token
+      description: |
+        Validates the email verification token sent to the user's email address.
+        On success, the user's account is marked as verified.
+
+        Rate limit: 5 requests per hour per IP.
+      tags:
+        - Auth
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyEmailRequest"
+      responses:
+        "200":
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifyEmailResponse"
+        "401":
+          description: Invalid or expired verification token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "TOKEN_INVALID"
+                  message: "رمز التحقق غير صالح أو منتهي الصلاحية"
+                  message_en: "Verification token is invalid or expired"
+                  statusCode: 401
+                meta:
+                  timestamp: "2026-06-20T12:00:00Z"
+                  requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: loginUser
+      summary: Authenticate user and return tokens
+      description: |
+        Authenticates a user with email and password. Returns an access token
+        (JWT, 15-minute expiry), a refresh token (opaque, 7-day expiry), and
+        basic user profile. Account locks for 30 minutes after 5 consecutive
+        failed attempts.
+
+        Rate limit: 5 requests per minute per IP.
+      tags:
+        - Auth
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "INVALID_CREDENTIALS"
+                  message: "البريد الإلكتروني أو كلمة المرور غير صحيحة"
+                  message_en: "Invalid email or password"
+                  statusCode: 401
+                meta:
+                  timestamp: "2026-06-20T12:00:00Z"
+                  requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        "423":
+          description: Account locked due to too many failed attempts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "ACCOUNT_LOCKED"
+                  message: "الحساب مقفل مؤقتاً. حاول مرة أخرى بعد 30 دقيقة"
+                  message_en: "Account is temporarily locked. Try again after 30 minutes"
+                  statusCode: 423
+                meta:
+                  timestamp: "2026-06-20T12:00:00Z"
+                  requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      summary: Refresh access and refresh tokens
+      description: |
+        Exchanges a valid refresh token for a new access token and refresh
+        token pair. The old refresh token is revoked (rotation). If a revoked
+        token is reused, all user tokens are revoked (token reuse detection).
+
+        Rate limit: 10 requests per minute per IP.
+      tags:
+        - Auth
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequest"
+      responses:
+        "200":
+          description: Tokens refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPairResponse"
+        "401":
+          description: Invalid, expired, or revoked refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "REFRESH_TOKEN_INVALID"
+                  message: "رمز التحديث غير صالح أو منتهي الصلاحية"
+                  message_en: "Refresh token is invalid or expired"
+                  statusCode: 401
+                meta:
+                  timestamp: "2026-06-20T12:00:00Z"
+                  requestId: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logoutUser
+      summary: Logout and revoke refresh token
+      description: |
+        Revokes the provided refresh token, effectively logging the user out
+        from the current session.
+
+        Rate limit: 10 requests per minute per user.
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogoutRequest"
+      responses:
+        "200":
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogoutResponse"
+        "401":
+          description: Not authenticated or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/forgot-password:
+    post:
+      operationId: forgotPassword
+      summary: Request password reset email
+      description: |
+        Initiates the password reset flow. If the email exists, a reset token
+        is generated and sent via email. The response is always 200 regardless
+        of whether the email exists (to prevent email enumeration).
+
+        Rate limit: 3 requests per hour per IP.
+      tags:
+        - Auth
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+      responses:
+        "200":
+          description: Password reset email sent (if email exists)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForgotPasswordResponse"
+        "422":
+          description: Validation failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/reset-password:
+    post:
+      operationId: resetPassword
+      summary: Reset password with token
+      description: |
+        Resets the user's password using a valid reset token. All existing
+        refresh tokens are revoked, forcing re-login on all devices.
+
+        Rate limit: 5 requests per hour per IP.
+      tags:
+        - Auth
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResetPasswordResponse"
+        "401":
+          description: Invalid or expired reset token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Validation failure (e.g., weak password)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # =========================================================================
+  # USER ENDPOINTS
+  # =========================================================================
+
+  /users/me:
+    get:
+      operationId: getCurrentUser
+      summary: Get current authenticated user profile
+      description: |
+        Returns the profile of the currently authenticated user based on the
+        JWT access token.
+
+        Rate limit: 60 requests per minute per user.
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfileResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateCurrentUser
+      summary: Update own user profile
+      description: |
+        Updates the authenticated user's own profile fields. Only allowed
+        fields can be updated (first_name, last_name, phone). Role or email
+        changes are not permitted via this endpoint.
+
+        Rate limit: 30 requests per minute per user.
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfileResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Validation failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users:
+    get:
+      operationId: listUsers
+      summary: List users (paginated, filterable)
+      description: |
+        Returns a paginated list of users. Supports filtering by role, active
+        status, and full-text search. Requires admin or manager role.
+
+        Rate limit: 60 requests per minute per user.
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-indexed)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: search
+          in: query
+          required: false
+          description: Full-text search on name, email, phone
+          schema:
+            type: string
+            maxLength: 100
+        - name: role
+          in: query
+          required: false
+          description: Filter by user role
+          schema:
+            type: string
+            enum:
+              - admin
+              - manager
+              - employee
+              - customer
+              - partner
+        - name: is_active
+          in: query
+          required: false
+          description: Filter by active status
+          schema:
+            type: boolean
+        - name: sort_by
+          in: query
+          required: false
+          description: Sort field
+          schema:
+            type: string
+            enum:
+              - created_at
+              - email
+              - first_name_ar
+              - role
+            default: created_at
+        - name: order
+          in: query
+          required: false
+          description: Sort order
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+      responses:
+        "200":
+          description: Paginated list of users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (requires admin or manager)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/{id}:
+    get:
+      operationId: getUserById
+      summary: Get user by ID
+      description: |
+        Returns detailed user information for the specified user ID.
+        Requires admin or manager role.
+
+        Rate limit: 60 requests per minute per user.
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User UUID v7
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDetailResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/{id}/role:
+    patch:
+      operationId: changeUserRole
+      summary: Change user role
+      description: |
+        Changes the role of a user. Requires admin role. Changing a user's role
+        revokes all their active sessions, forcing re-login with the new
+        permissions.
+
+        Rate limit: 30 requests per minute per user.
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Target user UUID v7
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeRoleRequest"
+      responses:
+        "200":
+          description: Role changed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDetailResponse"
+        "400":
+          description: Invalid role transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (requires admin)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/{id}/disable:
+    post:
+      operationId: disableUser
+      summary: Disable user account
+      description: |
+        Disables a user account. The user will not be able to log in, and all
+        active sessions are revoked. Requires admin role.
+
+        Rate limit: 20 requests per minute per user.
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Target user UUID v7
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: User disabled successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStatusResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (requires admin)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/{id}/enable:
+    post:
+      operationId: enableUser
+      summary: Enable previously disabled user account
+      description: |
+        Re-enables a previously disabled user account. The user can log in
+        again. Requires admin role.
+
+        Rate limit: 20 requests per minute per user.
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Target user UUID v7
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: User enabled successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStatusResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (requires admin)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+# =============================================================================
+# COMPONENTS
+# =============================================================================
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT access token obtained from `/auth/login` or `/auth/refresh`.
+        Token payload contains `sub` (user ID), `email`, `role`, and
+        `permissions` array.
+
+  schemas:
+    # -------------------------------------------------------------------------
+    # REQUEST SCHEMAS
+    # -------------------------------------------------------------------------
+
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - first_name_ar
+        - last_name_ar
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: User email address. Must be unique across all users.
+          example: "ahmed@example.com"
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 128
+          pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]).{8,128}$"
+          description: |
+            Password must be 8-128 characters, contain at least 1 uppercase,
+            1 lowercase, 1 digit, and 1 special character.
+          example: "Str0ng!Pass"
+        first_name_ar:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: First name in Arabic
+          example: "أحمد"
+        last_name_ar:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Last name in Arabic
+          example: "العلي"
+        first_name_en:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: First name in English (optional)
+          example: "Ahmed"
+        last_name_en:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Last name in English (optional)
+          example: "Al-Ali"
+        phone:
+          type: string
+          pattern: "^\\+[1-9]\\d{1,14}$"
+          maxLength: 20
+          description: Phone number in E.164 format (optional)
+          example: "+966512345678"
+
+    VerifyEmailRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          description: Email verification JWT token from the verification link
+          example: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: Registered email address
+          example: "ahmed@example.com"
+        password:
+          type: string
+          format: password
+          maxLength: 128
+          description: Account password
+          example: "Str0ng!Pass"
+
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+          description: Opaque refresh token obtained from login or refresh
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+    LogoutRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+          description: Refresh token to revoke
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+    ForgotPasswordRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: Registered email address
+          example: "ahmed@example.com"
+
+    ResetPasswordRequest:
+      type: object
+      required:
+        - token
+        - new_password
+      properties:
+        token:
+          type: string
+          description: Password reset JWT token from the reset email link
+          example: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+        new_password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 128
+          pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]).{8,128}$"
+          description: |
+            New password. Must not match any of the last 5 passwords.
+          example: "NewStr0ng!Pass2"
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        first_name_ar:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: First name in Arabic
+          example: "أحمد"
+        last_name_ar:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Last name in Arabic
+          example: "العلي"
+        first_name_en:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: First name in English
+          example: "Ahmed"
+        last_name_en:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Last name in English
+          example: "Al-Ali"
+        phone:
+          type: string
+          pattern: "^\\+[1-9]\\d{1,14}$"
+          maxLength: 20
+          description: Phone number in E.164 format
+          example: "+966512345678"
+
+    ChangeRoleRequest:
+      type: object
+      required:
+        - role
+      properties:
+        role:
+          type: string
+          enum:
+            - admin
+            - manager
+            - employee
+            - customer
+            - partner
+          description: New role to assign. Admin role cannot be self-assigned.
+
+    # -------------------------------------------------------------------------
+    # RESPONSE SCHEMAS
+    # -------------------------------------------------------------------------
+
+    AuthResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: object
+          required:
+            - accessToken
+            - refreshToken
+            - expiresIn
+            - user
+          properties:
+            accessToken:
+              type: string
+              description: JWT access token (RS256, 15-minute expiry)
+              example: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+            refreshToken:
+              type: string
+              description: Opaque refresh token (7-day expiry)
+              example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            expiresIn:
+              type: integer
+              description: Access token expiry in seconds
+              example: 900
+            user:
+              $ref: "#/components/schemas/User"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    LoginResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: object
+          required:
+            - accessToken
+            - refreshToken
+            - expiresIn
+            - user
+          properties:
+            accessToken:
+              type: string
+              description: JWT access token
+              example: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+            refreshToken:
+              type: string
+              description: Opaque refresh token
+              example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            expiresIn:
+              type: integer
+              description: Access token expiry in seconds
+              example: 900
+            user:
+              $ref: "#/components/schemas/User"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    VerifyEmailResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: object
+          required:
+            - verified
+          properties:
+            verified:
+              type: boolean
+              description: Whether email is now verified
+              example: true
+            message:
+              type: string
+              description: Human-readable success message
+              example: "Email verified successfully"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    TokenPairResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: object
+          required:
+            - accessToken
+            - refreshToken
+            - expiresIn
+          properties:
+            accessToken:
+              type: string
+              description: New JWT access token
+              example: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+            refreshToken:
+              type: string
+              description: New opaque refresh token
+              example: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+            expiresIn:
+              type: integer
+              description: Access token expiry in seconds
+              example: 900
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    LogoutResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: object
+          required:
+            - loggedOut
+          properties:
+            loggedOut:
+              type: boolean
+              example: true
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    ForgotPasswordResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: object
+          required:
+            - message
+          properties:
+            message:
+              type: string
+              description: |
+                Always the same message regardless of whether the email exists
+                (prevents email enumeration).
+              example: "If the email exists, a password reset link has been sent"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    ResetPasswordResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: object
+          required:
+            - reset
+          properties:
+            reset:
+              type: boolean
+              description: Whether password was reset successfully
+              example: true
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    UserProfileResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          $ref: "#/components/schemas/User"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    UserDetailResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          $ref: "#/components/schemas/User"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    UserListResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/ResponseMeta"
+            - type: object
+              properties:
+                pagination:
+                  $ref: "#/components/schemas/PaginationMeta"
+
+    UserStatusResponse:
+      type: object
+      required:
+        - data
+        - meta
+      properties:
+        data:
+          type: object
+          required:
+            - id
+            - is_active
+          properties:
+            id:
+              type: string
+              format: uuid
+              description: User UUID v7
+              example: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+            is_active:
+              type: boolean
+              description: Current active status
+              example: false
+            message:
+              type: string
+              description: Human-readable status message
+              example: "User account has been disabled"
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    # -------------------------------------------------------------------------
+    # ENTITY SCHEMAS
+    # -------------------------------------------------------------------------
+
+    User:
+      type: object
+      required:
+        - id
+        - email
+        - first_name_ar
+        - last_name_ar
+        - role
+        - is_active
+        - is_verified
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: User UUID v7
+          example: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: "ahmed@example.com"
+        first_name_ar:
+          type: string
+          description: First name in Arabic
+          example: "أحمد"
+        last_name_ar:
+          type: string
+          description: Last name in Arabic
+          example: "العلي"
+        first_name_en:
+          type: string
+          nullable: true
+          description: First name in English
+          example: "Ahmed"
+        last_name_en:
+          type: string
+          nullable: true
+          description: Last name in English
+          example: "Al-Ali"
+        phone:
+          type: string
+          nullable: true
+          description: Phone number in E.164 format
+          example: "+966512345678"
+        role:
+          type: string
+          enum:
+            - admin
+            - manager
+            - employee
+            - customer
+            - partner
+          description: User role determining permissions
+          example: "customer"
+        is_active:
+          type: boolean
+          description: Whether the account is active (not disabled)
+          example: true
+        is_verified:
+          type: boolean
+          description: Whether the email has been verified
+          example: true
+        last_login_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp of last successful login
+          example: "2026-06-20T10:30:00Z"
+        created_at:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+          example: "2026-01-15T09:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2026-06-18T14:22:00Z"
+
+    # -------------------------------------------------------------------------
+    # ERROR SCHEMAS
+    # -------------------------------------------------------------------------
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - meta
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+            - message_en
+            - statusCode
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+              example: "INVALID_CREDENTIALS"
+            message:
+              type: string
+              description: Human-readable error message in Arabic
+              example: "البريد الإلكتروني أو كلمة المرور غير صحيحة"
+            message_en:
+              type: string
+              description: Human-readable error message in English
+              example: "Invalid email or password"
+            statusCode:
+              type: integer
+              description: HTTP status code
+              example: 401
+            details:
+              description: |
+                Additional error details. May contain field-level validation
+                errors or contextual information.
+              oneOf:
+                - type: array
+                  items:
+                    $ref: "#/components/schemas/ValidationErrorDetail"
+                - type: object
+                  additionalProperties: true
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+
+    ValidationErrorDetail:
+      type: object
+      properties:
+        field:
+          type: string
+          description: The field that failed validation
+          example: "email"
+        code:
+          type: string
+          description: Field-level error code
+          example: "INVALID_FORMAT"
+        message:
+          type: string
+          description: Field-level error message
+          example: "Must be a valid email address"
+        received:
+          description: The invalid value that was received
+
+    # -------------------------------------------------------------------------
+    # META SCHEMAS
+    # -------------------------------------------------------------------------
+
+    ResponseMeta:
+      type: object
+      required:
+        - timestamp
+        - requestId
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of the response
+          example: "2026-06-20T12:00:00Z"
+        requestId:
+          type: string
+          format: uuid
+          description: Unique request identifier for tracing
+          example: "018f9a92-3c5f-7a8b-9c0d-1e2f3a4b5c6d"
+
+    PaginationMeta:
+      type: object
+      required:
+        - total
+        - perPage
+        - currentPage
+        - hasNextPage
+        - hasPreviousPage
+      properties:
+        total:
+          type: integer
+          minimum: 0
+          description: Total number of records
+          example: 150
+        perPage:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Number of items per page
+          example: 20
+        currentPage:
+          type: integer
+          minimum: 1
+          description: Current page number
+          example: 1
+        totalPages:
+          type: integer
+          minimum: 0
+          description: Total number of pages
+          example: 8
+        hasNextPage:
+          type: boolean
+          description: Whether there are more pages after the current one
+          example: true
+        hasPreviousPage:
+          type: boolean
+          description: Whether there are pages before the current one
+          example: false
