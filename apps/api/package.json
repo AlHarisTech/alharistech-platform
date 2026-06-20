@@ -1,0 +1,38 @@
+{
+  "name": "@aht/api",
+  "version": "0.4.0",
+  "private": true,
+  "description": "AlharisTech Platform — API Gateway (NestJS Runtime Anchor)",
+  "scripts": {
+    "dev": "nest start --watch",
+    "build": "nest build",
+    "start": "node dist/main",
+    "lint": "eslint src/",
+    "test": "jest",
+    "test:contracts": "jest --config jest.contract.config.ts",
+    "db:migrate": "drizzle-kit migrate",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-fastify": "^11.0.0",
+    "@nestjs/config": "^4.0.0",
+    "@aht/database": "workspace:*",
+    "@aht/config": "workspace:*",
+    "@aht/types": "workspace:*",
+    "fastify": "^5.0.0",
+    "ioredis": "^5.0.0",
+    "reflect-metadata": "^0.2.0",
+    "rxjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/schematics": "^11.0.0",
+    "@nestjs/testing": "^11.0.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0",
+    "jest": "^30.0.0",
+    "ts-jest": "^29.0.0"
+  }
+}
