@@ -548,13 +548,14 @@ export class PolicyGuard implements CanActivate {
 
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
     try {
-      const payload = this.decodeJwtPayload(token);
+      const raw = this.decodeJwtPayload(token);
+      const payload = raw as Record<string, unknown> | null;
       if (payload?.sub && payload?.role) {
         return {
-          id: payload.sub,
-          role: payload.role,
-          customerId: payload.customerId ?? payload.customer_id,
-          permissions: payload.permissions ?? payload.scopes,
+          id: String(payload.sub),
+          role: String(payload.role),
+          customerId: payload.customerId ? String(payload.customerId) : (payload.customer_id ? String(payload.customer_id) : undefined),
+          permissions: Array.isArray(payload.permissions) ? payload.permissions.map(String) : (Array.isArray(payload.scopes) ? payload.scopes.map(String) : undefined),
         };
       }
     } catch {

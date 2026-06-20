@@ -329,7 +329,7 @@ export class SchemaRegistry implements OnModuleInit {
         const op = operation as Record<string, unknown>;
         if (!op) continue;
 
-        const resolvedOp = this.resolveRefsRecursive(op, spec);
+        const resolvedOp = this.resolveRefsRecursive(op, spec) as Record<string, unknown>;
 
         const key = `${method.toUpperCase()}:${pathPattern}`;
         this.openapiOperations.set(key, {

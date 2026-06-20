@@ -67,7 +67,7 @@ boundaries:
     name: "NestJS API Gateway"
     app: "apps/api"
     runs:
-      - "REST endpoints (all 184 CRUD operations across 9 domains)"
+      - "REST endpoints (all 149 CRUD operations across 9 domains)"
       - "GraphQL resolvers (complex queries, field-level authorization)"
       - "Authentication (JWT access/refresh token issuance, rotation, revocation)"
       - "Authorization (RBAC policy engine evaluating access-control.yaml)"
