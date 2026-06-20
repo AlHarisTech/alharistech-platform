@@ -70,11 +70,14 @@ export class SchemaRegistry implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     try {
       await this.loadAllSchemas();
+      this.precompileAllValidators();
       this.ready = true;
       this.lastLoadTime = new Date().toISOString();
       this.logger.log(
         `SchemaRegistry loaded: ${this.openapiSpecs.size} OpenAPI specs, ` +
           `${this.openapiOperations.size} endpoints, ` +
+          `${this.requestValidators.size} request validators compiled, ` +
+          `${this.responseValidators.size} response validators compiled, ` +
           `${this.eventSchemas.size} event schemas, ` +
           `${this.policyRules.length} policy rules`,
       );
@@ -197,6 +200,7 @@ export class SchemaRegistry implements OnModuleInit {
       this.ajv = this.createAjvInstance();
 
       await this.loadAllSchemas();
+      this.precompileAllValidators();
       this.ready = true;
       this.lastLoadTime = new Date().toISOString();
       this.logger.log('All schemas reloaded successfully');
@@ -281,6 +285,49 @@ export class SchemaRegistry implements OnModuleInit {
     await this.loadOpenApiSpecs();
     await this.loadEventSchemas();
     await this.loadPolicyRules();
+  }
+
+  private precompileAllValidators(): void {
+    const start = performance.now();
+    let requestCount = 0;
+    let responseCount = 0;
+
+    for (const [key, operation] of this.openapiOperations) {
+      const validator = this.compileRequestValidator(operation);
+      if (validator) {
+        this.requestValidators.set(key, validator);
+        requestCount++;
+      }
+    }
+
+    for (const [key, operation] of this.openapiOperations) {
+      for (const statusCode of operation.responseSchemas.keys()) {
+        const responseKey = `${key}:${statusCode}`;
+        const responseSchema = operation.responseSchemas.get(statusCode);
+        if (responseSchema) {
+          const validator = this.compileSchema(responseSchema);
+          if (validator) {
+            this.responseValidators.set(responseKey, validator);
+            responseCount++;
+          }
+        }
+      }
+    }
+
+    for (const [eventName, eventEntry] of this.eventSchemas) {
+      if (!this.eventValidators.has(eventName)) {
+        const validator = this.compileSchema(eventEntry.schema);
+        if (validator) {
+          this.eventValidators.set(eventName, validator);
+        }
+      }
+    }
+
+    const elapsed = (performance.now() - start).toFixed(2);
+    this.logger.log(
+      `Precompiled ${requestCount} request validators, ${responseCount} response validators ` +
+        `(${elapsed}ms)`,
+    );
   }
 
   private async loadOpenApiSpecs(): Promise<void> {
