@@ -1,0 +1,253 @@
+@startuml state-machines
+' ============================================================
+' AlharisTech Platform — Aggregate State Machine Diagrams
+' Order, Ticket, CommerceOrder, Invoice, User Account
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam state {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+  FontColor #1A1A1A
+  FontSize 10
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 9
+}
+
+skinparam arrow {
+  FontSize 9
+}
+
+title **AlharisTech Platform — Aggregate State Machines**
+title **آلات الحالة للتجميعات الرئيسية — الطلبات، التذاكر، الفواتير، الحسابات**
+
+' ============================================================
+' 1. SERVICE ORDER STATE MACHINE
+' ============================================================
+
+state "**Service Order** (service.orders)" as OrderTitle #F4F6F7
+
+state "draft\nمسودة" as OrderDraft
+state "pending\nقيد الانتظار" as OrderPending
+state "in_review\nقيد المراجعة" as OrderReview
+state "in_progress\nقيد المعالجة" as OrderProgress
+state "completed\nمكتمل" as OrderCompleted #D5F5E3
+state "cancelled\nملغي" as OrderCancelled #FADBD8
+state "rejected\nمرفوض" as OrderRejected #FADBD8
+
+OrderTitle -down-> OrderDraft
+
+[*] -down-> OrderDraft : Customer starts order
+
+OrderDraft --> OrderPending : submitOrder()\n▪ Customer submits form + documents\n▪ Event: OrderPlaced
+
+OrderPending --> OrderReview : assignEmployee()\n▪ Admin/Manager assigns employee\n▪ Event: OrderAssigned\n▪ Auto-transition on assignment
+
+OrderPending --> OrderCancelled : cancelOrder()\n▪ Customer cancels before review\n▪ Guard: cancel_reason required
+
+OrderPending --> OrderRejected : rejectOrder()\n▪ Employee rejects application\n▪ Guard: rejection note required
+
+OrderReview --> OrderProgress : startProcessing()\n▪ Employee begins work\n▪ Guard: ALL documents verified = true\n▪ Event: OrderStatusChanged
+
+OrderReview --> OrderPending : requestClarification()\n▪ Employee needs more documents\n▪ Event: OrderStatusChanged\n▪ Customer notified to upload
+
+OrderReview --> OrderCancelled : adminCancel()\n▪ Admin cancels during review\n▪ Guard: cancel_reason required
+
+OrderReview --> OrderRejected : rejectOrder()\n▪ Employee rejects\n▪ Guard: rejection note required
+
+OrderProgress --> OrderCompleted : completeOrder()\n▪ Employee finishes work\n▪ Guard: all docs verified\n▪ Event: OrderCompleted\n▪ Sets completed_at = NOW()\n▪ Triggers rating request
+
+OrderProgress --> OrderCancelled : adminCancel()\n▪ Admin cancels during processing\n▪ Guard: cancel_reason required
+
+OrderCompleted --> [*] : TERMINAL
+
+OrderCancelled --> OrderPending : adminReopen()\n▪ Admin only\n▪ Event: OrderStatusChanged
+
+OrderRejected --> OrderPending : adminReopen()\n▪ Admin only\n▪ Event: OrderStatusChanged
+
+note right of OrderCancelled
+  **Cancelled/Rejected can be**
+  **reopened only by Admin.**
+  reopened → pending
+  Customer can resubmit.
+endnote
+
+' ============================================================
+' 2. SUPPORT TICKET STATE MACHINE
+' ============================================================
+
+state "**Support Ticket** (support.tickets)" as TicketTitle #F4F6F7
+
+state "open\nمفتوح" as TicketOpen
+state "in_progress\nقيد المعالجة" as TicketProgress
+state "waiting_customer\nبانتظار العميل" as TicketWaiting
+state "resolved\nتم الحل" as TicketResolved #D5F5E3
+state "closed\nمغلق" as TicketClosed #D5F5E3
+state "reopened\nمعاد فتحه" as TicketReopened
+
+TicketTitle -down-> TicketOpen
+
+[*] -down-> TicketOpen : Customer creates ticket\n▪ Priority auto-assigned\n▪ SLA deadlines computed\n▪ Event: TicketOpened
+
+TicketOpen --> TicketProgress : assignOrStart()\n▪ Manager assigns employee\n▪ OR employee takes action\n▪ Event: TicketAssigned
+
+TicketOpen --> TicketResolved : quickResolve()\n▪ Simple issue, resolved immediately\n▪ Event: TicketResolved
+
+TicketProgress --> TicketWaiting : needCustomerInput()\n▪ Employee needs customer info\n▪ Event: TicketStatusChanged
+
+TicketProgress --> TicketResolved : resolveTicket()\n▪ Employee provides solution\n▪ Sets resolved_at = NOW()\n▪ Event: TicketResolved
+
+TicketWaiting --> TicketProgress : customerReply()\n▪ AUTO on customer message\n▪ Event: TicketMessageAdded\n▪ Event: TicketStatusChanged
+
+TicketWaiting --> TicketResolved : resolveFromWaiting()\n▪ Employee resolves while waiting\n▪ Event: TicketResolved
+
+TicketResolved --> TicketClosed : autoClose()\n▪ System cron (every 15 min)\n▪ Guard: updated_at > 72 hours\n▪ Sets closed_at = NOW()\n▪ Event: TicketClosed
+
+TicketResolved --> TicketReopened : customerReopen()\n▪ Guard: NOW() - resolved_at < 7 days\n▪ Increments reopened_count\n▪ Event: TicketReopened
+
+TicketClosed --> TicketReopened : customerReopen()\n▪ Guard: NOW() - closed_at < 7 days\n▪ Event: TicketReopened
+
+TicketReopened --> TicketProgress : autoTransition()\n▪ Ticket resumes with same assignee
+
+note right of TicketClosed
+  **Reopen Window: 7 calendar days.**
+  After 7 days: create new ticket
+  referencing old ticket.
+  Error: REOPEN_WINDOW_EXPIRED
+endnote
+
+note right of TicketOpen
+  **Admin Force-Close:**
+  Any status → closed
+  Only Admin role.
+  Reason required.
+endnote
+
+' ============================================================
+' 3. COMMERCE ORDER STATE MACHINE
+' ============================================================
+
+state "**Commerce Order** (commerce.orders)" as ComOrderTitle #F4F6F7
+
+state "pending\nقيد الانتظار" as ComPending
+state "confirmed\nمؤكد" as ComConfirmed
+state "processing\nقيد التجهيز" as ComProcessing
+state "shipped\nتم الشحن" as ComShipped
+state "delivered\nتم التسليم" as ComDelivered #D5F5E3
+state "cancelled\nملغي" as ComCancelled #FADBD8
+state "refunded\nمسترجع" as ComRefunded #FADBD8
+
+ComOrderTitle -down-> ComPending
+
+[*] -down-> ComPending : Customer completes checkout\n▪ Cart validated\n▪ Payment initiated\n▪ Event: OrderPlaced
+
+ComPending --> ComConfirmed : paymentSucceeded()\n▪ Payment verified (sync or webhook)\n▪ Guard: payment_status = 'paid'\n▪ Sets placed_at = NOW()\n▪ Event: PaymentCompleted
+
+ComPending --> ComCancelled : paymentFailedOrTimeout()\n▪ Payment failed or 30min timeout\n▪ Guard: cancel_reason required\n▪ Event: OrderCancelled\n▪ Cart re-activated for retry
+
+ComConfirmed --> ComProcessing : beginFulfillment()\n▪ Inventory reserved\n▪ Guard: all items in stock\n▪ Event: InventoryReserved
+
+ComConfirmed --> ComCancelled : adminCancel()\n▪ Admin cancels before processing\n▪ Guard: cancel_reason required\n▪ Event: OrderCancelled\n▪ Inventory released
+
+ComProcessing --> ComShipped : shipOrder()\n▪ Tracking number assigned\n▪ Sets shipped_at = NOW()\n▪ Sets estimated_delivery\n▪ Event: ShipmentCreated
+
+ComShipped --> ComDelivered : deliveryConfirmed()\n▪ Carrier confirms delivery\n▪ Auto on tracking update\n▪ Sets delivered_at = NOW()\n▪ Event: ShipmentDelivered
+
+ComDelivered --> ComRefunded : processRefund()\n▪ Customer return/refund\n▪ Refund via payment gateway\n▪ Inventory released\n▪ Event: OrderRefunded
+
+ComCancelled --> [*] : TERMINAL
+ComRefunded --> [*] : TERMINAL
+
+note right of ComShipped
+  **Cannot cancel after shipped.**
+  Must use refund process.
+endnote
+
+' ============================================================
+' 4. INVOICE STATE MACHINE
+' ============================================================
+
+state "**Invoice** (billing.invoices)" as InvTitle #F4F6F7
+
+state "draft\nمسودة" as InvDraft
+state "sent\nمرسلة" as InvSent
+state "paid\nمدفوعة" as InvPaid #D5F5E3
+state "overdue\nمتأخرة" as InvOverdue #FADBD8
+state "void\nملغاة" as InvVoid #FADBD8
+
+InvTitle -down-> InvDraft
+
+[*] -down-> InvDraft : System generates invoice\n▪ Triggered by OrderPlaced event\n▪ Amount from order total
+
+InvDraft --> InvSent : sendInvoice()\n▪ Invoice finalized and sent\n▪ Customer receives email/SMS
+
+InvSent --> InvPaid : paymentReceived()\n▪ Payment confirmed via gateway\n▪ Sets paid_at = NOW()\n▪ Event: InvoicePaid
+
+InvSent --> InvOverdue : paymentDeadlineExceeded()\n▪ Cron: due_date < NOW()\n▪ AND payment_status != 'paid'\n▪ Event: InvoiceOverdue\n▪ Late payment reminder sent
+
+InvOverdue --> InvPaid : latePaymentReceived()\n▪ Payment received after due date\n▪ May include late fees
+
+InvSent --> InvVoid : voidInvoice()\n▪ Order cancelled → void\n▪ Admin can manually void\n▪ Guard: cannot void paid invoice
+
+InvDraft --> InvVoid : voidDraft()\n▪ Draft discarded
+
+InvPaid --> [*] : TERMINAL
+InvVoid --> [*] : TERMINAL
+
+' ============================================================
+' 5. USER ACCOUNT STATE MACHINE
+' ============================================================
+
+state "**User Account** (identity.users)" as UserTitle #F4F6F7
+
+state "unverified\nغير مفعل" as UserUnverified
+state "active\nنشط" as UserActive #D5F5E3
+state "locked\nمقفل" as UserLocked #FADBD8
+state "disabled\nمعطل" as UserDisabled #FADBD8
+
+UserTitle -down-> UserUnverified
+
+[*] -down-> UserUnverified : User registers\n▪ Role: customer (default)\n▪ is_verified: false\n▪ Event: UserRegistered
+
+UserUnverified --> UserActive : verifyEmail()\n▪ Email verification token (24h TTL)\n▪ Sets is_verified = true\n▪ Event: UserVerified
+
+UserUnverified --> UserActive : login()\n▪ Login allowed even if unverified\n▪ Verification is optional for login
+
+UserActive --> UserLocked : exceedLoginAttempts()\n▪ Guard: failed_login_attempts ≥ 5\n▪ Sets locked_until = NOW() + 30 min\n▪ Event: AccountLocked\n▪ Security alert sent
+
+UserLocked --> UserActive : lockTimeoutExpired()\n▪ Guard: NOW() > locked_until\n▪ Auto-unlock after 30 minutes\n▪ Resets failed_login_attempts = 0
+
+UserActive --> UserDisabled : adminDisable()\n▪ Admin disables account\n▪ Revokes ALL sessions\n▪ Event: AccountDisabled
+
+UserDisabled --> UserActive : adminEnable()\n▪ Admin re-enables account\n▪ User can login again
+
+note right of UserLocked
+  **Password Reset:**
+  User stays in current state.
+  Password change revokes
+  all refresh tokens except
+  current session.
+endnote
+
+' ============================================================
+' SUMMARY TABLE
+' ============================================================
+
+note bottom of UserDisabled
+  **= Transition Summary =**
+  |= Aggregate |= Total States |= Terminal States |= Auto Transitions =
+  | Service Order | 7 | completed, cancelled, rejected | pending→in_review (on assign) |
+  | Support Ticket | 6 | closed | resolved→closed (72h), waiting→in_progress (on reply) |
+  | Commerce Order | 7 | cancelled, refunded | shipped→delivered (on tracking), pending→cancelled (30min timeout) |
+  | Invoice | 5 | paid, void | sent→overdue (past due_date) |
+  | User Account | 4 | disabled | locked→active (after 30min) |
+endnote
+
+@enduml

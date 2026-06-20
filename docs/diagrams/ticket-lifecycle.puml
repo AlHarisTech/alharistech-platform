@@ -1,0 +1,427 @@
+@startuml ticket-lifecycle
+' ============================================================
+' AlharisTech Platform — Support Ticket Lifecycle Sequence
+' Ticket Flow: Open → Assign → Respond → Resolve → Close → Rate
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam participant {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+  FontColor #A1A1A
+}
+
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #E67E22
+  FontColor #1A1A1A
+}
+
+skinparam database {
+  BackgroundColor #D5F5E3
+  BorderColor #27AE60
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 9
+}
+
+skinparam arrow {
+  FontSize 9
+}
+
+title **AlharisTech Platform — Full Support Ticket Lifecycle**
+title **دورة حياة تذكرة الدعم الفني الكاملة**
+
+actor "Customer\nالعميل" as Customer
+actor "Support Employee\nموظف الدعم" as Employee
+actor "Manager\nالمدير" as Manager
+participant "Support API\nNestJS" as SupportAPI
+participant "Ticket Service\nDomain Logic" as TicketSvc
+participant "Knowledge Base\nService" as KBSvc
+participant "Notification\nService" as Notify
+participant "SLA Monitor\nCron Job" as SLAMonitor
+database "PostgreSQL\ntickets / messages" as DB
+
+== PHASE 1: TICKET CREATION — إنشاء التذكرة ==
+
+Customer -> SupportAPI : POST /api/v1/tickets\n{ title, description, category: "technical",\n  priority: "high" }
+
+SupportAPI -> SupportAPI : Zod validation:\n· title: 5-500 chars\n· description: 10-10000 chars\n· category: valid enum
+
+SupportAPI -> TicketSvc : createTicket(dto, customerId)
+
+TicketSvc -> DB : Check open ticket count\nSELECT COUNT(*) FROM tickets\nWHERE customer_id = ? AND status IN ('open','in_progress','waiting_customer')
+
+alt Maximum open tickets exceeded (> 10)
+  TicketSvc --> SupportAPI : 422 { error: "MAX_OPEN_TICKETS_EXCEEDED" }
+  SupportAPI --> Customer : 422 Limit exceeded
+else Within limits
+  TicketSvc -> TicketSvc : Calculate priority:\n· Customer suggested: "high" → use as-is\n· If not specified: auto-assign by category
+
+  note right of TicketSvc
+    **Auto-Priority Rules:**
+    · complaint, billing → urgent
+    · technical → high
+    · account, service_order → medium
+    · general, suggestion → low
+  endnote
+
+  TicketSvc -> TicketSvc : Compute SLA deadlines:\n· Priority = high\n· Response SLA: 4 hours\n· Resolution SLA: 24 hours
+
+  note right of TicketSvc
+    **SLA Matrix:**
+    |= Priority |= Response |= Resolution |
+    | urgent | 1 hour | 4 hours |
+    | high | 4 hours | 24 hours |
+    | medium | 8 hours | 72 hours |
+    | low | 24 hours | 168 hours |
+  endnote
+
+  TicketSvc -> DB : BEGIN TXN\nINSERT INTO tickets (\n  ticket_number: TKT-2026-000143,\n  title, description, status: 'open',\n  priority: 'high', category,\n  customer_id, sla_response_deadline,\n  sla_resolution_deadline)
+
+  DB --> TicketSvc : Ticket created
+
+  TicketSvc -> Notify : Publish **TicketOpened**\n{ ticketId, ticketNumber, customerId,\n  category, priority, slaDeadlines }
+
+  Notify -> Customer : Email: "تم استلام تذكرتك - رقم TKT-2026-000143"\n+ SLA info, expected response time
+  Notify -> Manager : In-app alert: "New high-priority ticket"
+
+  TicketSvc --> SupportAPI : 201 Created
+  SupportAPI --> Customer : 201 { data: { id, ticketNumber, status, slaDeadlines } }
+end
+
+== PHASE 2: TICKET ASSIGNMENT — تعيين التذكرة ==
+
+Manager -> SupportAPI : GET /api/v1/tickets\n?status=open&priority=high&assigned_to=null
+
+SupportAPI -> DB : SELECT * FROM tickets\nWHERE status = 'open' AND assigned_to IS NULL
+
+DB --> SupportAPI : Unassigned tickets
+SupportAPI --> Manager : 200 { data: [...unassigned tickets] }
+
+Manager -> Manager : Review ticket details + category
+
+Manager -> SupportAPI : PATCH /api/v1/tickets/{id}/assign\n{ assigned_to: "employee-uuid" }
+
+SupportAPI -> TicketSvc : assignTicket(ticketId, employeeId, managerId)
+
+TicketSvc -> DB : Validate target user:\nSELECT role FROM users WHERE id = ?
+
+alt Target not employee/manager/admin
+  TicketSvc --> SupportAPI : 422 { error: "INVALID_ASSIGNEE" }
+else Valid employee
+  TicketSvc -> DB : UPDATE tickets SET\n  assigned_to = ?, assigned_at = NOW()
+
+  alt Status is 'open'
+    TicketSvc -> DB : UPDATE tickets SET status = 'in_progress'
+
+    note right of TicketSvc
+      **Auto-Transition:**
+      open → in_progress
+      triggered by: assignment
+    endnote
+  end
+
+  TicketSvc -> Notify : Publish **TicketAssigned**\n{ ticketId, ticketNumber, assignedTo,\n  previousAssignee: null }
+
+  Notify -> Employee : Email + in-app: "تم تعيين تذكرة جديدة لك"\n+ ticket details, SLA deadlines
+  Notify -> Customer : Email: "تم تعيين موظف لمتابعة تذكرتك"
+
+  TicketSvc -> DB : APPEND status_history\n{ status, changed_by, note: "Assigned to <name>" }
+end
+
+== PHASE 3: KNOWLEDGE BASE SEARCH — البحث في قاعدة المعرفة ==
+
+Employee -> SupportAPI : View ticket detail
+SupportAPI -> DB : SELECT t.*, m.* FROM tickets t\nLEFT JOIN ticket_messages m\nWHERE t.id = ? AND (m.is_internal = false OR sender_type = 'employee')
+DB --> SupportAPI : Ticket with non-internal messages
+SupportAPI --> Employee : 200 { data: { ticket, messages, slaDeadlines } }
+
+Employee -> KBSvc : GET /api/v1/knowledge/articles\n?search=حل مشكلة تقنية&category=technical
+KBSvc -> DB : Full-text search\nacross title_ar, title_en, content_ar, content_en\nWHERE is_published = true AND deleted_at IS NULL
+DB --> KBSvc : Matching articles
+KBSvc --> Employee : 200 { data: [...articles] }
+
+alt Helpful article found
+  Employee -> Employee : Review article content
+
+  Employee -> SupportAPI : POST /api/v1/tickets/{id}/link-article\n{ articleId: "kb-uuid" }
+
+  SupportAPI -> TicketSvc : linkArticle(ticketId, articleId)
+
+  TicketSvc -> DB : UPDATE tickets\nAPPEND articleId to linked_article_ids (unique)
+
+  TicketSvc -> DB : INSERT INTO ticket_messages\n(sender_type: 'system',\n message: 'تم ربط مقالة: {article_title_ar}')
+
+  TicketSvc --> SupportAPI : 200
+end
+
+== PHASE 4: MESSAGE LOOP — دورة المراسلات ==
+
+Employee -> Employee : Draft response
+
+Employee -> SupportAPI : POST /api/v1/tickets/{id}/messages\n{ message: "الحل هو...", is_internal: false }
+
+SupportAPI -> TicketSvc : addMessage(ticketId, message, senderId, senderType: 'employee', isInternal: false)
+
+TicketSvc -> DB : INSERT INTO ticket_messages\n(ticket_id, sender_id, sender_type: 'employee',\n message, is_internal: false)
+
+alt First staff message
+  TicketSvc -> DB : UPDATE tickets\nSET first_response_at = NOW()\nWHERE first_response_at IS NULL
+  note right of TicketSvc : SLA Response Time recorded
+end
+
+TicketSvc -> Notify : Publish **TicketMessageAdded**\n{ ticketId, messageId, senderType: employee,\n  isInternal: false }
+
+Notify -> Customer : Email: "رد جديد على تذكرتك"\n+ message preview
+
+TicketSvc --> SupportAPI : 201
+SupportAPI --> Employee : 201 Created
+
+Customer -> SupportAPI : View ticket + reply
+SupportAPI -> DB : SELECT messages WHERE ticket_id = ?\nORDER BY created_at (filtered: non-internal only)
+DB --> SupportAPI : Message thread
+SupportAPI --> Customer : 200 { data: { messages: [...] } }
+
+Customer -> SupportAPI : POST /api/v1/tickets/{id}/messages\n{ message: "شكراً، ولكن ما زالت المشكلة..." }
+
+SupportAPI -> TicketSvc : addMessage(ticketId, message, customerId, senderType: 'customer')
+
+TicketSvc -> DB : INSERT INTO ticket_messages
+
+alt Ticket status is 'waiting_customer'
+  TicketSvc -> DB : UPDATE tickets\nSET status = 'in_progress'
+
+  note right of TicketSvc
+    **Auto-Transition:**
+    waiting_customer → in_progress
+    triggered by: customer reply
+  endnote
+
+  TicketSvc -> Notify : Publish **TicketStatusChanged**\n(oldStatus: waiting_customer → newStatus: in_progress)
+end
+
+TicketSvc -> Notify : Publish **TicketMessageAdded**\n{ senderType: customer }
+
+Notify -> Employee : In-app: "رد جديد من العميل على تذكرة #TKT-2026-000143"
+
+loop Back-and-forth communication
+  Employee -> SupportAPI : POST /api/v1/tickets/{id}/messages\n{ message: "توضيح إضافي..." }
+  SupportAPI -> TicketSvc : addMessage(...)
+
+  alt Employee needs to wait for customer
+    Employee -> SupportAPI : PATCH /api/v1/tickets/{id}/status\n{ status: "waiting_customer" }
+
+    note right of TicketSvc
+      **Status Transition:**
+      in_progress → waiting_customer
+      triggered by: employee
+    endnote
+
+    TicketSvc -> DB : UPDATE tickets SET status = 'waiting_customer'
+    TicketSvc -> Notify : Publish **TicketStatusChanged**
+    Notify -> Customer : Email: "نحتاج ردك للمتابعة"
+  end
+
+  Customer -> SupportAPI : Reply message
+  SupportAPI -> TicketSvc : addMessage(...)
+end
+
+== PHASE 5: INTERNAL NOTES — الملاحظات الداخلية ==
+
+Employee -> SupportAPI : POST /api/v1/tickets/{id}/messages\n{ message: "العميل متعاون - يحتاج متابعة أسبوعية",\n  is_internal: true }
+
+SupportAPI -> TicketSvc : addInternalNote(ticketId, message, employeeId)
+
+TicketSvc -> DB : INSERT INTO ticket_messages\n(sender_type: 'employee', is_internal: true)
+
+TicketSvc -> Notify : Publish **TicketInternalNoteAdded**\n{ ticketId, messageId, senderId }
+
+note right of TicketSvc
+  **Security:**
+  Internal notes are NEVER
+  returned in customer API responses.
+  Only Employee, Manager, Admin can view.
+endnote
+
+TicketSvc --> SupportAPI : 201
+
+' Verify customer cannot see internal note
+Customer -> SupportAPI : GET /api/v1/tickets/{id}/messages
+SupportAPI -> DB : SELECT * FROM ticket_messages\nWHERE ticket_id = ? AND is_internal = false
+DB --> SupportAPI : Messages (internal notes excluded)
+SupportAPI --> Customer : 200 { data: [...public messages only] }
+
+== PHASE 6: RESOLUTION & CLOSURE — الحل والإغلاق ==
+
+Employee -> SupportAPI : PATCH /api/v1/tickets/{id}/status\n{ status: "resolved", note: "تم حل المشكلة - تحديث الإعدادات" }
+
+SupportAPI -> TicketSvc : updateStatus(ticketId, "resolved", note, employeeId)
+
+note right of TicketSvc
+  **Status Transition:**
+  in_progress → resolved
+  (or open → resolved for quick resolution)
+endnote
+
+TicketSvc -> DB : BEGIN TXN\nUPDATE tickets SET\n  status = 'resolved',\n  resolved_at = NOW()\nAPPEND status_history
+DB --> TicketSvc : Resolved
+
+TicketSvc -> Notify : Publish **TicketResolved**\n{ ticketId, ticketNumber, resolvedBy,\n  firstResponseAt, resolutionTimeMinutes }
+
+Notify -> Customer : Email: "تم حل تذكرتك - يرجى التأكيد والتقييم"\n+ satisfaction survey link
+
+TicketSvc --> SupportAPI : 200
+
+Customer -> SupportAPI : Confirm resolution + rate
+SupportAPI -> SupportAPI : POST /api/v1/tickets/{id}/rate\n{ rating: 4, comment: "حل سريع ومفيد" }
+
+SupportAPI -> TicketSvc : rateTicket(ticketId, rating, comment, customerId)
+
+TicketSvc -> TicketSvc : Validate:\n· Ticket belongs to customer\n· Status is 'resolved' or 'closed'\n· Not already rated
+
+TicketSvc -> DB : UPDATE tickets SET\n  satisfaction_rating = 4,\n  satisfaction_comment = ?
+
+TicketSvc -> Notify : Publish **TicketRated**\n{ ticketId, rating, comment }
+
+TicketSvc --> SupportAPI : 200
+
+== PHASE 7: AUTO-CLOSURE — الإغلاق التلقائي ==
+
+note over SLAMonitor, DB
+  **Auto-Close Scheduler:**
+  Runs every 15 minutes.
+  Closes resolved tickets with
+  no activity for 72+ hours.
+endnote
+
+SLAMonitor -> DB : SELECT * FROM tickets\nWHERE status = 'resolved'\nAND updated_at < NOW() - INTERVAL '72 hours'
+
+alt Resolved tickets idle > 72h
+  SLAMonitor -> TicketSvc : autoClose(ticketId)
+
+  note right of TicketSvc
+    **Auto-Transition:**
+    resolved → closed
+    triggered by: system (72h inactivity)
+  endnote
+
+  TicketSvc -> DB : UPDATE tickets SET\n  status = 'closed', closed_at = NOW()\nAPPEND status_history\n(system auto-close)
+
+  TicketSvc -> Notify : Publish **TicketClosed**\n{ ticketId, closedBy: "system",\n  totalMessages, resolutionTimeMinutes }
+
+  Notify -> Customer : Email: "تم إغلاق تذكرتك"
+end
+
+== PHASE 8: REOPEN — إعادة فتح التذكرة ==
+
+opt Customer reopens within 7 days
+  Customer -> SupportAPI : POST /api/v1/tickets/{id}/reopen\n{ reason: "المشكلة عادت مرة أخرى" }
+
+  SupportAPI -> TicketSvc : reopenTicket(ticketId, customerId)
+
+  TicketSvc -> DB : Check reopen eligibility:\nSELECT closed_at FROM tickets WHERE id = ?
+
+  alt Closed > 7 days ago
+    TicketSvc --> SupportAPI : 422 { error: "REOPEN_WINDOW_EXPIRED",\n  create_new_ticket: true }
+    SupportAPI --> Customer : 422 "يجب إنشاء تذكرة جديدة"
+  else Within 7-day window
+    TicketSvc -> DB : UPDATE tickets SET\n  status = 'reopened',\n  reopened_at = NOW(),\n  reopened_count = reopened_count + 1,\n  assigned_to = previous_assignee
+
+    note right of TicketSvc
+      **Status Transition:**
+      closed → reopened
+      guard: NOW() - closed_at < 7 days
+    endnote
+
+    TicketSvc -> Notify : Publish **TicketReopened**\n{ ticketId, reopenedBy, originalClosedAt }
+
+    Notify -> Employee : Alert: "تم إعادة فتح تذكرة #TKT-2026-000143"
+    Notify -> Customer : Email: "تم إعادة فتح تذكرتك"
+
+    TicketSvc --> SupportAPI : 200
+  end
+end
+
+== SLA MONITORING & ESCALATION — مراقبة و تصعيد SLA ==
+
+note over SLAMonitor, DB
+  **SLA Monitoring (cron every 15 min):**
+  · T-1h warning before SLA breach
+  · SLA breach on deadline exceeded
+  · Escalation to manager on breach
+endnote
+
+SLAMonitor -> DB : SELECT * FROM tickets\nWHERE status NOT IN ('resolved', 'closed')\nAND sla_response_deadline < NOW() + INTERVAL '1 hour'\nAND first_response_at IS NULL
+
+alt SLA response deadline approaching (< 1h)
+  SLAMonitor -> Notify : Publish **SLABreachWarning**\n{ ticketId, slaType: "response",\n  deadline, timeRemaining }
+
+  Notify -> Employee : Urgent: "تبقى أقل من ساعة للرد على التذكرة!"
+  Notify -> Manager : Alert: "SLA warning for ticket #..."
+end
+
+SLAMonitor -> DB : SELECT * FROM tickets\nWHERE sla_response_deadline < NOW()\nAND first_response_at IS NULL
+
+alt SLA response deadline exceeded
+  SLAMonitor -> Notify : Publish **SLABreachEscalation**\n{ ticketId, slaType: "response",\n  exceededByMinutes, assignedTo }
+
+  Notify -> Manager : ESCALATION: "تجاوز وقت الرد على التذكرة"\n+ employee details
+  Notify -> Employee : Alert: "SLA Breach — Response time exceeded"
+end
+
+SLAMonitor -> DB : SELECT * FROM tickets\nWHERE sla_resolution_deadline < NOW()\nAND status NOT IN ('resolved', 'closed')
+
+alt SLA resolution deadline exceeded
+  SLAMonitor -> Notify : Publish **SLABreachEscalation**\n{ slaType: "resolution", ... }
+
+  Notify -> Manager : ESCALATION: "تجاوز وقت الحل للتذكرة"
+end
+
+== FORCE CLOSE (ADMIN ONLY) — إغلاق إجباري ==
+
+note over Manager, DB
+  **Admin Force-Close:**
+  Admin can force-close any ticket
+  from any status. Requires reason.
+  Only role with this privilege.
+endnote
+
+Manager -> SupportAPI : PATCH /api/v1/tickets/{id}/status\n{ status: "closed", note: "إغلاق إجباري - تم حل المشكلة" }
+
+SupportAPI -> TicketSvc : forceClose(ticketId, reason, adminId)
+
+alt Actor is not Admin
+  TicketSvc --> SupportAPI : 403 Forbidden
+else Admin with reason
+  TicketSvc -> DB : UPDATE tickets SET\n  status = 'closed', closed_at = NOW()\nAPPEND status_history with reason
+
+  TicketSvc -> Notify : Publish **TicketClosed**\n{ ticketId, closedBy, reason }
+
+  TicketSvc --> SupportAPI : 200
+end
+
+== FULL TICKET STATE MACHINE SUMMARY ==
+
+note over Customer, DB
+  **Ticket Status Transitions:**
+  |= From |= To |= Trigger |= Guard |
+  | **open** | in_progress | Assignment or employee action | — |
+  | **open** | resolved | Quick resolution by employee | — |
+  | **in_progress** | waiting_customer | Employee needs customer input | — |
+  | **in_progress** | resolved | Employee resolves | — |
+  | **waiting_customer** | in_progress | Customer posts reply (auto) | — |
+  | **waiting_customer** | resolved | Employee resolves | — |
+  | **resolved** | closed | Auto after 72h inactivity | No messages in 72h |
+  | **resolved** | reopened | Customer reopens | Within 7 days of resolved_at |
+  | **closed** | reopened | Customer reopens | Within 7 days of closed_at |
+  | **Any** | closed | Admin force-close | Admin role + reason required |
+endnote
+
+@enduml

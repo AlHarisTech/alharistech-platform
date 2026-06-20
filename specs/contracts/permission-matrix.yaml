@@ -1,0 +1,1065 @@
+# =============================================================================
+# PERMISSION MATRIX — Single Source of Truth
+# Complete RBAC Authorization Model for AlharisTech Platform
+# 5 Roles × 9 Domains = Comprehensive access control
+# Version: 1.0 | Generated from domain specs | Do not edit manually
+# =============================================================================
+
+# Domain legend:
+#   identity, customer, service, commerce, support, content, notification, analytics, ai
+
+roles:
+  # =========================================================================
+  # ADMIN — مدير النظام — Full access across all domains
+  # =========================================================================
+  - role: "admin"
+    display_ar: "مدير النظام"
+    display_en: "System Administrator"
+    permissions:
+      # IDENTITY DOMAIN
+      - resource: "users"
+        actions: ["create", "read", "update", "delete"]
+        domain: "identity"
+      - resource: "roles"
+        actions: ["create", "read", "update", "delete"]
+        domain: "identity"
+      - resource: "sessions"
+        actions: ["read", "revoke"]
+        domain: "identity"
+      - resource: "auth_tokens"
+        actions: ["issue", "refresh", "revoke"]
+        domain: "identity"
+      # CUSTOMER DOMAIN
+      - resource: "customers"
+        actions: ["create", "read", "update", "delete"]
+        domain: "customer"
+      - resource: "customer_profiles"
+        actions: ["create", "read", "update", "delete"]
+        domain: "customer"
+      - resource: "communication_logs"
+        actions: ["create", "read", "update", "delete"]
+        domain: "customer"
+      - resource: "customer_tags"
+        actions: ["create", "read", "update", "delete"]
+        domain: "customer"
+      - resource: "customer_import"
+        actions: ["create"]
+        domain: "customer"
+      - resource: "customer_export"
+        actions: ["create"]
+        domain: "customer"
+      - resource: "customer_merge"
+        actions: ["create"]
+        domain: "customer"
+      # SERVICE DOMAIN
+      - resource: "services"
+        actions: ["create", "read", "update", "delete"]
+        domain: "service"
+      - resource: "service_categories"
+        actions: ["create", "read", "update", "delete"]
+        domain: "service"
+      - resource: "service_orders"
+        actions: ["create", "read", "update", "delete"]
+        domain: "service"
+      - resource: "order_assignment"
+        actions: ["create", "read", "update"]
+        domain: "service"
+      - resource: "order_documents"
+        actions: ["create", "read", "verify", "delete"]
+        domain: "service"
+      - resource: "order_ratings"
+        actions: ["read", "delete"]
+        domain: "service"
+      # COMMERCE DOMAIN
+      - resource: "products"
+        actions: ["create", "read", "update", "delete"]
+        domain: "commerce"
+      - resource: "product_categories"
+        actions: ["create", "read", "update", "delete"]
+        domain: "commerce"
+      - resource: "carts"
+        actions: ["create", "read", "update", "delete"]
+        domain: "commerce"
+      - resource: "commerce_orders"
+        actions: ["create", "read", "update", "delete"]
+        domain: "commerce"
+      - resource: "inventory"
+        actions: ["create", "read", "update", "delete"]
+        domain: "commerce"
+      - resource: "coupons"
+        actions: ["create", "read", "update", "delete"]
+        domain: "commerce"
+      - resource: "product_reviews"
+        actions: ["create", "read", "update", "delete"]
+        domain: "commerce"
+      - resource: "price_history"
+        actions: ["read"]
+        domain: "commerce"
+      # SUPPORT DOMAIN
+      - resource: "tickets"
+        actions: ["create", "read", "update", "delete"]
+        domain: "support"
+      - resource: "ticket_status"
+        actions: ["read", "update"]
+        domain: "support"
+      - resource: "ticket_assignment"
+        actions: ["create", "read", "update"]
+        domain: "support"
+      - resource: "ticket_messages"
+        actions: ["create", "read", "update", "delete"]
+        domain: "support"
+      - resource: "knowledge_articles"
+        actions: ["create", "read", "update", "delete"]
+        domain: "support"
+      - resource: "knowledge_article_publish"
+        actions: ["create", "update"]
+        domain: "support"
+      - resource: "ticket_reports"
+        actions: ["read"]
+        domain: "support"
+      - resource: "sla_configuration"
+        actions: ["create", "read", "update", "delete"]
+        domain: "support"
+      # CONTENT DOMAIN
+      - resource: "pages"
+        actions: ["create", "read", "update", "delete"]
+        domain: "content"
+      - resource: "page_publish"
+        actions: ["create", "update"]
+        domain: "content"
+      - resource: "page_schedule"
+        actions: ["create", "read", "update", "delete"]
+        domain: "content"
+      - resource: "page_versions"
+        actions: ["read", "restore"]
+        domain: "content"
+      - resource: "media"
+        actions: ["create", "read", "update", "delete"]
+        domain: "content"
+      - resource: "blog_posts"
+        actions: ["create", "read", "update", "delete"]
+        domain: "content"
+      - resource: "blog_publish"
+        actions: ["create", "update"]
+        domain: "content"
+      - resource: "blog_categories"
+        actions: ["create", "read", "update", "delete"]
+        domain: "content"
+      - resource: "menus"
+        actions: ["create", "read", "update", "delete"]
+        domain: "content"
+      - resource: "sitemap"
+        actions: ["read"]
+        domain: "content"
+      # NOTIFICATION DOMAIN
+      - resource: "notification_templates"
+        actions: ["create", "read", "update", "delete"]
+        domain: "notification"
+      - resource: "notification_logs"
+        actions: ["read"]
+        domain: "notification"
+      - resource: "notification_preferences"
+        actions: ["read", "update"]
+        domain: "notification"
+      - resource: "notification_bulk"
+        actions: ["create", "read", "update", "delete"]
+        domain: "notification"
+      # ANALYTICS DOMAIN
+      - resource: "analytics_dashboards"
+        actions: ["create", "read", "update", "delete"]
+        domain: "analytics"
+      - resource: "analytics_reports"
+        actions: ["create", "read", "update"]
+        domain: "analytics"
+      - resource: "analytics_report_export"
+        actions: ["create", "read"]
+        domain: "analytics"
+      - resource: "analytics_kpis"
+        actions: ["create", "read", "update", "delete"]
+        domain: "analytics"
+      - resource: "analytics_metrics"
+        actions: ["read"]
+        domain: "analytics"
+      # AI DOMAIN
+      - resource: "ai_agents"
+        actions: ["create", "read", "update", "delete"]
+        domain: "ai"
+      - resource: "ai_agent_invoke"
+        actions: ["execute"]
+        domain: "ai"
+      - resource: "ai_chat"
+        actions: ["send"]
+        domain: "ai"
+      - resource: "ai_knowledge"
+        actions: ["create", "read", "update", "delete", "ingest"]
+        domain: "ai"
+      - resource: "ai_prompts"
+        actions: ["create", "read", "update", "delete"]
+        domain: "ai"
+      - resource: "ai_prompt_activate"
+        actions: ["update"]
+        domain: "ai"
+      - resource: "ai_interactions"
+        actions: ["read"]
+        domain: "ai"
+      - resource: "ai_interaction_stats"
+        actions: ["read"]
+        domain: "ai"
+
+  # =========================================================================
+  # MANAGER — مدير — Department-level access
+  # =========================================================================
+  - role: "manager"
+    display_ar: "مدير"
+    display_en: "Manager"
+    permissions:
+      # IDENTITY DOMAIN
+      - resource: "users"
+        actions: ["read"]
+        domain: "identity"
+      - resource: "roles"
+        actions: ["read"]
+        domain: "identity"
+      - resource: "sessions"
+        actions: ["read"]
+        domain: "identity"
+      - resource: "auth_tokens"
+        actions: ["issue", "refresh", "revoke"]
+        domain: "identity"
+      # CUSTOMER DOMAIN
+      - resource: "customers"
+        actions: ["create", "read", "update"]
+        domain: "customer"
+      - resource: "customer_profiles"
+        actions: ["read", "update"]
+        domain: "customer"
+      - resource: "communication_logs"
+        actions: ["create", "read", "update"]
+        domain: "customer"
+      - resource: "customer_tags"
+        actions: ["create", "read", "update", "delete"]
+        domain: "customer"
+      - resource: "customer_import"
+        actions: []
+        domain: "customer"
+      - resource: "customer_export"
+        actions: ["create"]
+        domain: "customer"
+      - resource: "customer_merge"
+        actions: []
+        domain: "customer"
+      # SERVICE DOMAIN
+      - resource: "services"
+        actions: ["create", "read", "update"]
+        domain: "service"
+      - resource: "service_categories"
+        actions: ["create", "read", "update"]
+        domain: "service"
+      - resource: "service_orders"
+        actions: ["create", "read", "update"]
+        domain: "service"
+      - resource: "order_assignment"
+        actions: ["create", "read"]
+        domain: "service"
+      - resource: "order_documents"
+        actions: ["create", "read", "verify"]
+        domain: "service"
+      - resource: "order_ratings"
+        actions: ["read"]
+        domain: "service"
+      # COMMERCE DOMAIN
+      - resource: "products"
+        actions: ["create", "read", "update"]
+        domain: "commerce"
+      - resource: "product_categories"
+        actions: ["create", "read", "update"]
+        domain: "commerce"
+      - resource: "carts"
+        actions: ["create", "read", "update", "delete"]
+        domain: "commerce"
+      - resource: "commerce_orders"
+        actions: ["read", "update"]
+        domain: "commerce"
+      - resource: "inventory"
+        actions: ["read", "update"]
+        domain: "commerce"
+      - resource: "coupons"
+        actions: ["create", "read", "update"]
+        domain: "commerce"
+      - resource: "product_reviews"
+        actions: ["read", "update"]
+        domain: "commerce"
+      - resource: "price_history"
+        actions: ["read"]
+        domain: "commerce"
+      # SUPPORT DOMAIN
+      - resource: "tickets"
+        actions: ["create", "read", "update"]
+        domain: "support"
+      - resource: "ticket_status"
+        actions: ["read", "update"]
+        domain: "support"
+      - resource: "ticket_assignment"
+        actions: ["create", "read", "update"]
+        domain: "support"
+      - resource: "ticket_messages"
+        actions: ["create", "read", "update"]
+        domain: "support"
+      - resource: "knowledge_articles"
+        actions: ["create", "read", "update"]
+        domain: "support"
+      - resource: "knowledge_article_publish"
+        actions: ["create", "update"]
+        domain: "support"
+      - resource: "ticket_reports"
+        actions: ["read"]
+        domain: "support"
+      - resource: "sla_configuration"
+        actions: ["read"]
+        domain: "support"
+      # CONTENT DOMAIN
+      - resource: "pages"
+        actions: ["create", "read", "update"]
+        domain: "content"
+      - resource: "page_publish"
+        actions: ["create", "update"]
+        domain: "content"
+      - resource: "page_schedule"
+        actions: ["create", "read", "update", "delete"]
+        domain: "content"
+      - resource: "page_versions"
+        actions: ["read", "restore"]
+        domain: "content"
+      - resource: "media"
+        actions: ["create", "read", "update", "delete"]
+        domain: "content"
+      - resource: "blog_posts"
+        actions: ["create", "read", "update"]
+        domain: "content"
+      - resource: "blog_publish"
+        actions: ["create", "update"]
+        domain: "content"
+      - resource: "blog_categories"
+        actions: ["create", "read", "update", "delete"]
+        domain: "content"
+      - resource: "menus"
+        actions: ["create", "read", "update", "delete"]
+        domain: "content"
+      - resource: "sitemap"
+        actions: ["read"]
+        domain: "content"
+      # NOTIFICATION DOMAIN
+      - resource: "notification_templates"
+        actions: ["read"]
+        domain: "notification"
+      - resource: "notification_logs"
+        actions: ["read"]
+        domain: "notification"
+      - resource: "notification_preferences"
+        actions: ["read", "update"]
+        domain: "notification"
+      - resource: "notification_bulk"
+        actions: ["execute"]
+        domain: "notification"
+      # ANALYTICS DOMAIN
+      - resource: "analytics_dashboards"
+        actions: ["create", "read", "update", "delete"]
+        domain: "analytics"
+      - resource: "analytics_reports"
+        actions: ["create", "read"]
+        domain: "analytics"
+      - resource: "analytics_report_export"
+        actions: ["create", "read"]
+        domain: "analytics"
+      - resource: "analytics_kpis"
+        actions: ["create", "read", "update"]
+        domain: "analytics"
+      - resource: "analytics_metrics"
+        actions: ["read"]
+        domain: "analytics"
+      # AI DOMAIN
+      - resource: "ai_agents"
+        actions: ["read"]
+        domain: "ai"
+      - resource: "ai_agent_invoke"
+        actions: ["execute"]
+        domain: "ai"
+      - resource: "ai_chat"
+        actions: ["send"]
+        domain: "ai"
+      - resource: "ai_knowledge"
+        actions: ["create", "read", "update", "delete", "ingest"]
+        domain: "ai"
+      - resource: "ai_prompts"
+        actions: ["create", "read", "update"]
+        domain: "ai"
+      - resource: "ai_prompt_activate"
+        actions: ["update"]
+        domain: "ai"
+      - resource: "ai_interactions"
+        actions: ["read"]
+        domain: "ai"
+      - resource: "ai_interaction_stats"
+        actions: ["read"]
+        domain: "ai"
+
+  # =========================================================================
+  # EMPLOYEE — موظف — Assigned/responsibility-based access
+  # =========================================================================
+  - role: "employee"
+    display_ar: "موظف"
+    display_en: "Employee"
+    permissions:
+      # IDENTITY DOMAIN
+      - resource: "users"
+        actions: ["read"]
+        domain: "identity"
+        scope: "self"
+      - resource: "roles"
+        actions: []
+        domain: "identity"
+      - resource: "sessions"
+        actions: ["read"]
+        domain: "identity"
+        scope: "self"
+      - resource: "auth_tokens"
+        actions: ["issue", "refresh", "revoke"]
+        domain: "identity"
+        scope: "self"
+      # CUSTOMER DOMAIN
+      - resource: "customers"
+        actions: ["read"]
+        domain: "customer"
+      - resource: "customer_profiles"
+        actions: ["read"]
+        domain: "customer"
+      - resource: "communication_logs"
+        actions: ["create", "read"]
+        domain: "customer"
+      - resource: "customer_tags"
+        actions: []
+        domain: "customer"
+      - resource: "customer_import"
+        actions: []
+        domain: "customer"
+      - resource: "customer_export"
+        actions: []
+        domain: "customer"
+      - resource: "customer_merge"
+        actions: []
+        domain: "customer"
+      # SERVICE DOMAIN
+      - resource: "services"
+        actions: ["read"]
+        domain: "service"
+      - resource: "service_categories"
+        actions: ["read"]
+        domain: "service"
+      - resource: "service_orders"
+        actions: ["read", "update"]
+        domain: "service"
+        scope: "assigned"
+      - resource: "order_assignment"
+        actions: []
+        domain: "service"
+      - resource: "order_documents"
+        actions: ["create", "read", "verify"]
+        domain: "service"
+        scope: "assigned"
+      - resource: "order_ratings"
+        actions: []
+        domain: "service"
+      # COMMERCE DOMAIN
+      - resource: "products"
+        actions: ["read"]
+        domain: "commerce"
+      - resource: "product_categories"
+        actions: ["read"]
+        domain: "commerce"
+      - resource: "carts"
+        actions: ["create", "read", "update", "delete"]
+        domain: "commerce"
+      - resource: "commerce_orders"
+        actions: ["read"]
+        domain: "commerce"
+      - resource: "inventory"
+        actions: ["read"]
+        domain: "commerce"
+      - resource: "coupons"
+        actions: ["read"]
+        domain: "commerce"
+      - resource: "product_reviews"
+        actions: []
+        domain: "commerce"
+      - resource: "price_history"
+        actions: []
+        domain: "commerce"
+      # SUPPORT DOMAIN
+      - resource: "tickets"
+        actions: ["create", "read"]
+        domain: "support"
+      - resource: "ticket_status"
+        actions: ["update"]
+        domain: "support"
+      - resource: "ticket_assignment"
+        actions: []
+        domain: "support"
+      - resource: "ticket_messages"
+        actions: ["create", "read", "update"]
+        domain: "support"
+        scope: "own"
+      - resource: "knowledge_articles"
+        actions: ["read"]
+        domain: "support"
+      - resource: "knowledge_article_publish"
+        actions: []
+        domain: "support"
+      - resource: "ticket_reports"
+        actions: ["read"]
+        domain: "support"
+        scope: "own_stats"
+      - resource: "sla_configuration"
+        actions: []
+        domain: "support"
+      # CONTENT DOMAIN
+      - resource: "pages"
+        actions: ["create", "read", "update"]
+        domain: "content"
+        scope: "assigned"
+      - resource: "page_publish"
+        actions: ["create", "update"]
+        domain: "content"
+      - resource: "page_schedule"
+        actions: []
+        domain: "content"
+      - resource: "page_versions"
+        actions: ["read"]
+        domain: "content"
+      - resource: "media"
+        actions: ["create", "read"]
+        domain: "content"
+      - resource: "blog_posts"
+        actions: ["create", "read", "update"]
+        domain: "content"
+        scope: "assigned"
+      - resource: "blog_publish"
+        actions: ["create", "update"]
+        domain: "content"
+      - resource: "blog_categories"
+        actions: ["read"]
+        domain: "content"
+      - resource: "menus"
+        actions: ["read"]
+        domain: "content"
+      - resource: "sitemap"
+        actions: ["read"]
+        domain: "content"
+      # NOTIFICATION DOMAIN
+      - resource: "notification_templates"
+        actions: []
+        domain: "notification"
+      - resource: "notification_logs"
+        actions: []
+        domain: "notification"
+      - resource: "notification_preferences"
+        actions: ["read", "update"]
+        domain: "notification"
+        scope: "self"
+      - resource: "notification_bulk"
+        actions: []
+        domain: "notification"
+      # ANALYTICS DOMAIN
+      - resource: "analytics_dashboards"
+        actions: ["read"]
+        domain: "analytics"
+        scope: "overview_only"
+      - resource: "analytics_reports"
+        actions: []
+        domain: "analytics"
+      - resource: "analytics_report_export"
+        actions: []
+        domain: "analytics"
+      - resource: "analytics_kpis"
+        actions: []
+        domain: "analytics"
+      - resource: "analytics_metrics"
+        actions: []
+        domain: "analytics"
+      # AI DOMAIN
+      - resource: "ai_agents"
+        actions: ["read"]
+        domain: "ai"
+        scope: "active_only"
+      - resource: "ai_agent_invoke"
+        actions: ["execute"]
+        domain: "ai"
+        scope: "support_analytics_only"
+      - resource: "ai_chat"
+        actions: ["send"]
+        domain: "ai"
+      - resource: "ai_knowledge"
+        actions: ["read"]
+        domain: "ai"
+      - resource: "ai_prompts"
+        actions: ["read"]
+        domain: "ai"
+      - resource: "ai_prompt_activate"
+        actions: []
+        domain: "ai"
+      - resource: "ai_interactions"
+        actions: ["read"]
+        domain: "ai"
+        scope: "own"
+      - resource: "ai_interaction_stats"
+        actions: []
+        domain: "ai"
+
+  # =========================================================================
+  # CUSTOMER — عميل — Own data access
+  # =========================================================================
+  - role: "customer"
+    display_ar: "عميل"
+    display_en: "Customer"
+    permissions:
+      # IDENTITY DOMAIN
+      - resource: "users"
+        actions: ["read"]
+        domain: "identity"
+        scope: "self"
+      - resource: "roles"
+        actions: []
+        domain: "identity"
+      - resource: "sessions"
+        actions: ["read"]
+        domain: "identity"
+        scope: "self"
+      - resource: "auth_tokens"
+        actions: ["issue", "refresh", "revoke"]
+        domain: "identity"
+        scope: "self"
+      # CUSTOMER DOMAIN
+      - resource: "customers"
+        actions: ["read"]
+        domain: "customer"
+        scope: "own"
+      - resource: "customer_profiles"
+        actions: ["read"]
+        domain: "customer"
+        scope: "own"
+      - resource: "communication_logs"
+        actions: []
+        domain: "customer"
+      - resource: "customer_tags"
+        actions: []
+        domain: "customer"
+      - resource: "customer_import"
+        actions: []
+        domain: "customer"
+      - resource: "customer_export"
+        actions: []
+        domain: "customer"
+      - resource: "customer_merge"
+        actions: []
+        domain: "customer"
+      # SERVICE DOMAIN
+      - resource: "services"
+        actions: ["read"]
+        domain: "service"
+      - resource: "service_categories"
+        actions: ["read"]
+        domain: "service"
+      - resource: "service_orders"
+        actions: ["create", "read"]
+        domain: "service"
+        scope: "own"
+      - resource: "order_assignment"
+        actions: []
+        domain: "service"
+      - resource: "order_documents"
+        actions: ["create", "read"]
+        domain: "service"
+        scope: "own_orders"
+      - resource: "order_ratings"
+        actions: ["create"]
+        domain: "service"
+        scope: "own_completed"
+      # COMMERCE DOMAIN
+      - resource: "products"
+        actions: ["read"]
+        domain: "commerce"
+      - resource: "product_categories"
+        actions: ["read"]
+        domain: "commerce"
+      - resource: "carts"
+        actions: ["create", "read", "update", "delete"]
+        domain: "commerce"
+        scope: "own"
+      - resource: "commerce_orders"
+        actions: ["create", "read"]
+        domain: "commerce"
+        scope: "own"
+      - resource: "inventory"
+        actions: []
+        domain: "commerce"
+      - resource: "coupons"
+        actions: ["read"]
+        domain: "commerce"
+        scope: "apply_own"
+      - resource: "product_reviews"
+        actions: ["create", "read"]
+        domain: "commerce"
+        scope: "own_reviews"
+      - resource: "price_history"
+        actions: []
+        domain: "commerce"
+      # SUPPORT DOMAIN
+      - resource: "tickets"
+        actions: ["create", "read"]
+        domain: "support"
+        scope: "own"
+      - resource: "ticket_status"
+        actions: []
+        domain: "support"
+      - resource: "ticket_assignment"
+        actions: []
+        domain: "support"
+      - resource: "ticket_messages"
+        actions: ["create", "read"]
+        domain: "support"
+        scope: "own_tickets_non_internal"
+      - resource: "knowledge_articles"
+        actions: ["read"]
+        domain: "support"
+        scope: "published_only"
+      - resource: "knowledge_article_publish"
+        actions: []
+        domain: "support"
+      - resource: "ticket_reports"
+        actions: []
+        domain: "support"
+      - resource: "sla_configuration"
+        actions: []
+        domain: "support"
+      # CONTENT DOMAIN
+      - resource: "pages"
+        actions: ["read"]
+        domain: "content"
+        scope: "published"
+      - resource: "page_publish"
+        actions: []
+        domain: "content"
+      - resource: "page_schedule"
+        actions: []
+        domain: "content"
+      - resource: "page_versions"
+        actions: []
+        domain: "content"
+      - resource: "media"
+        actions: []
+        domain: "content"
+      - resource: "blog_posts"
+        actions: ["read"]
+        domain: "content"
+        scope: "published"
+      - resource: "blog_publish"
+        actions: []
+        domain: "content"
+      - resource: "blog_categories"
+        actions: ["read"]
+        domain: "content"
+      - resource: "menus"
+        actions: []
+        domain: "content"
+      - resource: "sitemap"
+        actions: ["read"]
+        domain: "content"
+      # NOTIFICATION DOMAIN
+      - resource: "notification_templates"
+        actions: []
+        domain: "notification"
+      - resource: "notification_logs"
+        actions: ["read"]
+        domain: "notification"
+        scope: "own"
+      - resource: "notification_preferences"
+        actions: ["read", "update"]
+        domain: "notification"
+        scope: "own"
+      - resource: "notification_bulk"
+        actions: []
+        domain: "notification"
+      # ANALYTICS DOMAIN
+      - resource: "analytics_dashboards"
+        actions: []
+        domain: "analytics"
+      - resource: "analytics_reports"
+        actions: []
+        domain: "analytics"
+      - resource: "analytics_report_export"
+        actions: []
+        domain: "analytics"
+      - resource: "analytics_kpis"
+        actions: []
+        domain: "analytics"
+      - resource: "analytics_metrics"
+        actions: []
+        domain: "analytics"
+      # AI DOMAIN
+      - resource: "ai_agents"
+        actions: []
+        domain: "ai"
+      - resource: "ai_agent_invoke"
+        actions: ["execute"]
+        domain: "ai"
+        scope: "support_agent_only"
+      - resource: "ai_chat"
+        actions: ["send"]
+        domain: "ai"
+      - resource: "ai_knowledge"
+        actions: []
+        domain: "ai"
+      - resource: "ai_prompts"
+        actions: []
+        domain: "ai"
+      - resource: "ai_prompt_activate"
+        actions: []
+        domain: "ai"
+      - resource: "ai_interactions"
+        actions: ["read"]
+        domain: "ai"
+        scope: "own"
+      - resource: "ai_interaction_stats"
+        actions: []
+        domain: "ai"
+
+  # =========================================================================
+  # PARTNER — شريك — Limited assigned-data access
+  # =========================================================================
+  - role: "partner"
+    display_ar: "شريك"
+    display_en: "Partner"
+    permissions:
+      # IDENTITY DOMAIN
+      - resource: "users"
+        actions: ["read"]
+        domain: "identity"
+        scope: "self"
+      - resource: "roles"
+        actions: []
+        domain: "identity"
+      - resource: "sessions"
+        actions: ["read"]
+        domain: "identity"
+        scope: "self"
+      - resource: "auth_tokens"
+        actions: ["issue", "refresh", "revoke"]
+        domain: "identity"
+        scope: "self"
+      # CUSTOMER DOMAIN
+      - resource: "customers"
+        actions: ["read"]
+        domain: "customer"
+        scope: "assigned"
+      - resource: "customer_profiles"
+        actions: []
+        domain: "customer"
+      - resource: "communication_logs"
+        actions: []
+        domain: "customer"
+      - resource: "customer_tags"
+        actions: []
+        domain: "customer"
+      - resource: "customer_import"
+        actions: []
+        domain: "customer"
+      - resource: "customer_export"
+        actions: []
+        domain: "customer"
+      - resource: "customer_merge"
+        actions: []
+        domain: "customer"
+      # SERVICE DOMAIN
+      - resource: "services"
+        actions: ["read"]
+        domain: "service"
+      - resource: "service_categories"
+        actions: ["read"]
+        domain: "service"
+      - resource: "service_orders"
+        actions: []
+        domain: "service"
+      - resource: "order_assignment"
+        actions: []
+        domain: "service"
+      - resource: "order_documents"
+        actions: []
+        domain: "service"
+      - resource: "order_ratings"
+        actions: []
+        domain: "service"
+      # COMMERCE DOMAIN
+      - resource: "products"
+        actions: ["read"]
+        domain: "commerce"
+      - resource: "product_categories"
+        actions: ["read"]
+        domain: "commerce"
+      - resource: "carts"
+        actions: ["create", "read", "update", "delete"]
+        domain: "commerce"
+        scope: "own"
+      - resource: "commerce_orders"
+        actions: ["read"]
+        domain: "commerce"
+        scope: "assigned"
+      - resource: "inventory"
+        actions: []
+        domain: "commerce"
+      - resource: "coupons"
+        actions: []
+        domain: "commerce"
+      - resource: "product_reviews"
+        actions: []
+        domain: "commerce"
+      - resource: "price_history"
+        actions: []
+        domain: "commerce"
+      # SUPPORT DOMAIN
+      - resource: "tickets"
+        actions: []
+        domain: "support"
+      - resource: "ticket_status"
+        actions: []
+        domain: "support"
+      - resource: "ticket_assignment"
+        actions: []
+        domain: "support"
+      - resource: "ticket_messages"
+        actions: []
+        domain: "support"
+      - resource: "knowledge_articles"
+        actions: []
+        domain: "support"
+      - resource: "knowledge_article_publish"
+        actions: []
+        domain: "support"
+      - resource: "ticket_reports"
+        actions: []
+        domain: "support"
+      - resource: "sla_configuration"
+        actions: []
+        domain: "support"
+      # CONTENT DOMAIN
+      - resource: "pages"
+        actions: ["read"]
+        domain: "content"
+        scope: "published"
+      - resource: "page_publish"
+        actions: []
+        domain: "content"
+      - resource: "page_schedule"
+        actions: []
+        domain: "content"
+      - resource: "page_versions"
+        actions: []
+        domain: "content"
+      - resource: "media"
+        actions: []
+        domain: "content"
+      - resource: "blog_posts"
+        actions: ["read"]
+        domain: "content"
+        scope: "published"
+      - resource: "blog_publish"
+        actions: []
+        domain: "content"
+      - resource: "blog_categories"
+        actions: ["read"]
+        domain: "content"
+      - resource: "menus"
+        actions: []
+        domain: "content"
+      - resource: "sitemap"
+        actions: ["read"]
+        domain: "content"
+      # NOTIFICATION DOMAIN
+      - resource: "notification_templates"
+        actions: []
+        domain: "notification"
+      - resource: "notification_logs"
+        actions: ["read"]
+        domain: "notification"
+        scope: "own"
+      - resource: "notification_preferences"
+        actions: ["read", "update"]
+        domain: "notification"
+        scope: "own"
+      - resource: "notification_bulk"
+        actions: []
+        domain: "notification"
+      # ANALYTICS DOMAIN
+      - resource: "analytics_dashboards"
+        actions: ["read"]
+        domain: "analytics"
+        scope: "own_reports"
+      - resource: "analytics_reports"
+        actions: ["create", "read"]
+        domain: "analytics"
+        scope: "own_data"
+      - resource: "analytics_report_export"
+        actions: ["read"]
+        domain: "analytics"
+        scope: "own_reports"
+      - resource: "analytics_kpis"
+        actions: []
+        domain: "analytics"
+      - resource: "analytics_metrics"
+        actions: []
+        domain: "analytics"
+      # AI DOMAIN
+      - resource: "ai_agents"
+        actions: []
+        domain: "ai"
+      - resource: "ai_agent_invoke"
+        actions: []
+        domain: "ai"
+      - resource: "ai_chat"
+        actions: ["send"]
+        domain: "ai"
+        scope: "via_api_key"
+      - resource: "ai_knowledge"
+        actions: []
+        domain: "ai"
+      - resource: "ai_prompts"
+        actions: []
+        domain: "ai"
+      - resource: "ai_prompt_activate"
+        actions: []
+        domain: "ai"
+      - resource: "ai_interactions"
+        actions: ["read"]
+        domain: "ai"
+        scope: "own"
+      - resource: "ai_interaction_stats"
+        actions: []
+        domain: "ai"
+
+# ===========================================================================
+# Role Hierarchy
+# ===========================================================================
+hierarchy:
+  - inherits_from: "admin"
+    inherits: []
+    description: "Top-level role; no inheritance needed"
+  - inherits_from: "manager"
+    inherits: []
+    description: "Department-level role; shares some admin read access"
+  - inherits_from: "employee"
+    inherits: []
+    description: "Operational role with assigned-data scoping"
+  - inherits_from: "customer"
+    inherits: []
+    description: "Self-service role; own data only"
+  - inherits_from: "partner"
+    inherits: []
+    description: "External role; limited to assigned resources"

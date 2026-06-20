@@ -1,0 +1,433 @@
+@startuml notification-pipeline
+' ============================================================
+' AlharisTech Platform — Notification Delivery Pipeline
+' Domain Event → Preferences → Template → Routing → Delivery → Retry → DLQ
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam participant {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+  FontColor #1A1A1A
+}
+
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #E67E22
+  FontColor #1A1A1A
+}
+
+skinparam database {
+  BackgroundColor #D5F5E3
+  BorderColor #27AE60
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 9
+}
+
+skinparam arrow {
+  FontSize 9
+}
+
+skinparam box {
+  BackgroundColor #F4F6F7
+  BorderColor #AAB7B8
+  FontSize 10
+  FontStyle bold
+}
+
+title **AlharisTech Platform — Notification Delivery Pipeline**
+title **خط أنابيب توصيل الإشعارات — من الحدث إلى التسليم**
+
+box "Domain Services (Publishers)" #E8F0FE
+  participant "Service\nDomain" as ServiceDomain
+  participant "Support\nDomain" as SupportDomain
+  participant "Commerce\nDomain" as CommerceDomain
+  participant "Identity\nDomain" as IdentityDomain
+endbox
+
+box "Notification Service" #D5F5E3
+  participant "Event Bus\nSubscriber" as EventBus
+  participant "Notification\nDispatcher" as Dispatcher
+  participant "Preference\nEngine" as PrefEngine
+  participant "Template\nEngine" as TemplateEngine
+  participant "Channel\nRouter" as ChannelRouter
+endbox
+
+box "Delivery Channels" #FDEBD0
+  participant "Email\nProvider\n(Resend/SES)" as EmailProvider
+  participant "SMS\nProvider\n(Twilio/Unifonic)" as SMSProvider
+  participant "Push\nProvider\n(Firebase/OneSignal)" as PushProvider
+endbox
+
+box "Reliability & Monitoring" #FDEDEC
+  participant "Delivery Log\nPostgreSQL" as DeliveryLog
+  participant "Retry Queue\nBullMQ" as RetryQueue
+  participant "Dead Letter\nQueue" as DLQ
+endbox
+
+actor "Admin\nمدير" as Admin
+database "PostgreSQL\npreferences / templates" as DB
+
+== EVENT INGESTION — استقبال الأحداث ==
+
+note over ServiceDomain, IdentityDomain
+  **Domain Events Published:**
+  · OrderStatusChanged (Service)
+  · TicketOpened, TicketResolved (Support)
+  · PaymentCompleted, ShipmentCreated (Commerce)
+  · UserRegistered, AccountLocked (Identity)
+  · ... 40+ event types across domains
+endnote
+
+ServiceDomain -> EventBus : Publish **OrderStatusChanged**\n{ orderId, oldStatus: "in_progress",\n  newStatus: "completed",\n  customerId: "uuid-123",\n  changedBy: "uuid-456",\n  timestamp }
+
+SupportDomain -> EventBus : Publish **TicketAssigned**\n{ ticketId, ticketNumber: "TKT-2026-000143",\n  assignedTo: "uuid-789",\n  customerId: "uuid-456" }
+
+CommerceDomain -> EventBus : Publish **PaymentCompleted**\n{ orderId, orderNumber: "ORD-2026-000042",\n  amount: 253.00, currency: "SAR",\n  customerId: "uuid-456" }
+
+EventBus -> Dispatcher : Route events to notification handlers
+note right of EventBus
+  **Event Routing Map:**
+  OrderStatusChanged → notifyCustomer, notifyEmployee
+  TicketAssigned → notifyEmployee, notifyCustomer
+  PaymentCompleted → notifyCustomer
+  UserRegistered → notifyCustomer (welcome)
+  AccountLocked → notifyCustomer (security alert)
+endnote
+
+== PREFERENCE CHECK — التحقق من التفضيلات ==
+
+Dispatcher -> PrefEngine : checkUserPreferences(customerId, eventType)
+
+PrefEngine -> DB : SELECT * FROM notification_preferences\nWHERE user_id = ?
+
+DB --> PrefEngine : { preferences }
+
+note right of PrefEngine
+  **User Notification Preferences:**
+  {rn    global_enabled: true,
+    channels: {
+      email: {
+        enabled: true,
+        types: ["order", "ticket", "payment"]
+      },
+      sms: {
+        enabled: true,
+        types: ["payment", "security"],
+        quiet_hours: { start: "22:00", end: "08:00" }
+      },
+      push: {
+        enabled: true,
+        types: ["order", "ticket", "payment", "security"]
+      }
+    },
+    locale: "ar"
+  }
+endnote
+
+alt Notifications globally disabled
+  PrefEngine --> Dispatcher : SKIP — notifications disabled
+  note right of Dispatcher : Record in delivery_log as "skipped: preference"
+else Globally enabled
+  PrefEngine -> PrefEngine : Check if event type allowed\nfor each channel
+
+  PrefEngine --> Dispatcher : { channels: { email: true, sms: true, push: true },\n  locale: "ar" }
+end
+
+== TEMPLATE SELECTION & RENDERING — اختيار القالب وتعبئته ==
+
+Dispatcher -> TemplateEngine : selectTemplate(eventType, locale, channel)
+
+TemplateEngine -> DB : SELECT * FROM notification_templates\nWHERE event_type = 'OrderStatusChanged'\nAND locale = 'ar'\nAND channel IN ('email', 'sms', 'push')
+
+DB --> TemplateEngine : { templates: [email_template, sms_template, push_template] }
+
+note right of TemplateEngine
+  **Template Structure (Handlebars):**
+  email_order_status_changed_ar:
+    subject: "{{siteName}} - تحديث حالة الطلب #{{referenceNumber}}"
+    body_html: "<p>عزيزي {{customerName}}،</p>
+      <p>تم تغيير حالة طلبك #{{referenceNumber}}
+      من <strong>{{oldStatusAr}}</strong>
+      إلى <strong>{{newStatusAr}}</strong>.</p>"
+    body_text: "..."
+    sms_body: "{{siteName}}: طلبك #{{referenceNumber}}
+      تغير إلى {{newStatusAr}}"
+    push_title: "تحديث الطلب"
+    push_body: "طلبك #{{referenceNumber}}: {{newStatusAr}}"
+endnote
+
+TemplateEngine -> TemplateEngine : **Render with variables:**
+note right of TemplateEngine
+  **Variable Substitution:**
+  {rn    orderId → lookup order details
+    customerId → lookup customer name (ar/en)
+    referenceNumber → from order payload
+    oldStatus → oldStatus mapped to Arabic label
+    newStatus → newStatus mapped to Arabic label
+    siteName → "منصة الحارس تك"
+    dashboardLink → https://alharistech.com/ar/orders/{id}
+  }
+endnote
+
+TemplateEngine -> DB : Lookup additional context:\n· Customer: first_name_ar, last_name_ar\n· Order: reference_number, service name_ar\n· Status labels (ar): in_progress → "قيد المعالجة"\n  completed → "مكتمل"
+
+DB --> TemplateEngine : Context data
+
+TemplateEngine -> TemplateEngine : Render Handlebars templates\nwith full context → final messages
+
+TemplateEngine --> Dispatcher : {rn  email: { subject, html, text },
+  sms: { body },
+  push: { title, body }
+}
+
+== MULTI-CHANNEL ROUTING — توجيه متعدد القنوات ==
+
+Dispatcher -> ChannelRouter : dispatch(channel, renderedMessage, user)
+
+par Parallel delivery to all enabled channels
+  ChannelRouter -> ChannelRouter : Route to EMAIL
+  note right of ChannelRouter
+    **Channel: Email**
+    Provider: Resend (primary) / AWS SES (fallback)
+    Format: HTML + plain text
+    Max size: 100KB
+  endnote
+
+  ChannelRouter -> EmailProvider : POST /emails\n{ from: "AlharisTech <noreply@alharistech.com>",\n  to: "customer@example.com",\n  subject: "{{rendered_subject}}",\n  html: "{{rendered_html}}",\n  text: "{{rendered_text}}",\n  headers: { "X-Entity-Ref-ID": "uuid" } }
+
+  EmailProvider -> EmailProvider : Queue → SMTP → Inbox
+  EmailProvider --> ChannelRouter : { messageId, status: "queued" }
+
+  ChannelRouter -> DeliveryLog : Log email attempt\n{ channel: "email", messageId, status: "queued" }
+end
+
+par
+  ChannelRouter -> ChannelRouter : Route to SMS
+
+  alt Within quiet hours (22:00-08:00)
+    ChannelRouter -> DeliveryLog : Log SMS deferred\n(reason: quiet_hours)
+    note right of ChannelRouter
+      **Quiet Hours:**
+      SMS delivery delayed until 08:00.
+      Stored in scheduled queue.
+      Priority: security alerts bypass quiet hours.
+    endnote
+  else Outside quiet hours or security event
+    ChannelRouter -> SMSProvider : POST /messages\n{ to: "+9665XXXXXXXX",\n  body: "{{rendered_sms_body}}" }
+
+    SMSProvider -> SMSProvider : Route to carrier → Deliver
+    SMSProvider --> ChannelRouter : { sid, status: "sent" }
+
+    ChannelRouter -> DeliveryLog : Log SMS attempt\n{ channel: "sms", sid, status: "sent" }
+  end
+end
+
+par
+  ChannelRouter -> ChannelRouter : Route to PUSH
+
+  ChannelRouter -> PushProvider : POST /send\n{ tokens: ["device_token_xxx"],\n  notification: {\n    title: "{{push_title}}",\n    body: "{{push_body}}"\n  },\n  data: {\n    type: "order_status",\n    orderId: "uuid",\n    deepLink: "/ar/orders/uuid"\n  } }
+
+  PushProvider -> PushProvider : FCM/APNs → Device
+  PushProvider --> ChannelRouter : { success: 1, failure: 0 }
+
+  ChannelRouter -> DeliveryLog : Log push attempt\n{ channel: "push", status: "delivered" }
+end
+
+== DELIVERY STATUS TRACKING — تتبع حالة التسليم ==
+
+note over ChannelRouter, DeliveryLog
+  **Delivery Status Workflow:**
+  queued → sent → delivered / bounced / failed
+
+  Webhooks from providers update
+  delivery status asynchronously.
+endnote
+
+EmailProvider -> ChannelRouter : Webhook: email delivered\n{ messageId, event: "delivered" }
+ChannelRouter -> DeliveryLog : UPDATE delivery_log\nSET status = 'delivered', delivered_at = NOW()
+
+EmailProvider -> ChannelRouter : Webhook: email bounced\n{ messageId, event: "bounced", reason }
+ChannelRouter -> DeliveryLog : UPDATE delivery_log\nSET status = 'bounced', error = reason
+
+alt Email bounced (hard bounce)
+  ChannelRouter -> DB : UPDATE notification_preferences\nSET email_enabled = false\n(auto-disable on hard bounce)
+  note right of ChannelRouter
+    Auto-suppress channel on hard bounce
+    to protect sender reputation.
+  endnote
+end
+
+== FAILURE & RETRY — الفشل وإعادة المحاولة ==
+
+alt Delivery failed (provider error / timeout)
+  ChannelRouter -> DeliveryLog : UPDATE delivery_log\nSET status = 'failed', attempt_count = attempt_count + 1
+
+  ChannelRouter -> RetryQueue : Enqueue retry job\n{ messageId, channel, attempt: 1, maxAttempts: 3 }
+
+  note right of RetryQueue
+    **Exponential Backoff Strategy:**
+    |= Attempt |= Delay |
+    | 1st | 1 minute |
+    | 2nd | 5 minutes (5x) |
+    | 3rd | 25 minutes (5x) |
+    | Total | ~31 minutes before DLQ |
+  endnote
+
+  RetryQueue -> RetryQueue : Wait 1 minute (attempt 1)
+
+  RetryQueue -> ChannelRouter : Retry delivery (attempt 1)
+
+  alt Retry succeeds
+    ChannelRouter -> EmailProvider : Re-send email
+    EmailProvider --> ChannelRouter : OK
+    ChannelRouter -> DeliveryLog : UPDATE status = 'sent'\nattempt_count = 1
+    ChannelRouter -> RetryQueue : REMOVE job (success)
+  else Retry fails (attempt 1)
+    ChannelRouter -> DeliveryLog : UPDATE attempt_count = 2
+
+    RetryQueue -> RetryQueue : Wait 5 minutes (attempt 2)
+    RetryQueue -> ChannelRouter : Retry delivery (attempt 2)
+
+    alt Retry succeeds
+      ChannelRouter -> DeliveryLog : UPDATE status = 'sent'
+      ChannelRouter -> RetryQueue : REMOVE job
+    else Retry fails (attempt 2)
+      ChannelRouter -> DeliveryLog : UPDATE attempt_count = 3
+
+      RetryQueue -> RetryQueue : Wait 25 minutes (attempt 3)
+
+      RetryQueue -> ChannelRouter : Final retry (attempt 3)
+
+      alt Retry succeeds
+        ChannelRouter -> DeliveryLog : UPDATE status = 'sent'
+        ChannelRouter -> RetryQueue : REMOVE job
+      else All retries exhausted (attempt 3 failed)
+        note right of DLQ
+          **ALL RETRIES EXHAUSTED**
+          Moving to Dead Letter Queue.
+        endnote
+
+        ChannelRouter -> DeliveryLog : UPDATE status = 'permanent_failure'\nfailed_at = NOW()
+
+        ChannelRouter -> DLQ : Enqueue dead letter\n{ messageId, channel, eventType,\n  user, attempts: 3, lastError,\n  originalPayload }
+
+        DLQ -> Notify : Publish alert: **Admin Notification**
+        Notify -> Admin : Email: "فشل توصيل إشعار - تحقق من DLQ"\n+ message details + error log
+      end
+    end
+  end
+end
+
+== DEAD LETTER QUEUE MANAGEMENT — إدارة طابور الرسائل الميتة ==
+
+note over DLQ, Admin
+  **Dead Letter Queue (DLQ):**
+  Stores messages that failed all retry attempts.
+  Admin can:
+  · View DLQ dashboard
+  · Inspect failed message details
+  · Manually retry (with reason)
+  · Purge (after investigation)
+  · Export for audit
+endnote
+
+Admin -> DLQ : GET /api/v1/admin/notifications/dead-letter\n?status=failed&channel=email&from=...
+
+DLQ --> Admin : 200 { data: [...failedMessages],\n  meta: { total, page } }
+
+Admin -> Admin : Inspect failed message:\n· Original event payload\n· Error details\n· Attempt history\n· User preferences at time of failure
+
+alt Issue resolved (provider outage over / fixed)
+  Admin -> DLQ : POST /api/v1/admin/notifications/dead-letter/{id}/retry
+
+  DLQ -> ChannelRouter : Retry with original payload
+  ChannelRouter -> EmailProvider : Re-send
+  EmailProvider --> ChannelRouter : OK
+  ChannelRouter -> DeliveryLog : UPDATE status = 'sent' (manual retry)
+  ChannelRouter -> DLQ : REMOVE from DLQ
+else Irrecoverable (invalid email / user deleted)
+  Admin -> DLQ : POST /api/v1/admin/notifications/dead-letter/{id}/purge\n{ reason: "User account deleted" }
+
+  DLQ -> DeliveryLog : UPDATE status = 'discarded'\nnote: "Purged by admin: {reason}"
+end
+
+== DELIVERY LOG & AUDIT — سجل التسليم والتدقيق ==
+
+note over DeliveryLog, DB
+  **= Delivery Log Schema =**
+
+  |= Field |= Description |
+  | id | UUID |
+  | event_type | OrderStatusChanged, TicketOpened, ... |
+  | user_id | Recipient user ID |
+  | channel | email, sms, push |
+  | message_id | Provider reference ID |
+  | status | queued, sent, delivered, failed, bounced, permanent_failure, discarded |
+  | attempt_count | 0–3 |
+  | last_error | Provider error message |
+  | retry_history | JSONB [{ attempt, timestamp, error }] |
+  | template_id | Template used |
+  | rendered_content | Rendered message (for debugging) |
+  | created_at | Initial attempt timestamp |
+  | delivered_at | Delivery confirmation timestamp |
+  | failed_at | Final failure timestamp |
+endnote
+
+== BATCH & DIGEST — التجميع والملخص ==
+
+note over Dispatcher, ChannelRouter
+  **Notification Batching (Phase 2):**
+  · Low-priority notifications batched hourly
+  · Daily digest email for marketing/updates
+  · Real-time for: payment, security, SLA alerts
+  · User-configurable digest frequency
+endnote
+
+opt Batch notification (low priority)
+  Dispatcher -> Dispatcher : Check batch eligibility:\n· Priority: low\n· Not a security event\n· User opted into digest
+
+  Dispatcher -> DB : INSERT INTO notification_batch\n(user_id, event_type, payload, scheduled_for)
+
+  note right of Dispatcher
+    Cron job runs every hour.
+    Aggregates pending notifications.
+    Sends single digest message.
+  endnote
+end
+
+== CHANNEL FAILOVER — تجاوز فشل القناة ==
+
+note over ChannelRouter, PushProvider
+  **Channel Failover Strategy:**
+  · Primary Email: Resend → Fallback: AWS SES
+  · Primary SMS: Twilio → Fallback: Unifonic (Saudi)
+  · Primary Push: Firebase → Fallback: direct APNs/FCM
+  · Provider selection based on availability + cost
+endnote
+
+ChannelRouter -> EmailProvider : Send via Resend (primary)
+
+alt Resend unavailable (timeout / 5xx)
+  ChannelRouter -> ChannelRouter : Switch to fallback provider
+
+  ChannelRouter -> EmailProvider : Send via AWS SES (fallback)
+
+  note right of ChannelRouter
+    **Failover Logic:**
+    · Circuit breaker: 5 failures → 60s cooldown
+    · Health check: periodic ping to primary
+    · Auto-recovery: switch back when healthy
+  endnote
+
+  EmailProvider --> ChannelRouter : OK (via fallback)
+end
+
+@enduml

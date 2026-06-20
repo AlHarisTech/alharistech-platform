@@ -1,0 +1,2793 @@
+# =============================================================================
+# SERVICE CATALOG — Single Source of Truth
+# All API endpoints across all 9 domains of AlharisTech Platform
+# Version: 1.0 | Generated from domain specs | Do not edit manually
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # IDENTITY DOMAIN — Auth & User Management (14 endpoints)
+  # ===========================================================================
+  - path: "/api/v1/auth/register"
+    method: "POST"
+    domain: "identity"
+    service: "AuthService"
+    description: "Register new user account"
+    auth: "public"
+    roles: []
+    rate_limit: "3 per hour per IP"
+    request_schema: "RegisterRequest"
+    response_schema: "AuthResponse"
+    errors: ["409", "422"]
+    fr_ref: "FR-101"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/auth/verify-email"
+    method: "POST"
+    domain: "identity"
+    service: "AuthService"
+    description: "Verify email address with token"
+    auth: "public"
+    roles: []
+    rate_limit: "5 per hour per IP"
+    request_schema: "VerifyEmailRequest"
+    response_schema: "VerifyEmailResponse"
+    errors: ["401", "404"]
+    fr_ref: "FR-102"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/auth/login"
+    method: "POST"
+    domain: "identity"
+    service: "AuthService"
+    description: "Authenticate user and return tokens"
+    auth: "public"
+    roles: []
+    rate_limit: "5 per minute per IP"
+    request_schema: "LoginRequest"
+    response_schema: "LoginResponse"
+    errors: ["401", "423"]
+    fr_ref: "FR-103"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/auth/refresh"
+    method: "POST"
+    domain: "identity"
+    service: "AuthService"
+    description: "Refresh access and refresh tokens"
+    auth: "public"
+    roles: []
+    rate_limit: "10 per minute per IP"
+    request_schema: "RefreshTokenRequest"
+    response_schema: "TokenPairResponse"
+    errors: ["401"]
+    fr_ref: "FR-104"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/auth/logout"
+    method: "POST"
+    domain: "identity"
+    service: "AuthService"
+    description: "Logout and revoke refresh token"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer", "partner"]
+    rate_limit: "10 per minute per user"
+    request_schema: "LogoutRequest"
+    response_schema: "LogoutResponse"
+    errors: ["401"]
+    fr_ref: "FR-105"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/auth/forgot-password"
+    method: "POST"
+    domain: "identity"
+    service: "AuthService"
+    description: "Request password reset email"
+    auth: "public"
+    roles: []
+    rate_limit: "3 per hour per IP"
+    request_schema: "ForgotPasswordRequest"
+    response_schema: "ForgotPasswordResponse"
+    errors: ["422"]
+    fr_ref: "FR-106"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/auth/reset-password"
+    method: "POST"
+    domain: "identity"
+    service: "AuthService"
+    description: "Reset password with token"
+    auth: "public"
+    roles: []
+    rate_limit: "5 per hour per IP"
+    request_schema: "ResetPasswordRequest"
+    response_schema: "ResetPasswordResponse"
+    errors: ["401", "422"]
+    fr_ref: "FR-107"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/users/me"
+    method: "GET"
+    domain: "identity"
+    service: "UserService"
+    description: "Get current authenticated user profile"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer", "partner"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "UserProfileResponse"
+    errors: ["401"]
+    fr_ref: "FR-108"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/users/me"
+    method: "PATCH"
+    domain: "identity"
+    service: "UserService"
+    description: "Update own user profile"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer", "partner"]
+    rate_limit: "30 per minute per user"
+    request_schema: "UpdateOwnProfileRequest"
+    response_schema: "UserProfileResponse"
+    errors: ["401", "422"]
+    fr_ref: "FR-109"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/users"
+    method: "GET"
+    domain: "identity"
+    service: "UserService"
+    description: "List users (paginated, filterable)"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "UserListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-110"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/users/{id}"
+    method: "GET"
+    domain: "identity"
+    service: "UserService"
+    description: "Get user by ID"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "UserDetailResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-111"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/users/{id}/role"
+    method: "PATCH"
+    domain: "identity"
+    service: "UserService"
+    description: "Change user role"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "30 per minute per user"
+    request_schema: "ChangeRoleRequest"
+    response_schema: "UserDetailResponse"
+    errors: ["400", "401", "403", "404"]
+    fr_ref: "FR-112"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/users/{id}/disable"
+    method: "POST"
+    domain: "identity"
+    service: "UserService"
+    description: "Disable user account"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "UserStatusResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-113"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/users/{id}/enable"
+    method: "POST"
+    domain: "identity"
+    service: "UserService"
+    description: "Enable previously disabled user account"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "UserStatusResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-114"
+    phase: "phase-1"
+    graphql: false
+
+  # ===========================================================================
+  # CUSTOMER DOMAIN (13 endpoints)
+  # ===========================================================================
+  - path: "/api/v1/customers"
+    method: "POST"
+    domain: "customer"
+    service: "CustomerService"
+    description: "Create new customer record"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "20 per minute per user"
+    request_schema: "CreateCustomerRequest"
+    response_schema: "CustomerResponse"
+    errors: ["409", "422"]
+    fr_ref: "FR-201"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/customers"
+    method: "GET"
+    domain: "customer"
+    service: "CustomerService"
+    description: "List, search, and filter customers"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "CustomerListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-205"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/customers/{id}"
+    method: "GET"
+    domain: "customer"
+    service: "CustomerService"
+    description: "Get customer detail with order history"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "CustomerDetailResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-204"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/customers/{id}"
+    method: "PATCH"
+    domain: "customer"
+    service: "CustomerService"
+    description: "Update customer profile"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: "UpdateCustomerRequest"
+    response_schema: "CustomerResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-201"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/customers/{id}"
+    method: "DELETE"
+    domain: "customer"
+    service: "CustomerService"
+    description: "Soft-delete customer"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-201"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/customers/{id}/tags"
+    method: "PATCH"
+    domain: "customer"
+    service: "CustomerService"
+    description: "Update customer tags"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: "UpdateTagsRequest"
+    response_schema: "CustomerTagsResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-202"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/customers/{id}/orders"
+    method: "GET"
+    domain: "customer"
+    service: "CustomerService"
+    description: "Get customer order history (cross-domain from Service)"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "CustomerOrdersResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-204"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/customers/{id}/communications"
+    method: "GET"
+    domain: "customer"
+    service: "CommunicationService"
+    description: "Get communication log for customer"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "CommunicationLogResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-203"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/customers/{id}/communications"
+    method: "POST"
+    domain: "customer"
+    service: "CommunicationService"
+    description: "Log communication with customer"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "30 per minute per user"
+    request_schema: "LogCommunicationRequest"
+    response_schema: "CommunicationLogEntryResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-203"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/customers/import"
+    method: "POST"
+    domain: "customer"
+    service: "ImportService"
+    description: "Import customers from CSV file"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "5 per hour per user"
+    request_schema: "ImportCSVRequest"
+    response_schema: "ImportResultResponse"
+    errors: ["401", "403", "413", "422"]
+    fr_ref: "FR-206"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/customers/export"
+    method: "POST"
+    domain: "customer"
+    service: "ExportService"
+    description: "Export customers to CSV"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "10 per hour per user"
+    request_schema: "ExportRequest"
+    response_schema: "ExportResultResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-206"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/customers/merge"
+    method: "POST"
+    domain: "customer"
+    service: "CustomerService"
+    description: "Merge duplicate customer records"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "20 per minute per user"
+    request_schema: "MergeCustomersRequest"
+    response_schema: "MergeCustomersResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-207"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/customers/tags"
+    method: "GET"
+    domain: "customer"
+    service: "CustomerService"
+    description: "List all used customer tags"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "TagsListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-202"
+    phase: "phase-1"
+    graphql: false
+
+  # ===========================================================================
+  # SERVICE DOMAIN — Services & Service Orders (15 endpoints)
+  # ===========================================================================
+  - path: "/api/v1/services"
+    method: "GET"
+    domain: "service"
+    service: "ServiceCatalogService"
+    description: "List active services with search, filter, pagination"
+    auth: "public"
+    roles: []
+    rate_limit: "120 per minute per IP"
+    request_schema: null
+    response_schema: "ServiceListResponse"
+    errors: []
+    fr_ref: "FR-301"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/services/{id}"
+    method: "GET"
+    domain: "service"
+    service: "ServiceCatalogService"
+    description: "Get service detail by ID"
+    auth: "public"
+    roles: []
+    rate_limit: "120 per minute per IP"
+    request_schema: null
+    response_schema: "ServiceDetailResponse"
+    errors: ["404"]
+    fr_ref: "FR-301"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/services/slug/{slug}"
+    method: "GET"
+    domain: "service"
+    service: "ServiceCatalogService"
+    description: "Get service detail by slug"
+    auth: "public"
+    roles: []
+    rate_limit: "120 per minute per IP"
+    request_schema: null
+    response_schema: "ServiceDetailResponse"
+    errors: ["404"]
+    fr_ref: "FR-301"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/services/categories"
+    method: "GET"
+    domain: "service"
+    service: "ServiceCategoryService"
+    description: "List service categories"
+    auth: "public"
+    roles: []
+    rate_limit: "120 per minute per IP"
+    request_schema: null
+    response_schema: "CategoryListResponse"
+    errors: []
+    fr_ref: "FR-301"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/services"
+    method: "POST"
+    domain: "service"
+    service: "ServiceCatalogService"
+    description: "Create new service"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: "CreateServiceRequest"
+    response_schema: "ServiceDetailResponse"
+    errors: ["401", "403", "422"]
+    fr_ref: "FR-301"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/services/{id}"
+    method: "PATCH"
+    domain: "service"
+    service: "ServiceCatalogService"
+    description: "Update existing service"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: "UpdateServiceRequest"
+    response_schema: "ServiceDetailResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-301"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/services/{id}"
+    method: "DELETE"
+    domain: "service"
+    service: "ServiceCatalogService"
+    description: "Deactivate (soft-delete) service"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-301"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/orders"
+    method: "POST"
+    domain: "service"
+    service: "OrderService"
+    description: "Submit new service order with documents"
+    auth: "required"
+    roles: ["customer"]
+    rate_limit: "10 per minute per user"
+    request_schema: "CreateOrderRequest"
+    response_schema: "OrderResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-302"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/orders"
+    method: "GET"
+    domain: "service"
+    service: "OrderService"
+    description: "List orders (role-scoped, filterable)"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "OrderListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-304"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/orders/{id}"
+    method: "GET"
+    domain: "service"
+    service: "OrderService"
+    description: "Get order detail with status history"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "OrderDetailResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-304"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/orders/{id}/status"
+    method: "PATCH"
+    domain: "service"
+    service: "OrderService"
+    description: "Update order status (employee processing)"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "60 per minute per user"
+    request_schema: "UpdateOrderStatusRequest"
+    response_schema: "OrderStatusResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-305"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/orders/{id}/documents"
+    method: "POST"
+    domain: "service"
+    service: "DocumentService"
+    description: "Upload documents to order"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer"]
+    rate_limit: "20 per minute per user"
+    request_schema: "UploadDocumentsRequest"
+    response_schema: "DocumentsResponse"
+    errors: ["401", "403", "404", "413", "422", "500"]
+    fr_ref: "FR-303"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/orders/{id}/assign"
+    method: "POST"
+    domain: "service"
+    service: "OrderService"
+    description: "Assign order to employee"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: "AssignOrderRequest"
+    response_schema: "OrderAssignmentResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-306"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/orders/{id}/rate"
+    method: "POST"
+    domain: "service"
+    service: "OrderService"
+    description: "Rate completed service order"
+    auth: "required"
+    roles: ["customer"]
+    rate_limit: "20 per minute per user"
+    request_schema: "RateOrderRequest"
+    response_schema: "OrderRatingResponse"
+    errors: ["401", "403", "404", "409", "422"]
+    fr_ref: "FR-308"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/orders/{id}/timeline"
+    method: "GET"
+    domain: "service"
+    service: "OrderService"
+    description: "Get order status history timeline"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "OrderTimelineResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-304"
+    phase: "phase-1"
+    graphql: false
+
+  # ===========================================================================
+  # COMMERCE DOMAIN — Products, Cart, Commerce Orders (30 endpoints)
+  # ===========================================================================
+  - path: "/api/v1/products"
+    method: "GET"
+    domain: "commerce"
+    service: "ProductService"
+    description: "List products with search, filter, pagination, sort"
+    auth: "public"
+    roles: []
+    rate_limit: "60 per minute per IP"
+    request_schema: null
+    response_schema: "ProductListResponse"
+    errors: ["422"]
+    fr_ref: "FR-401"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/products/{id}"
+    method: "GET"
+    domain: "commerce"
+    service: "ProductService"
+    description: "Get product detail by ID"
+    auth: "public"
+    roles: []
+    rate_limit: "60 per minute per IP"
+    request_schema: null
+    response_schema: "ProductDetailResponse"
+    errors: ["404"]
+    fr_ref: "FR-401"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/products/slug/{slug}"
+    method: "GET"
+    domain: "commerce"
+    service: "ProductService"
+    description: "Get product detail by slug"
+    auth: "public"
+    roles: []
+    rate_limit: "60 per minute per IP"
+    request_schema: null
+    response_schema: "ProductDetailResponse"
+    errors: ["404"]
+    fr_ref: "FR-401"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/products"
+    method: "POST"
+    domain: "commerce"
+    service: "ProductService"
+    description: "Create new product"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "120 per minute per user"
+    request_schema: "CreateProductRequest"
+    response_schema: "ProductDetailResponse"
+    errors: ["401", "403", "409", "422"]
+    fr_ref: "FR-402"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/products/{id}"
+    method: "PATCH"
+    domain: "commerce"
+    service: "ProductService"
+    description: "Update existing product"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "120 per minute per user"
+    request_schema: "UpdateProductRequest"
+    response_schema: "ProductDetailResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-402"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/products/{id}"
+    method: "DELETE"
+    domain: "commerce"
+    service: "ProductService"
+    description: "Soft-delete product"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-402"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/categories"
+    method: "GET"
+    domain: "commerce"
+    service: "CategoryService"
+    description: "List product categories (tree or flat)"
+    auth: "public"
+    roles: []
+    rate_limit: "60 per minute per IP"
+    request_schema: null
+    response_schema: "CategoryListResponse"
+    errors: []
+    fr_ref: "FR-403"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/categories/{id}"
+    method: "GET"
+    domain: "commerce"
+    service: "CategoryService"
+    description: "Get category by ID"
+    auth: "public"
+    roles: []
+    rate_limit: "60 per minute per IP"
+    request_schema: null
+    response_schema: "CategoryDetailResponse"
+    errors: ["404"]
+    fr_ref: "FR-403"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/categories"
+    method: "POST"
+    domain: "commerce"
+    service: "CategoryService"
+    description: "Create new product category"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: "CreateCategoryRequest"
+    response_schema: "CategoryDetailResponse"
+    errors: ["401", "403", "422"]
+    fr_ref: "FR-403"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/categories/{id}"
+    method: "PATCH"
+    domain: "commerce"
+    service: "CategoryService"
+    description: "Update product category"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: "UpdateCategoryRequest"
+    response_schema: "CategoryDetailResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-403"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/categories/{id}"
+    method: "DELETE"
+    domain: "commerce"
+    service: "CategoryService"
+    description: "Soft-delete product category"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-403"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/cart"
+    method: "GET"
+    domain: "commerce"
+    service: "CartService"
+    description: "Get current cart (by customer_id or session_id)"
+    auth: "optional"
+    roles: []
+    rate_limit: "60 per minute per session"
+    request_schema: null
+    response_schema: "CartResponse"
+    errors: ["404"]
+    fr_ref: "FR-404"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/cart/items"
+    method: "POST"
+    domain: "commerce"
+    service: "CartService"
+    description: "Add item to cart"
+    auth: "optional"
+    roles: []
+    rate_limit: "30 per minute per session"
+    request_schema: "AddCartItemRequest"
+    response_schema: "CartResponse"
+    errors: ["404", "422"]
+    fr_ref: "FR-404"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/cart/items/{cartItemId}"
+    method: "PATCH"
+    domain: "commerce"
+    service: "CartService"
+    description: "Update cart item quantity"
+    auth: "optional"
+    roles: []
+    rate_limit: "30 per minute per session"
+    request_schema: "UpdateCartItemRequest"
+    response_schema: "CartResponse"
+    errors: ["404", "422"]
+    fr_ref: "FR-404"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/cart/items/{cartItemId}"
+    method: "DELETE"
+    domain: "commerce"
+    service: "CartService"
+    description: "Remove item from cart"
+    auth: "optional"
+    roles: []
+    rate_limit: "30 per minute per session"
+    request_schema: null
+    response_schema: "CartResponse"
+    errors: ["404"]
+    fr_ref: "FR-404"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/commerce/orders"
+    method: "POST"
+    domain: "commerce"
+    service: "CommerceOrderService"
+    description: "Create commerce order (checkout)"
+    auth: "required"
+    roles: ["customer"]
+    rate_limit: "10 per minute per user"
+    request_schema: "CheckoutRequest"
+    response_schema: "CommerceOrderResponse"
+    errors: ["401", "422"]
+    fr_ref: "FR-405"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/commerce/orders"
+    method: "GET"
+    domain: "commerce"
+    service: "CommerceOrderService"
+    description: "List commerce orders (role-scoped, filterable)"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "CommerceOrderListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-406"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/commerce/orders/{id}"
+    method: "GET"
+    domain: "commerce"
+    service: "CommerceOrderService"
+    description: "Get commerce order by ID with status history"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "CommerceOrderDetailResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-406"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/commerce/orders/{id}/status"
+    method: "PATCH"
+    domain: "commerce"
+    service: "CommerceOrderService"
+    description: "Update commerce order status"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: "UpdateCommerceOrderStatusRequest"
+    response_schema: "CommerceOrderStatusResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-405"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/commerce/orders/{id}/cancel"
+    method: "POST"
+    domain: "commerce"
+    service: "CommerceOrderService"
+    description: "Cancel commerce order (customer before shipped, admin any time)"
+    auth: "required"
+    roles: ["admin", "manager", "customer"]
+    rate_limit: "20 per minute per user"
+    request_schema: "CancelOrderRequest"
+    response_schema: "CommerceOrderStatusResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-405"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/commerce/orders/{id}/status-history"
+    method: "GET"
+    domain: "commerce"
+    service: "CommerceOrderService"
+    description: "Get commerce order status history"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "OrderStatusHistoryResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-406"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/inventory"
+    method: "GET"
+    domain: "commerce"
+    service: "InventoryService"
+    description: "List inventory (filterable by low stock, out of stock, product search)"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "InventoryListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-407"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/inventory/{productId}"
+    method: "GET"
+    domain: "commerce"
+    service: "InventoryService"
+    description: "Get inventory by product ID"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "InventoryDetailResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-407"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/inventory/{productId}"
+    method: "PATCH"
+    domain: "commerce"
+    service: "InventoryService"
+    description: "Update inventory quantity (restock/adjust)"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: "UpdateInventoryRequest"
+    response_schema: "InventoryDetailResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-407"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/products/{id}/reviews"
+    method: "GET"
+    domain: "commerce"
+    service: "ReviewService"
+    description: "List product reviews"
+    auth: "public"
+    roles: []
+    rate_limit: "60 per minute per IP"
+    request_schema: null
+    response_schema: "ReviewListResponse"
+    errors: ["404"]
+    fr_ref: "FR-408"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/products/{id}/reviews"
+    method: "POST"
+    domain: "commerce"
+    service: "ReviewService"
+    description: "Submit product review"
+    auth: "required"
+    roles: ["customer"]
+    rate_limit: "20 per minute per user"
+    request_schema: "CreateReviewRequest"
+    response_schema: "ReviewResponse"
+    errors: ["401", "404", "422"]
+    fr_ref: "FR-408"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/products/{id}/reviews/{reviewId}"
+    method: "PATCH"
+    domain: "commerce"
+    service: "ReviewService"
+    description: "Moderate product review (approve/reject)"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: "ModerateReviewRequest"
+    response_schema: "ReviewResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-408"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/coupons"
+    method: "GET"
+    domain: "commerce"
+    service: "CouponService"
+    description: "List all coupons"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "CouponListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-409"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/coupons"
+    method: "POST"
+    domain: "commerce"
+    service: "CouponService"
+    description: "Create new coupon"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: "CreateCouponRequest"
+    response_schema: "CouponDetailResponse"
+    errors: ["401", "403", "422"]
+    fr_ref: "FR-409"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/coupons/{id}"
+    method: "PATCH"
+    domain: "commerce"
+    service: "CouponService"
+    description: "Update coupon"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: "UpdateCouponRequest"
+    response_schema: "CouponDetailResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-409"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/coupons/{id}"
+    method: "DELETE"
+    domain: "commerce"
+    service: "CouponService"
+    description: "Delete coupon"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-409"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/coupons/validate"
+    method: "POST"
+    domain: "commerce"
+    service: "CouponService"
+    description: "Validate coupon code during checkout"
+    auth: "optional"
+    roles: []
+    rate_limit: "30 per minute per IP"
+    request_schema: "ValidateCouponRequest"
+    response_schema: "CouponValidationResponse"
+    errors: ["404", "422"]
+    fr_ref: "FR-409"
+    phase: "phase-2"
+    graphql: false
+
+  # ===========================================================================
+  # SUPPORT DOMAIN — Tickets & Knowledge Base (24 endpoints)
+  # ===========================================================================
+  - path: "/api/v1/tickets"
+    method: "POST"
+    domain: "support"
+    service: "TicketService"
+    description: "Create new support ticket"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer"]
+    rate_limit: "5 per minute per user"
+    request_schema: "CreateTicketRequest"
+    response_schema: "TicketResponse"
+    errors: ["401", "422"]
+    fr_ref: "FR-501"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/tickets"
+    method: "GET"
+    domain: "support"
+    service: "TicketService"
+    description: "List tickets (role-scoped, filterable)"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "TicketListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-502"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/tickets/{id}"
+    method: "GET"
+    domain: "support"
+    service: "TicketService"
+    description: "Get ticket by ID with messages (role-scoped)"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "TicketDetailResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-502"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/tickets/{id}/status"
+    method: "PATCH"
+    domain: "support"
+    service: "TicketService"
+    description: "Update ticket status"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "30 per minute per user"
+    request_schema: "UpdateTicketStatusRequest"
+    response_schema: "TicketStatusResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-503"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/tickets/{id}/assign"
+    method: "PATCH"
+    domain: "support"
+    service: "TicketService"
+    description: "Assign ticket to employee"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: "AssignTicketRequest"
+    response_schema: "TicketResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-504"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/tickets/{id}/priority"
+    method: "PATCH"
+    domain: "support"
+    service: "TicketService"
+    description: "Update ticket priority"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "30 per minute per user"
+    request_schema: "UpdatePriorityRequest"
+    response_schema: "TicketResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-503"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/tickets/{id}"
+    method: "DELETE"
+    domain: "support"
+    service: "TicketService"
+    description: "Soft-delete ticket"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-502"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/tickets/{id}/messages"
+    method: "POST"
+    domain: "support"
+    service: "MessageService"
+    description: "Add message to ticket"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer"]
+    rate_limit: "20 per minute per user"
+    request_schema: "CreateMessageRequest"
+    response_schema: "MessageResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-505"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/tickets/{id}/messages"
+    method: "GET"
+    domain: "support"
+    service: "MessageService"
+    description: "List messages for ticket (role-scoped)"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "MessageListResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-505"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/tickets/{id}/messages/{messageId}"
+    method: "PATCH"
+    domain: "support"
+    service: "MessageService"
+    description: "Edit own message (within 15 min window)"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "20 per minute per user"
+    request_schema: "EditMessageRequest"
+    response_schema: "MessageResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-505"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/tickets/{id}/messages/{messageId}"
+    method: "DELETE"
+    domain: "support"
+    service: "MessageService"
+    description: "Delete message"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-505"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/tickets/{id}/rate"
+    method: "POST"
+    domain: "support"
+    service: "TicketService"
+    description: "Submit satisfaction rating for resolved ticket"
+    auth: "required"
+    roles: ["customer"]
+    rate_limit: "10 per minute per user"
+    request_schema: "RateTicketRequest"
+    response_schema: "TicketRatingResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-506"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/tickets/{id}/link-article"
+    method: "POST"
+    domain: "support"
+    service: "TicketService"
+    description: "Link knowledge article to ticket"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "30 per minute per user"
+    request_schema: "LinkArticleRequest"
+    response_schema: "TicketResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-506"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/knowledge/articles"
+    method: "GET"
+    domain: "support"
+    service: "KnowledgeService"
+    description: "Search and list published knowledge articles"
+    auth: "public"
+    roles: []
+    rate_limit: "60 per minute per IP"
+    request_schema: null
+    response_schema: "ArticleListResponse"
+    errors: []
+    fr_ref: "FR-507"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/knowledge/articles/{id}"
+    method: "GET"
+    domain: "support"
+    service: "KnowledgeService"
+    description: "Get knowledge article by ID"
+    auth: "public"
+    roles: []
+    rate_limit: "60 per minute per IP"
+    request_schema: null
+    response_schema: "ArticleDetailResponse"
+    errors: ["404"]
+    fr_ref: "FR-507"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/knowledge/articles"
+    method: "POST"
+    domain: "support"
+    service: "KnowledgeService"
+    description: "Create new knowledge article"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "30 per minute per user"
+    request_schema: "CreateArticleRequest"
+    response_schema: "ArticleDetailResponse"
+    errors: ["401", "403", "422"]
+    fr_ref: "FR-508"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/knowledge/articles/{id}"
+    method: "PATCH"
+    domain: "support"
+    service: "KnowledgeService"
+    description: "Update knowledge article"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "30 per minute per user"
+    request_schema: "UpdateArticleRequest"
+    response_schema: "ArticleDetailResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-508"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/knowledge/articles/{id}"
+    method: "DELETE"
+    domain: "support"
+    service: "KnowledgeService"
+    description: "Soft-delete knowledge article"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-508"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/knowledge/articles/{id}/publish"
+    method: "POST"
+    domain: "support"
+    service: "KnowledgeService"
+    description: "Publish knowledge article"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "ArticleDetailResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-508"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/knowledge/articles/{id}/unpublish"
+    method: "POST"
+    domain: "support"
+    service: "KnowledgeService"
+    description: "Unpublish knowledge article"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "ArticleDetailResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-508"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/knowledge/articles/{id}/feedback"
+    method: "POST"
+    domain: "support"
+    service: "KnowledgeService"
+    description: "Mark article helpful/not helpful"
+    auth: "public"
+    roles: []
+    rate_limit: "10 per minute per IP"
+    request_schema: "ArticleFeedbackRequest"
+    response_schema: "ArticleFeedbackResponse"
+    errors: ["404", "422"]
+    fr_ref: "FR-507"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/support/reports"
+    method: "GET"
+    domain: "support"
+    service: "SupportReportService"
+    description: "Get support performance reports"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: null
+    response_schema: "SupportReportResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-509"
+    phase: "phase-2"
+    graphql: false
+
+  # ===========================================================================
+  # CONTENT DOMAIN — Pages, Media, Blog, Menus, Sitemap (31 endpoints)
+  # ===========================================================================
+  - path: "/api/v1/pages"
+    method: "POST"
+    domain: "content"
+    service: "PageService"
+    description: "Create new page"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "100 per minute per user"
+    request_schema: "CreatePageRequest"
+    response_schema: "PageResponse"
+    errors: ["401", "403", "409", "422"]
+    fr_ref: "FR-601"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/pages"
+    method: "GET"
+    domain: "content"
+    service: "PageService"
+    description: "List pages (paginated, filterable)"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "100 per minute per user"
+    request_schema: null
+    response_schema: "PageListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-601"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/pages/{id}"
+    method: "GET"
+    domain: "content"
+    service: "PageService"
+    description: "Get page by ID"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "100 per minute per user"
+    request_schema: null
+    response_schema: "PageDetailResponse"
+    errors: ["401", "403", "404", "410"]
+    fr_ref: "FR-601"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/pages/{id}"
+    method: "PATCH"
+    domain: "content"
+    service: "PageService"
+    description: "Update page (increments version)"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "100 per minute per user"
+    request_schema: "UpdatePageRequest"
+    response_schema: "PageResponse"
+    errors: ["401", "403", "404", "409", "410", "422"]
+    fr_ref: "FR-602"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/pages/{id}"
+    method: "DELETE"
+    domain: "content"
+    service: "PageService"
+    description: "Soft-delete page (unpublish first if published)"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404", "409"]
+    fr_ref: "FR-603"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/pages/{id}/publish"
+    method: "POST"
+    domain: "content"
+    service: "PageService"
+    description: "Publish page"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "30 per minute per user"
+    request_schema: null
+    response_schema: "PageResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-604"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/pages/{id}/unpublish"
+    method: "POST"
+    domain: "content"
+    service: "PageService"
+    description: "Unpublish page"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "30 per minute per user"
+    request_schema: null
+    response_schema: "PageResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-604"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/pages/{id}/schedule"
+    method: "POST"
+    domain: "content"
+    service: "PageService"
+    description: "Schedule page publishing for future"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "20 per minute per user"
+    request_schema: "SchedulePageRequest"
+    response_schema: "PageScheduleResponse"
+    errors: ["401", "403", "404", "409", "422"]
+    fr_ref: "FR-605"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/pages/{id}/versions"
+    method: "GET"
+    domain: "content"
+    service: "PageService"
+    description: "Get version history for page"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "VersionListResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-606"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/pages/{id}/versions/{version}"
+    method: "GET"
+    domain: "content"
+    service: "PageService"
+    description: "Get specific version snapshot"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "VersionDetailResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-606"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/pages/{id}/versions/{version}/restore"
+    method: "POST"
+    domain: "content"
+    service: "PageService"
+    description: "Restore page to specific version"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "PageResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-607"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/media"
+    method: "POST"
+    domain: "content"
+    service: "MediaService"
+    description: "Upload media file(s)"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "30 per minute per user"
+    request_schema: "UploadMediaRequest"
+    response_schema: "MediaUploadResponse"
+    errors: ["401", "403", "413", "422", "500"]
+    fr_ref: "FR-608"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/media"
+    method: "GET"
+    domain: "content"
+    service: "MediaService"
+    description: "List media files (paginated, filterable)"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "MediaListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-608"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/media/{id}"
+    method: "GET"
+    domain: "content"
+    service: "MediaService"
+    description: "Get media details"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "MediaDetailResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-608"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/media/{id}"
+    method: "DELETE"
+    domain: "content"
+    service: "MediaService"
+    description: "Delete media file"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404", "409"]
+    fr_ref: "FR-609"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/blog"
+    method: "POST"
+    domain: "content"
+    service: "BlogService"
+    description: "Create new blog post"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "100 per minute per user"
+    request_schema: "CreateBlogPostRequest"
+    response_schema: "BlogPostResponse"
+    errors: ["401", "403", "409", "422"]
+    fr_ref: "FR-610"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/blog"
+    method: "GET"
+    domain: "content"
+    service: "BlogService"
+    description: "List blog posts (public: published only; auth: all)"
+    auth: "public"
+    roles: []
+    rate_limit: "60 per minute per IP"
+    request_schema: null
+    response_schema: "BlogPostListResponse"
+    errors: []
+    fr_ref: "FR-610"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/blog/{id}"
+    method: "GET"
+    domain: "content"
+    service: "BlogService"
+    description: "Get blog post by ID"
+    auth: "public"
+    roles: []
+    rate_limit: "60 per minute per IP"
+    request_schema: null
+    response_schema: "BlogPostDetailResponse"
+    errors: ["404"]
+    fr_ref: "FR-610"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/blog/{id}"
+    method: "PATCH"
+    domain: "content"
+    service: "BlogService"
+    description: "Update blog post (increments version)"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "100 per minute per user"
+    request_schema: "UpdateBlogPostRequest"
+    response_schema: "BlogPostResponse"
+    errors: ["401", "403", "404", "409", "422"]
+    fr_ref: "FR-610"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/blog/{id}"
+    method: "DELETE"
+    domain: "content"
+    service: "BlogService"
+    description: "Soft-delete blog post"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404", "409"]
+    fr_ref: "FR-610"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/blog/{id}/publish"
+    method: "POST"
+    domain: "content"
+    service: "BlogService"
+    description: "Publish blog post"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "30 per minute per user"
+    request_schema: null
+    response_schema: "BlogPostResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-610"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/blog/categories"
+    method: "POST"
+    domain: "content"
+    service: "BlogCategoryService"
+    description: "Create blog category"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: "CreateBlogCategoryRequest"
+    response_schema: "BlogCategoryResponse"
+    errors: ["401", "403", "409", "422"]
+    fr_ref: "FR-611"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/blog/categories"
+    method: "GET"
+    domain: "content"
+    service: "BlogCategoryService"
+    description: "List blog categories"
+    auth: "public"
+    roles: []
+    rate_limit: "60 per minute per IP"
+    request_schema: null
+    response_schema: "BlogCategoryListResponse"
+    errors: []
+    fr_ref: "FR-611"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/blog/categories/{id}"
+    method: "GET"
+    domain: "content"
+    service: "BlogCategoryService"
+    description: "Get blog category by ID"
+    auth: "public"
+    roles: []
+    rate_limit: "60 per minute per IP"
+    request_schema: null
+    response_schema: "BlogCategoryResponse"
+    errors: ["404"]
+    fr_ref: "FR-611"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/blog/categories/{id}"
+    method: "PATCH"
+    domain: "content"
+    service: "BlogCategoryService"
+    description: "Update blog category"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: "UpdateBlogCategoryRequest"
+    response_schema: "BlogCategoryResponse"
+    errors: ["401", "403", "404", "409", "422"]
+    fr_ref: "FR-611"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/blog/categories/{id}"
+    method: "DELETE"
+    domain: "content"
+    service: "BlogCategoryService"
+    description: "Delete blog category"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-611"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/menus"
+    method: "POST"
+    domain: "content"
+    service: "MenuService"
+    description: "Create new menu"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: "CreateMenuRequest"
+    response_schema: "MenuResponse"
+    errors: ["401", "403", "422"]
+    fr_ref: "FR-612"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/menus"
+    method: "GET"
+    domain: "content"
+    service: "MenuService"
+    description: "List menus (filter by location)"
+    auth: "public"
+    roles: []
+    rate_limit: "60 per minute per IP"
+    request_schema: null
+    response_schema: "MenuListResponse"
+    errors: []
+    fr_ref: "FR-612"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/menus/{id}"
+    method: "GET"
+    domain: "content"
+    service: "MenuService"
+    description: "Get menu by ID"
+    auth: "public"
+    roles: []
+    rate_limit: "60 per minute per IP"
+    request_schema: null
+    response_schema: "MenuDetailResponse"
+    errors: ["404"]
+    fr_ref: "FR-612"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/menus/{id}"
+    method: "PATCH"
+    domain: "content"
+    service: "MenuService"
+    description: "Update menu (items)"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: "UpdateMenuRequest"
+    response_schema: "MenuDetailResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-612"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/menus/{id}"
+    method: "DELETE"
+    domain: "content"
+    service: "MenuService"
+    description: "Delete menu"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-612"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/sitemap.xml"
+    method: "GET"
+    domain: "content"
+    service: "SitemapService"
+    description: "Auto-generated XML sitemap"
+    auth: "public"
+    roles: []
+    rate_limit: "30 per minute per IP"
+    request_schema: null
+    response_schema: "XML"
+    errors: []
+    fr_ref: "FR-613"
+    phase: "phase-1"
+    graphql: false
+
+  # ===========================================================================
+  # NOTIFICATION DOMAIN (11 endpoints)
+  # ===========================================================================
+  - path: "/api/v1/notifications/templates"
+    method: "POST"
+    domain: "notification"
+    service: "TemplateService"
+    description: "Create notification template"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "30 per minute per user"
+    request_schema: "CreateTemplateRequest"
+    response_schema: "TemplateResponse"
+    errors: ["401", "403", "409", "422"]
+    fr_ref: "FR-701"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/notifications/templates"
+    method: "GET"
+    domain: "notification"
+    service: "TemplateService"
+    description: "List notification templates"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "TemplateListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-701"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/notifications/templates/{id}"
+    method: "GET"
+    domain: "notification"
+    service: "TemplateService"
+    description: "Get notification template by ID"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "TemplateDetailResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-701"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/notifications/templates/{id}"
+    method: "PATCH"
+    domain: "notification"
+    service: "TemplateService"
+    description: "Update notification template"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "30 per minute per user"
+    request_schema: "UpdateTemplateRequest"
+    response_schema: "TemplateDetailResponse"
+    errors: ["401", "403", "404", "409", "422"]
+    fr_ref: "FR-701"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/notifications/templates/{id}"
+    method: "DELETE"
+    domain: "notification"
+    service: "TemplateService"
+    description: "Delete notification template (soft-delete)"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-701"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/notifications/send"
+    method: "POST"
+    domain: "notification"
+    service: "DeliveryService"
+    description: "Send notification (internal service account only)"
+    auth: "required"
+    roles: ["system"]
+    rate_limit: "100 per minute per service account"
+    request_schema: "SendNotificationRequest"
+    response_schema: "SendNotificationResponse"
+    errors: ["400", "401", "404", "429"]
+    fr_ref: "FR-702"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/notifications/log"
+    method: "GET"
+    domain: "notification"
+    service: "LogService"
+    description: "List all notification logs (admin/manager)"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "NotificationLogListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-703"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/notifications/log/{id}"
+    method: "GET"
+    domain: "notification"
+    service: "LogService"
+    description: "Get notification log entry by ID"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "NotificationLogDetailResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-703"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/users/me/notifications/log"
+    method: "GET"
+    domain: "notification"
+    service: "LogService"
+    description: "Get own notification log"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer", "partner"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "NotificationLogListResponse"
+    errors: ["401"]
+    fr_ref: "FR-703"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/users/me/notifications/preferences"
+    method: "GET"
+    domain: "notification"
+    service: "PreferenceService"
+    description: "Get own notification preferences"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer", "partner"]
+    rate_limit: "30 per minute per user"
+    request_schema: null
+    response_schema: "PreferencesResponse"
+    errors: ["401"]
+    fr_ref: "FR-704"
+    phase: "phase-1"
+    graphql: false
+
+  - path: "/api/v1/users/me/notifications/preferences"
+    method: "PATCH"
+    domain: "notification"
+    service: "PreferenceService"
+    description: "Update own notification preferences"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer", "partner"]
+    rate_limit: "10 per minute per user"
+    request_schema: "UpdatePreferencesRequest"
+    response_schema: "PreferencesResponse"
+    errors: ["401", "422"]
+    fr_ref: "FR-704"
+    phase: "phase-1"
+    graphql: false
+
+  # ===========================================================================
+  # ANALYTICS DOMAIN (19 endpoints)
+  # ===========================================================================
+  - path: "/api/v1/analytics/dashboards/overview"
+    method: "GET"
+    domain: "analytics"
+    service: "DashboardService"
+    description: "Get overview dashboard with widget data"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "DashboardOverviewResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-801"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/analytics/dashboards"
+    method: "GET"
+    domain: "analytics"
+    service: "DashboardService"
+    description: "List custom dashboards (paginated)"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "DashboardListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-802"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/analytics/dashboards"
+    method: "POST"
+    domain: "analytics"
+    service: "DashboardService"
+    description: "Create custom dashboard"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: "CreateDashboardRequest"
+    response_schema: "DashboardDetailResponse"
+    errors: ["401", "403", "409", "422"]
+    fr_ref: "FR-802"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/analytics/dashboards/{id}"
+    method: "GET"
+    domain: "analytics"
+    service: "DashboardService"
+    description: "Get dashboard by ID with widget data"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "DashboardDetailResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-802"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/analytics/dashboards/{id}"
+    method: "PATCH"
+    domain: "analytics"
+    service: "DashboardService"
+    description: "Update dashboard (ownership check)"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: "UpdateDashboardRequest"
+    response_schema: "DashboardDetailResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-802"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/analytics/dashboards/{id}"
+    method: "DELETE"
+    domain: "analytics"
+    service: "DashboardService"
+    description: "Delete custom dashboard (not system dashboards)"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-802"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/analytics/dashboards/{id}/share"
+    method: "POST"
+    domain: "analytics"
+    service: "DashboardService"
+    description: "Share dashboard with user or role"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "20 per minute per user"
+    request_schema: "ShareDashboardRequest"
+    response_schema: "DashboardShareResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-802"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/analytics/reports"
+    method: "POST"
+    domain: "analytics"
+    service: "ReportService"
+    description: "Generate report (async via BullMQ)"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "10 per hour per user"
+    request_schema: "GenerateReportRequest"
+    response_schema: "ReportGenerationResponse"
+    errors: ["401", "403", "422"]
+    fr_ref: "FR-803"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/analytics/reports"
+    method: "GET"
+    domain: "analytics"
+    service: "ReportService"
+    description: "List reports (paginated, filterable by type, status, date)"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "ReportListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-803"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/analytics/reports/{id}"
+    method: "GET"
+    domain: "analytics"
+    service: "ReportService"
+    description: "Get report details"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "ReportDetailResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-803"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/analytics/reports/{id}/download"
+    method: "GET"
+    domain: "analytics"
+    service: "ReportService"
+    description: "Download generated report file (presigned URL)"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per hour per user"
+    request_schema: null
+    response_schema: "ReportDownloadResponse"
+    errors: ["400", "401", "403", "404", "410"]
+    fr_ref: "FR-804"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/analytics/reports/schedule"
+    method: "POST"
+    domain: "analytics"
+    service: "ReportService"
+    description: "Schedule recurring report generation"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "20 per minute per user"
+    request_schema: "ScheduleReportRequest"
+    response_schema: "ScheduleReportResponse"
+    errors: ["401", "403", "422"]
+    fr_ref: "FR-805"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/analytics/reports/schedule/{id}"
+    method: "DELETE"
+    domain: "analytics"
+    service: "ReportService"
+    description: "Cancel scheduled report"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "20 per minute per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-805"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/analytics/kpis"
+    method: "GET"
+    domain: "analytics"
+    service: "KpiService"
+    description: "List KPIs (filterable by domain)"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "KpiListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-806"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/analytics/kpis/{id}"
+    method: "GET"
+    domain: "analytics"
+    service: "KpiService"
+    description: "Get KPI detail with history"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "KpiDetailResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-806"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/analytics/kpis"
+    method: "POST"
+    domain: "analytics"
+    service: "KpiService"
+    description: "Define new KPI"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "20 per hour per user"
+    request_schema: "CreateKpiRequest"
+    response_schema: "KpiDetailResponse"
+    errors: ["401", "403", "409", "422"]
+    fr_ref: "FR-806"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/analytics/kpis/{id}"
+    method: "PATCH"
+    domain: "analytics"
+    service: "KpiService"
+    description: "Update KPI target/threshold"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "20 per hour per user"
+    request_schema: "UpdateKpiRequest"
+    response_schema: "KpiDetailResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-806"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/analytics/kpis/{id}"
+    method: "DELETE"
+    domain: "analytics"
+    service: "KpiService"
+    description: "Delete KPI"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "20 per hour per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-806"
+    phase: "phase-2"
+    graphql: false
+
+  - path: "/api/v1/analytics/metrics"
+    method: "GET"
+    domain: "analytics"
+    service: "KpiService"
+    description: "List available metric definitions"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "MetricDefinitionsResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-806"
+    phase: "phase-2"
+    graphql: false
+
+  # ===========================================================================
+  # AI DOMAIN (29 endpoints)
+  # ===========================================================================
+  - path: "/api/v1/ai/agents"
+    method: "GET"
+    domain: "ai"
+    service: "AgentService"
+    description: "List AI agents"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "AgentListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-901"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/agents/{id}"
+    method: "GET"
+    domain: "ai"
+    service: "AgentService"
+    description: "Get agent details"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "AgentDetailResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-901"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/agents"
+    method: "POST"
+    domain: "ai"
+    service: "AgentService"
+    description: "Create AI agent"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "20 per hour per user"
+    request_schema: "CreateAgentRequest"
+    response_schema: "AgentDetailResponse"
+    errors: ["401", "403", "422"]
+    fr_ref: "FR-901"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/agents/{id}"
+    method: "PATCH"
+    domain: "ai"
+    service: "AgentService"
+    description: "Update AI agent"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "30 per hour per user"
+    request_schema: "UpdateAgentRequest"
+    response_schema: "AgentDetailResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-901"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/agents/{id}"
+    method: "DELETE"
+    domain: "ai"
+    service: "AgentService"
+    description: "Delete AI agent"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "20 per hour per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-901"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/agents/{id}/activate"
+    method: "POST"
+    domain: "ai"
+    service: "AgentService"
+    description: "Activate agent"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "20 per hour per user"
+    request_schema: null
+    response_schema: "AgentStatusResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-901"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/agents/{id}/deactivate"
+    method: "POST"
+    domain: "ai"
+    service: "AgentService"
+    description: "Deactivate agent"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "20 per hour per user"
+    request_schema: null
+    response_schema: "AgentStatusResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-901"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/chat"
+    method: "POST"
+    domain: "ai"
+    service: "ChatService"
+    description: "Send message to an AI agent (RAG chat)"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer"]
+    rate_limit: "50 per hour per user (support), 20 per hour (content), 30 per hour (analytics)"
+    request_schema: "ChatRequest"
+    response_schema: "ChatResponse"
+    errors: ["400", "401", "403", "422", "429", "503"]
+    fr_ref: "FR-902"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/knowledge"
+    method: "POST"
+    domain: "ai"
+    service: "KnowledgeService"
+    description: "Create knowledge source for ingestion"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "5 per hour per user"
+    request_schema: "CreateKnowledgeSourceRequest"
+    response_schema: "KnowledgeSourceResponse"
+    errors: ["401", "403", "413", "422"]
+    fr_ref: "FR-903"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/knowledge"
+    method: "GET"
+    domain: "ai"
+    service: "KnowledgeService"
+    description: "List knowledge sources"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "KnowledgeSourceListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-903"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/knowledge/{id}"
+    method: "GET"
+    domain: "ai"
+    service: "KnowledgeService"
+    description: "Get knowledge source detail"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "KnowledgeSourceDetailResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-903"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/knowledge/{id}/refresh"
+    method: "POST"
+    domain: "ai"
+    service: "KnowledgeService"
+    description: "Re-ingest knowledge source"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "10 per hour per user"
+    request_schema: null
+    response_schema: "IngestionJobResponse"
+    errors: ["401", "403", "404", "409"]
+    fr_ref: "FR-903"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/knowledge/{id}"
+    method: "DELETE"
+    domain: "ai"
+    service: "KnowledgeService"
+    description: "Delete knowledge source and all embeddings"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "20 per hour per user"
+    request_schema: null
+    response_schema: "DeleteResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-903"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/knowledge/{id}/documents"
+    method: "GET"
+    domain: "ai"
+    service: "KnowledgeService"
+    description: "List documents in knowledge source"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "DocumentListResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-903"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/prompts"
+    method: "POST"
+    domain: "ai"
+    service: "PromptService"
+    description: "Create prompt (version 1)"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per hour per user"
+    request_schema: "CreatePromptRequest"
+    response_schema: "PromptDetailResponse"
+    errors: ["401", "403", "422"]
+    fr_ref: "FR-904"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/prompts"
+    method: "GET"
+    domain: "ai"
+    service: "PromptService"
+    description: "List prompts (latest versions)"
+    auth: "required"
+    roles: ["admin", "manager", "employee"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "PromptListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-904"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/prompts/{id}"
+    method: "GET"
+    domain: "ai"
+    service: "PromptService"
+    description: "Get prompt version detail"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "PromptDetailResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-904"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/prompts/{id}/versions"
+    method: "GET"
+    domain: "ai"
+    service: "PromptService"
+    description: "List all versions of a prompt"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "PromptVersionListResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-904"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/prompts/{id}/version"
+    method: "POST"
+    domain: "ai"
+    service: "PromptService"
+    description: "Create new version from existing prompt"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per hour per user"
+    request_schema: "VersionPromptRequest"
+    response_schema: "PromptDetailResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-904"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/prompts/{id}/test"
+    method: "POST"
+    domain: "ai"
+    service: "PromptService"
+    description: "Test prompt with variables"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per hour per user"
+    request_schema: "TestPromptRequest"
+    response_schema: "TestPromptResponse"
+    errors: ["401", "403", "404", "422"]
+    fr_ref: "FR-904"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/prompts/{id}/activate"
+    method: "POST"
+    domain: "ai"
+    service: "PromptService"
+    description: "Activate prompt version"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per hour per user"
+    request_schema: null
+    response_schema: "PromptStatusResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-904"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/prompts/{id}/deprecate"
+    method: "POST"
+    domain: "ai"
+    service: "PromptService"
+    description: "Deprecate prompt version"
+    auth: "required"
+    roles: ["admin"]
+    rate_limit: "30 per hour per user"
+    request_schema: "DeprecatePromptRequest"
+    response_schema: "PromptStatusResponse"
+    errors: ["400", "401", "403", "404"]
+    fr_ref: "FR-904"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/interactions"
+    method: "GET"
+    domain: "ai"
+    service: "InteractionService"
+    description: "List interactions (scoped to user, admin sees all)"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "InteractionListResponse"
+    errors: ["401", "403"]
+    fr_ref: "FR-905"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/interactions/{id}"
+    method: "GET"
+    domain: "ai"
+    service: "InteractionService"
+    description: "Get interaction detail (prompt, response, chunks, tool calls)"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer"]
+    rate_limit: "60 per minute per user"
+    request_schema: null
+    response_schema: "InteractionDetailResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-905"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/interactions/stats"
+    method: "GET"
+    domain: "ai"
+    service: "InteractionService"
+    description: "Get aggregate AI usage statistics"
+    auth: "required"
+    roles: ["admin", "manager"]
+    rate_limit: "30 per minute per user"
+    request_schema: null
+    response_schema: "InteractionStatsResponse"
+    errors: ["401", "403", "422"]
+    fr_ref: "FR-905"
+    phase: "phase-5"
+    graphql: false
+
+  - path: "/api/v1/ai/interactions/{id}/rate"
+    method: "PATCH"
+    domain: "ai"
+    service: "InteractionService"
+    description: "Rate an AI response"
+    auth: "required"
+    roles: ["admin", "manager", "employee", "customer"]
+    rate_limit: "20 per minute per user"
+    request_schema: "RateInteractionRequest"
+    response_schema: "InteractionRatingResponse"
+    errors: ["401", "403", "404"]
+    fr_ref: "FR-905"
+    phase: "phase-5"
+    graphql: false

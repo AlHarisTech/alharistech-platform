@@ -1,0 +1,466 @@
+@startuml payment-flow
+' ============================================================
+' AlharisTech Platform — Payment Processing Sequence
+' Commerce Checkout → Payment Gateway → Callback → Fulfillment
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam participant {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+  FontColor #1A1A1A
+}
+
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #E67E22
+  FontColor #1A1A1A
+}
+
+skinparam database {
+  BackgroundColor #D5F5E3
+  BorderColor #27AE60
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 9
+}
+
+skinparam arrow {
+  FontSize 9
+}
+
+skinparam box {
+  BackgroundColor #F4F6F7
+  BorderColor #AAB7B8
+  FontSize 10
+  FontStyle bold
+}
+
+title **AlharisTech Platform — Payment Processing Sequence**
+title **تدفق معالجة الدفع — من السلة إلى الشحن**
+
+actor "Customer\nالعميل" as Customer
+participant "Commerce API\nNestJS" as CommerceAPI
+participant "Commerce\nOrder Service" as OrderSvc
+participant "Inventory\nService" as InventorySvc
+
+box "Payment Gateway (External)" #FDEDEC
+  participant "Payment Gateway\nStripe / Moyasar" as PaymentGW
+endbox
+
+participant "Shipping\nService" as ShippingSvc
+participant "Notification\nService" as Notify
+database "PostgreSQL\ncommerce_orders / inventory" as DB
+database "Redis\nIdempotency / Cache" as Redis
+
+== PHASE 1: CHECKOUT INITIATION — بدء الدفع ==
+
+Customer -> CommerceAPI : Initiate checkout from cart
+CommerceAPI -> CommerceAPI : Authenticate customer\n(extract from JWT)
+
+CommerceAPI -> OrderSvc : beginCheckout(customerId)
+
+OrderSvc -> DB : SELECT cart_items ci\nJOIN products p ON ci.product_id = p.id\nWHERE ci.cart_id = (SELECT id FROM carts WHERE customer_id = ?)
+
+DB --> OrderSvc : Cart items with current product prices
+
+OrderSvc -> OrderSvc : **Validate Cart:**
+note right of OrderSvc
+  1. Cart not empty
+  2. All products active + not deleted
+  3. Quantity ≤ available inventory
+  4. Price not changed > 5% from snapshot
+endnote
+
+alt Cart invalid (empty/stock changed/prices stale)
+  OrderSvc --> CommerceAPI : 422 { error: "CHECKOUT_VALIDATION_FAILED",\n  details: { ... } }
+  CommerceAPI --> Customer : Show validation errors
+else Cart valid
+  OrderSvc -> OrderSvc : Calculate totals:\n· sub_total = SUM(quantity * unit_price)\n· shipping = calculateShipping(cart, address)\n· tax = calculateTax(sub_total)\n· discount = applyCoupon(code)\n· total = sub_total + shipping + tax - discount
+
+  OrderSvc --> CommerceAPI : Cart summary { items, totals, shippingOptions }
+  CommerceAPI --> Customer : Display checkout review\n{ items, sub_total, shipping, tax, total }
+
+  Customer -> CommerceAPI : Confirm checkout\n{ shipping_address, billing_address,\n  shipping_method, payment_method }
+
+  CommerceAPI -> CommerceAPI : Validate:\n· Shipping address completeness\n· Payment method valid
+end
+
+== PHASE 2: ORDER CREATION — إنشاء الطلب ==
+
+CommerceAPI -> OrderSvc : createOrder(checkoutDto, customerId)
+
+OrderSvc -> OrderSvc : Generate **Idempotency Key**\nKey = SHA256(customerId + cartId + timestamp)
+note right of OrderSvc
+  **Idempotency Key:**
+  Prevents duplicate order creation
+  on retry. Key is unique per checkout
+  attempt. Stored in Redis with TTL 24h.
+endnote
+
+OrderSvc -> Redis : SET idempotency:{key} "processing"\nNX (only if not exists)
+
+alt Idempotency key already exists
+  OrderSvc -> Redis : GET idempotency:{key}
+  alt Previous attempt succeeded
+    Redis --> OrderSvc : Existing orderId
+    OrderSvc --> CommerceAPI : 200 { data: existingOrder }
+  else Previous attempt failed
+    Redis --> OrderSvc : "failed"
+    OrderSvc --> CommerceAPI : 422 Retry checkout
+  end
+else New checkout (key set)
+  OrderSvc -> DB : BEGIN TRANSACTION
+
+  OrderSvc -> DB : Generate order_number:\nORD-{YYYY}-{6-digit sequence}
+
+  OrderSvc -> DB : INSERT INTO commerce_orders (\n  order_number, customer_id,\n  status: 'pending',\n  items: JSONB snapshot of cart,\n  sub_total, discount_amount,\n  shipping_amount, tax_amount, total,\n  currency: 'SAR',\n  shipping_address, billing_address,\n  payment_method, shipping_method,\n  payment_status: 'pending')
+
+  DB --> OrderSvc : Order created (id, order_number)
+
+  OrderSvc -> DB : INSERT INTO order_status_history\n(order_id, new_status: 'pending')
+
+  OrderSvc -> Notify : Publish **OrderPlaced**\n{ orderId, orderNumber, customerId,\n  items[], total, paymentMethod }
+
+  Notify -> Customer : Email: "تم استلام طلبك - رقم ORD-2026-000042"\n+ order summary
+
+  OrderSvc -> DB : UPDATE carts SET status = 'converted'\nWHERE customer_id = ? AND status = 'active'
+end
+
+== PHASE 3: PAYMENT GATEWAY REDIRECT — التوجيه لبوابة الدفع ==
+
+OrderSvc -> OrderSvc : Prepare payment request:\n{ amount: order.total * 100 (halalas),\n  currency: 'SAR',\n  orderId: order.id,\n  idempotencyKey,\n  metadata: { orderNumber, customerId },\n  success_url, cancel_url, webhook_url }
+
+OrderSvc -> PaymentGW : POST /v1/payment_intents\n{ amount, currency, metadata,\n  return_url, webhook_url }
+
+note right of PaymentGW
+  **Payment Gateway Integration:**
+  Moyasar (Saudi payments) or Stripe.
+  Amount in halalas (SAR * 100).
+  Supports: card, Apple Pay, Mada.
+endnote
+
+PaymentGW -> PaymentGW : Create PaymentIntent\n{ id, status: "requires_payment_method",\n  client_secret }
+
+PaymentGW --> OrderSvc : { paymentIntentId, clientSecret, redirectUrl }
+
+OrderSvc -> DB : UPDATE commerce_orders\nSET payment_id = ?\nWHERE id = ?
+
+OrderSvc -> Redis : SET payment:{paymentIntentId} = {orderId, status: "pending"}\nTTL: 3600 (1 hour timeout)
+
+OrderSvc --> CommerceAPI : { redirectUrl, paymentIntentId }
+CommerceAPI --> Customer : Redirect to payment gateway
+
+Customer -> PaymentGW : Browser redirect to payment page
+
+Customer -> Customer : Enter card details\n(Card number, expiry, CVC, name)
+
+Customer -> PaymentGW : Confirm payment
+
+PaymentGW -> PaymentGW : Process payment:\n· 3D Secure verification\n· Fraud check\n· Bank authorization
+
+== PHASE 4: PAYMENT RESULT HANDLING — معالجة نتيجة الدفع ==
+
+alt Payment Success (Synchronous)
+  PaymentGW --> Customer : Redirect to success_url\n?payment_intent=pi_xxx&status=succeeded
+
+  Customer -> CommerceAPI : GET /checkout/success\n?payment_intent=pi_xxx
+
+  CommerceAPI -> OrderSvc : handlePaymentSuccess(paymentIntentId)
+
+  OrderSvc -> PaymentGW : GET /v1/payment_intents/{id}\n(server-side verification)
+
+  PaymentGW --> OrderSvc : { id, status: "succeeded",\n  amount, currency, metadata }
+
+  OrderSvc -> OrderSvc : **Verify payment signature**
+  note right of OrderSvc
+    Server-side verification is mandatory.
+    Never trust client-redirected status.
+    Verify with Payment Gateway directly.
+  endnote
+
+  OrderSvc -> DB : UPDATE commerce_orders SET\n  payment_status = 'paid',\n  status = 'confirmed',\n  placed_at = NOW()
+
+  note right of OrderSvc
+    **Status Transition:**
+    pending → confirmed
+    guard: payment_status = 'paid'
+  endnote
+
+  OrderSvc -> DB : INSERT INTO order_status_history\n(order_id, old_status: 'pending',\n new_status: 'confirmed')
+
+  OrderSvc -> Notify : Publish **PaymentCompleted**\n{ orderId, orderNumber, amount,\n  paymentMethod, paymentId }
+
+  Notify -> Customer : Email: "تم تأكيد الدفع - طلبك قيد التجهيز"
+
+  OrderSvc -> Redis : SET idempotency:{key} = {orderId, status: "success"}\nTTL: 86400
+
+else Payment Failure (Synchronous)
+  PaymentGW --> Customer : Redirect to cancel_url\n?payment_intent=pi_xxx&status=failed
+
+  Customer -> CommerceAPI : GET /checkout/cancel\n?payment_intent=pi_xxx
+
+  CommerceAPI -> OrderSvc : handlePaymentFailure(paymentIntentId, reason)
+
+  OrderSvc -> PaymentGW : GET /v1/payment_intents/{id}\n(verify failure reason)
+
+  PaymentGW --> OrderSvc : { status: "failed",\n  last_payment_error: { message } }
+
+  OrderSvc -> DB : UPDATE commerce_orders SET\n  payment_status = 'failed'
+
+  OrderSvc -> Notify : Publish **PaymentFailed**\n{ orderId, orderNumber, reason }
+
+  Notify -> Customer : Email: "فشل الدفع - يرجى المحاولة مرة أخرى"
+
+  OrderSvc -> Redis : SET idempotency:{key} = "failed"\nTTL: 86400
+
+  OrderSvc --> CommerceAPI : 200 { status: "failed", reason }
+  CommerceAPI --> Customer : Payment failed screen\n+ retry option
+end
+
+== PHASE 5: WEBHOOK (ASYNC) — الخطاف الخلفي للدفع ==
+
+note over PaymentGW, OrderSvc
+  **Webhook Flow (Async Confirmation):**
+  Payment gateway sends server-to-server
+  POST to registered webhook URL.
+  This is the authoritative confirmation.
+  Must verify webhook signature.
+endnote
+
+PaymentGW -> CommerceAPI : POST /api/v1/webhooks/payment\nX-Signature: <hmac_sha256>\n{ type: "payment_intent.succeeded",\n  data: { id, amount, metadata } }
+
+CommerceAPI -> CommerceAPI : **Verify webhook signature**\nHMAC-SHA256(webhook_secret, raw_body)\nCompare with X-Signature header
+
+alt Invalid signature
+  CommerceAPI --> PaymentGW : 401 Unauthorized
+  note right of CommerceAPI : Reject unverified webhook
+else Valid signature
+  CommerceAPI -> Redis : SETNX webhook:{eventId} "processing"\n(webhook idempotency)
+
+  alt Duplicate webhook
+    Redis --> CommerceAPI : Key exists (already processed)
+    CommerceAPI --> PaymentGW : 200 OK (idempotent)
+  else New webhook
+    CommerceAPI -> OrderSvc : processPaymentWebhook(event)
+
+    alt Payment succeeded
+      OrderSvc -> DB : UPDATE commerce_orders SET\n  payment_status = 'paid',\n  status = 'confirmed',\n  placed_at = NOW()
+
+      orderSvc -> Notify : Publish **PaymentCompleted**
+
+      OrderSvc -> InventorySvc : reserveInventory(orderId)
+
+      note right of OrderSvc
+        **Webhook Timeout Handling:**
+        If webhook not received within 30 min,
+        poll Payment Gateway for status.
+        Cron job runs every 5 minutes.
+      endnote
+
+    else Payment failed
+      OrderSvc -> DB : UPDATE commerce_orders SET\n  payment_status = 'failed'
+
+      OrderSvc -> Notify : Publish **PaymentFailed**
+    end
+
+    OrderSvc -> Redis : SET webhook:{eventId} = "processed"\nTTL: 604800 (7 days)
+    CommerceAPI --> PaymentGW : 200 OK
+  end
+end
+
+== PHASE 6: INVENTORY RESERVATION — حجز المخزون ==
+
+OrderSvc -> InventorySvc : reserveInventory(orderId, items[])
+
+InventorySvc -> DB : BEGIN TRANSACTION
+
+loop For each item in order
+  InventorySvc -> DB : SELECT quantity_available, quantity_reserved\nFROM inventory\nWHERE product_id = ?\nFOR UPDATE (row-level lock)
+
+  note right of DB
+    **Row-Level Lock (FOR UPDATE):**
+    Prevents double-booking.
+    Another concurrent transaction
+    waits for this lock release.
+  endnote
+
+  DB --> InventorySvc : { quantity_available, quantity_reserved }
+
+  alt Insufficient stock
+    InventorySvc -> DB : ROLLBACK
+    InventorySvc -> OrderSvc : Stock insufficient for product
+    OrderSvc -> Notify : Alert admin: stock inconsistency
+  else Stock available
+    InventorySvc -> DB : UPDATE inventory SET\n  quantity_reserved = quantity_reserved + {qty}\nWHERE product_id = ?
+
+    InventorySvc -> InventorySvc : Check low stock:\nIF (available - reserved) ≤ threshold\n→ publish InventoryLowStock
+
+    alt Stock depleted
+      InventorySvc -> Notify : Publish **InventoryDepleted**\n{ inventoryId, productId, sku }
+      Notify -> Manager : Alert: "نفاد المخزون - {product_name}"
+    end
+  end
+end
+
+InventorySvc -> DB : COMMIT TRANSACTION
+
+InventorySvc -> Notify : Publish **InventoryReserved**\n{ orderId, items[] }
+
+InventorySvc --> OrderSvc : Inventory reserved
+
+== PHASE 7: ORDER PROCESSING & SHIPMENT — تجهيز وشحن الطلب ==
+
+OrderSvc -> DB : UPDATE commerce_orders\nSET status = 'processing'
+
+note right of OrderSvc
+  **Status Transition:**
+  confirmed → processing
+  triggered by: inventory reserved + payment confirmed
+endnote
+
+OrderSvc -> DB : INSERT INTO order_status_history\n(new_status: 'processing', note: 'بدء تجهيز الطلب')
+
+OrderSvc -> Notify : Publish **OrderStatusChanged**\n(oldStatus: confirmed → newStatus: processing)
+
+Notify -> Customer : Email: "طلبك قيد التجهيز"
+
+Employee -> CommerceAPI : Process order → assign tracking
+
+CommerceAPI -> ShippingSvc : createShipment(orderId, carrier, items, shippingAddress)
+
+ShippingSvc -> ShippingSvc : Register shipment with carrier\nGenerate tracking number + label
+
+ShippingSvc -> DB : UPDATE commerce_orders SET\n  status = 'shipped',\n  tracking_number = ?, shipped_at = NOW(),\n  estimated_delivery = ?
+
+note right of OrderSvc
+  **Status Transition:**
+  processing → shipped
+  triggered by: tracking number assigned
+endnote
+
+ShippingSvc -> DB : INSERT INTO order_status_history\n(new_status: 'shipped')
+
+ShippingSvc -> Notify : Publish **ShipmentCreated**\n{ orderId, orderNumber, trackingNumber,\n  carrier, estimatedDelivery }
+
+Notify -> Customer : Email: "تم شحن طلبك"\n+ tracking number + tracking link
+
+== PHASE 8: DELIVERY & COMPLETION — التسليم والإكمال ==
+
+note over ShippingSvc, DB
+  **Delivery Tracking:**
+  Cron job polls carrier API for
+  delivery status updates.
+  Auto-transitions to delivered
+  on confirmation.
+endnote
+
+ShippingSvc -> ShippingSvc : Poll carrier tracking API\n(periodic cron job)
+
+alt Delivery confirmed by carrier
+  ShippingSvc -> DB : UPDATE commerce_orders SET\n  status = 'delivered',\n  delivered_at = NOW()
+
+  note right of ShippingSvc
+    **Status Transition:**
+    shipped → delivered (TERMINAL)
+    triggered by: carrier delivery confirmation
+  endnote
+
+  ShippingSvc -> DB : INSERT INTO order_status_history\n(new_status: 'delivered')
+
+  ShippingSvc -> Notify : Publish **ShipmentDelivered**\n{ orderId, orderNumber, deliveredAt }
+
+  Notify -> Customer : Email: "تم تسليم طلبك - شكراً لتسوقك معنا"
+end
+
+== PAYMENT TIMEOUT & RETRY — معالجة انتهاء المهلة وإعادة المحاولة ==
+
+note over OrderSvc, Redis
+  **Payment Timeout Handling:**
+  Orders stuck in 'pending' status
+  beyond 30 min are auto-cancelled.
+  Cron job runs every 5 minutes.
+endnote
+
+OrderSvc -> DB : SELECT * FROM commerce_orders\nWHERE status = 'pending'\nAND payment_status = 'pending'\nAND created_at < NOW() - INTERVAL '30 minutes'
+
+alt Orders with expired payment window
+  loop For each expired order
+    OrderSvc -> PaymentGW : GET /v1/payment_intents/{paymentId}
+
+    alt Payment completed (webhook missed)
+      OrderSvc -> OrderSvc : Process as late webhook
+    else Payment still pending/expired
+      OrderSvc -> DB : UPDATE commerce_orders SET\n  status = 'cancelled',\n  cancelled_at = NOW(),\n  cancelled_reason = 'Payment timeout'
+
+      note right of OrderSvc
+        **Status Transition:**
+        pending → cancelled
+        triggered by: payment timeout (30 min)
+      endnote
+
+      OrderSvc -> Notify : Publish **OrderCancelled**\n{ orderId, reason: 'payment_timeout' }
+
+      Notify -> Customer : Email: "تم إلغاء طلبك - انتهت مهلة الدفع"
+
+      OrderSvc -> DB : UPDATE carts\nSET status = 'active'\nWHERE customer_id = ?\n(re-activate cart for retry)
+    end
+  end
+end
+
+== REFUND FLOW — مسار الاسترجاع ==
+
+opt Customer/Admin requests refund
+  Customer -> CommerceAPI : POST /api/v1/commerce/orders/{id}/refund\n{ reason: "منتج معيب" }
+
+  CommerceAPI -> OrderSvc : requestRefund(orderId, reason, customerId)
+
+  OrderSvc -> DB : Validate order status = 'delivered'
+
+  alt Order not delivered
+    OrderSvc --> CommerceAPI : 422 Cannot refund undelivered order
+  else Order delivered
+    OrderSvc -> PaymentGW : POST /v1/refunds\n{ payment_intent, amount, reason }
+
+    PaymentGW --> OrderSvc : { refundId, status: "succeeded" }
+
+    OrderSvc -> DB : UPDATE commerce_orders SET\n  status = 'refunded',\n  payment_status = 'refunded'
+
+    note right of OrderSvc
+      **Status Transition:**
+      delivered → refunded
+      triggered by: refund processed
+    endnote
+
+    OrderSvc -> InventorySvc : releaseInventory(orderId)\n(return stock)
+
+    InventorySvc -> DB : UPDATE inventory SET\n  quantity_reserved = quantity_reserved - qty,\n  quantity_available = quantity_available + qty
+
+    OrderSvc -> Notify : Publish **OrderRefunded**\n{ orderId, refundAmount, reason }
+
+    Notify -> Customer : Email: "تم استرجاع مبلغ طلبك"
+  end
+end
+
+== FULL ORDER STATE MACHINE SUMMARY ==
+
+note over Customer, DB
+  **Commerce Order Status Transitions:**
+  |= From |= To |= Trigger |= Guard |
+  | — | **pending** | Checkout | Cart valid + payment initiated |
+  | **pending** | confirmed | Payment succeeded | payment_status = 'paid' |
+  | **pending** | cancelled | Payment failure/timeout | With cancel_reason |
+  | **confirmed** | processing | Inventory reserved | All items in stock |
+  | **processing** | shipped | Tracking assigned | carrier + tracking_number |
+  | **shipped** | delivered | Carrier confirms delivery | Auto on tracking update |
+  | **delivered** | refunded | Refund processed | After return/customer request |
+  | **confirmed** | cancelled | Admin cancellation | Before shipment only |
+endnote
+
+@enduml

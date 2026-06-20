@@ -1,0 +1,471 @@
+@startuml auth-full-flow
+' ============================================================
+' AlharisTech Platform — Extended Authentication Flow
+' Register → Verify → Login → Protected Access → Refresh → Logout → Reuse Detection
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam participant {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+  FontColor #1A1A1A
+}
+
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #E67E22
+  FontColor #1A1A1A
+}
+
+skinparam database {
+  BackgroundColor #D5F5E3
+  BorderColor #27AE60
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 9
+}
+
+skinparam arrow {
+  FontSize 9
+}
+
+title **AlharisTech Platform — Extended Authentication Flow**
+title **تدفق المصادقة الموسع — التسجيل، التحقق، الدخول، التجديد، كشف إعادة الاستخدام**
+
+actor "User\nالمستخدم" as User
+participant "Frontend\nNext.js" as Frontend
+participant "Auth API\nNestJS" as AuthAPI
+participant "Auth Service\nDomain Logic" as AuthSvc
+participant "Token Service\nJWT Manager" as TokenSvc
+participant "Notification\nService" as Notify
+database "PostgreSQL\nusers / refresh_tokens" as DB
+database "Redis\nsession cache" as Redis
+
+== 1. REGISTRATION — التسجيل ==
+
+User -> Frontend : Fill registration form\n{ email, password, first_name_ar, last_name_ar }
+
+Frontend -> Frontend : Client-side validation:\n· email format\n· password strength (8+ chars, upper, lower, digit, special)\n· names not empty
+
+Frontend -> AuthAPI : POST /api/v1/auth/register\n{ email, password, first_name_ar, last_name_ar }
+
+AuthAPI -> AuthAPI : Zod validation (server-side)
+
+AuthAPI -> AuthSvc : register(dto)
+
+AuthSvc -> DB : Check email uniqueness\nSELECT id FROM users WHERE email = ?
+
+alt Email already registered
+  AuthSvc --> AuthAPI : 409 Conflict
+  note right of AuthSvc
+    Error: AUTH_EMAIL_EXISTS
+    "البريد الإلكتروني مسجل مسبقاً"
+  endnote
+  AuthAPI --> Frontend : 409 { error: "Email already registered" }
+  Frontend --> User : Show error
+else Email available
+  AuthSvc -> AuthSvc : Hash password with **Argon2id**\n(memory: 65536 KiB, iterations: 3, parallelism: 4)
+
+  AuthSvc -> DB : INSERT INTO users (\n  email, password_hash,\n  first_name_ar, last_name_ar,\n  role: 'customer',\n  is_verified: false,\n  is_active: true)
+
+  DB --> AuthSvc : User created (id, created_at)
+
+  AuthSvc -> TokenSvc : generateEmailVerificationToken(userId)
+
+  TokenSvc -> TokenSvc : Create JWT:\n{ sub: userId, purpose: "email_verification" }\nSigned: RS256\nExpires: 24 hours
+
+  TokenSvc --> AuthSvc : verificationToken
+
+  AuthSvc -> Notify : Publish **UserRegistered**\n{ userId, email, role: 'customer' }
+
+  Notify -> Notify : Send verification email:\nSubject: "تفعيل حسابك في منصة الحارس تك"\nBody: Welcome + verification link\nLink: /verify-email?token=<jwt>
+
+  AuthSvc --> AuthAPI : 201 Created
+  AuthAPI --> Frontend : 201 { message: "Registration successful. Check email." }
+  Frontend --> User : Show: "تحقق من بريدك الإلكتروني للتفعيل"
+end
+
+== 2. EMAIL VERIFICATION — تفعيل البريد الإلكتروني ==
+
+User -> Frontend : Click verification link from email
+Frontend -> AuthAPI : POST /api/v1/auth/verify-email\n{ token: "<jwt>" }
+
+AuthAPI -> AuthSvc : verifyEmail(token)
+
+AuthSvc -> TokenSvc : verifyAndDecode(token)
+
+TokenSvc -> TokenSvc : 1. Verify RS256 signature\n2. Check expiration (< 24h)\n3. Validate purpose = "email_verification"\n4. Extract userId from sub claim
+
+alt Token invalid or expired
+  TokenSvc --> AuthSvc : Invalid/expired token
+  AuthSvc --> AuthAPI : 401 { error: "Invalid or expired token" }
+  AuthAPI --> Frontend : 401
+  Frontend --> User : "رابط التفعيل منتهي - اطلب رابطاً جديداً"
+else Token valid
+  TokenSvc --> AuthSvc : { userId }
+
+  AuthSvc -> DB : UPDATE users SET\n  is_verified = true\nWHERE id = ? AND is_verified = false
+
+  alt Already verified
+    AuthSvc -> AuthSvc : Idempotent — no error
+  else Now verified
+    AuthSvc -> Notify : Publish **UserVerified**\n{ userId }
+
+    Notify -> User : Email: "تم تفعيل حسابك بنجاح"
+  end
+
+  AuthSvc --> AuthAPI : 200 OK
+  AuthAPI --> Frontend : 200 { message: "Email verified" }
+  Frontend --> User : Redirect to login page
+end
+
+== 3. LOGIN — تسجيل الدخول ==
+
+User -> Frontend : Enter email + password
+Frontend -> AuthAPI : POST /api/v1/auth/login\n{ email, password }
+
+AuthAPI -> AuthAPI : Rate limit check:\nMax 5 attempts/min per IP
+
+AuthAPI -> AuthSvc : login(email, password)
+
+AuthSvc -> DB : SELECT * FROM users\nWHERE email = ?
+
+alt User not found
+  AuthSvc --> AuthAPI : 401 Unauthorized
+  note right of AuthSvc
+    Generic error to prevent
+    email enumeration.
+  endnote
+else User found
+  AuthSvc -> AuthSvc : Check account status
+
+  alt Account locked
+    note right of AuthSvc
+      **Account Lock:**
+      locked_until > NOW()
+      Remaining: N minutes
+    endnote
+    AuthSvc --> AuthAPI : 423 Locked\n{ error: "Account locked", lockedUntil }
+
+  else Account disabled
+    note right of AuthSvc
+      **Account Disabled:**
+      is_active = false
+      Admin action required
+    endnote
+    AuthSvc --> AuthAPI : 401 Unauthorized\n{ error: "Account disabled" }
+
+  else Account active
+    AuthSvc -> AuthSvc : Verify password:\n**argon2.verify(password, hash)**
+
+    alt Password incorrect
+      AuthSvc -> DB : UPDATE users SET\n  failed_login_attempts = failed_login_attempts + 1
+
+      AuthSvc -> AuthSvc : Check if ≥ 5 attempts
+
+      alt Reached 5 failed attempts
+        AuthSvc -> DB : UPDATE users SET\n  locked_until = NOW() + INTERVAL '30 minutes',\n  failed_login_attempts = 0
+
+        AuthSvc -> Notify : Publish **AccountLocked**\n{ userId, reason: "5 failed attempts" }
+
+        Notify -> User : Email: "تم قفل حسابك مؤقتاً لأسباب أمنية"\n+ unlock instructions
+
+        AuthSvc --> AuthAPI : 423 Locked\n{ error: "Account locked for 30 minutes" }
+      else Under threshold
+        AuthSvc --> AuthAPI : 401 Unauthorized
+      end
+
+    else Password correct
+      AuthSvc -> DB : UPDATE users SET\n  failed_login_attempts = 0,\n  last_login_at = NOW()
+
+      AuthSvc -> TokenSvc : generateTokenPair(userId, role, permissions)
+
+      note right of TokenSvc
+        **Access Token (JWT):**
+        · Header: { alg: "RS256", typ: "JWT" }
+        · Payload: {
+            sub: userId,
+            email: user.email,
+            role: user.role,
+            permissions: [...],
+            iat: NOW,
+            exp: NOW + 15 min
+          }
+        · Signature: RSA private key
+
+        **Refresh Token:**
+        · Opaque: crypto.randomUUID()
+        · Stored as SHA-256 hash
+        · Expires: 7 days (absolute)
+        · Linked via familyId for rotation
+      endnote
+
+      TokenSvc -> TokenSvc : Generate Access Token\n(15 min expiry, RS256)
+
+      TokenSvc -> TokenSvc : Generate Refresh Token\n(opaque UUID, 7 day expiry)
+
+      TokenSvc -> DB : INSERT INTO refresh_tokens (\n  user_id, token_hash: SHA256(refreshToken),\n  device_info: { ip, userAgent },\n  expires_at: NOW() + 7 days,\n  family_id: crypto.randomUUID())
+
+      TokenSvc -> Redis : Cache session\nKEY: session:{userId}\n{ accessToken, role, permissions }\nTTL: 900 (15 min)
+
+      TokenSvc --> AuthSvc : { accessToken, refreshToken, expiresIn: 900 }
+
+      AuthSvc -> Notify : Publish **UserLoggedIn**\n{ userId, ip, device, timestamp }
+
+      AuthSvc --> AuthAPI : 200
+
+      AuthAPI -> AuthAPI : Set refresh token as cookie:\n· httpOnly: true\n· Secure: true\n· SameSite: Strict\n· Path: /api/v1/auth
+
+      AuthAPI --> Frontend : 200 { accessToken, user: { id, email, role }, expiresIn }
+      Frontend -> Frontend : Store accessToken **in memory only**\n(never localStorage/sessionStorage)
+      Frontend --> User : Redirect to dashboard
+    end
+  end
+end
+
+== 4. ACCESS PROTECTED RESOURCE — الوصول لمورد محمي ==
+
+User -> Frontend : Navigate to orders page
+Frontend -> AuthAPI : GET /api/v1/orders\nAuthorization: Bearer <accessToken>
+
+AuthAPI -> AuthAPI : **JwtAuthGuard:**\n· Extract Bearer token from header\n· Verify RS256 signature\n· Check exp claim (not expired)
+
+AuthAPI -> Redis : GET session:{userId}\n(validate session exists)
+
+alt Session expired (Redis key missing)
+  AuthAPI --> Frontend : 401 { error: "Token expired" }
+  note right of Frontend
+    Frontend interceptor catches 401.
+    Triggers automatic token refresh.
+    Retries original request.
+  endnote
+else Session valid
+  Redis --> AuthAPI : { userId, role, permissions }
+
+  AuthAPI -> AuthAPI : **RolesGuard:**\n· Check user.role matches @Roles() decorator
+
+  alt Role insufficient
+    AuthAPI --> Frontend : 403 Forbidden
+  else Role allowed
+    AuthAPI -> AuthAPI : **PermissionGuard:**\n· Check required permission ∈ user.permissions
+
+    alt Permission missing
+      AuthAPI --> Frontend : 403 Forbidden\n{ error: "Missing permission" }
+    else Permission granted
+      AuthAPI -> AuthAPI : Process request\nAttach user context (req.user)
+
+      AuthAPI --> Frontend : 200 { data: [...orders] }
+      Frontend --> User : Render orders list
+    end
+  end
+end
+
+== 5. TOKEN REFRESH — تجديد الرمز ==
+
+note over Frontend, TokenSvc
+  **Automatic Token Refresh (Axios Interceptor):**
+  1. Request fails with 401
+  2. Interceptor queues the request
+  3. Calls /api/v1/auth/refresh
+  4. If success: retry queued requests with new token
+  5. If refresh fails: redirect to login
+endnote
+
+Frontend -> AuthAPI : POST /api/v1/auth/refresh\nCookie: refreshToken=<opaque_token>
+
+AuthAPI -> AuthSvc : refreshToken(cookie.refreshToken)
+
+AuthSvc -> TokenSvc : refreshAccessToken(refreshToken)
+
+TokenSvc -> DB : Find token by hash:\nSELECT * FROM refresh_tokens\nWHERE token_hash = SHA256(refreshToken)\nAND revoked_at IS NULL\nAND expires_at > NOW()
+
+alt Token not found / expired / revoked
+  TokenSvc --> AuthSvc : Invalid refresh token
+  AuthSvc --> AuthAPI : 401
+
+  alt Token was revoked (reuse detected)
+    TokenSvc -> TokenSvc : **TOKEN REUSE DETECTION**
+    note right of TokenSvc
+      ⚠ SECURITY INCIDENT ⚠
+      A revoked refresh token was reused.
+      This indicates potential token theft.
+
+      Action: Revoke ALL tokens for this user.
+      Revoke entire token family (familyId).
+      Force re-authentication with password.
+    endnote
+
+    TokenSvc -> DB : UPDATE refresh_tokens\nSET revoked_at = NOW()\nWHERE user_id = ? AND family_id = ?
+
+    TokenSvc -> Redis : DELETE session:{userId}\n(clear all cached sessions)
+
+    TokenSvc -> Notify : Security alert:
+    Notify -> User : Email: "نشاط مشبوه - جميع الجلسات تم إنهاؤها"
+    Notify -> Manager : Alert: "Token reuse detected for user {email}"
+
+    AuthAPI -> AuthAPI : Clear refresh token cookie
+    AuthAPI --> Frontend : 401 { error: "TOKEN_REUSE_DETECTED",\n  message: "All sessions revoked for security" }
+    Frontend -> Frontend : Clear all stored tokens
+    Frontend --> User : Redirect to login\nShow security alert
+
+  else Token expired normally
+    AuthAPI -> AuthAPI : Clear cookie
+    AuthAPI --> Frontend : 401 { error: "Refresh token expired" }
+    Frontend --> User : Redirect to login
+  end
+
+else Token valid (normal refresh)
+  TokenSvc -> TokenSvc : **Token Rotation:**
+  note right of TokenSvc
+    1. Mark old refresh token as revoked
+    2. Set replaced_by = newTokenId
+    3. Issue NEW refresh token
+    4. Issue NEW access token
+    5. Both tokens inherit same familyId
+  endnote
+
+  TokenSvc -> DB : BEGIN TXN\n1. UPDATE refresh_tokens\n   SET revoked_at = NOW()\n   WHERE id = <oldTokenId>\n\n2. INSERT INTO refresh_tokens (\n   user_id, token_hash: SHA256(newRefreshToken),\n   device_info, family_id: <same>,\n   expires_at: NOW() + 7 days,\n   replaced_by: NULL)
+
+  DB --> TokenSvc : Rotation complete
+
+  TokenSvc -> Redis : UPDATE session:{userId}\nSET newAccessToken\nTTL: 900
+
+  TokenSvc --> AuthSvc : { newAccessToken, newRefreshToken }
+
+  AuthSvc --> AuthAPI : 200
+  AuthAPI -> AuthAPI : Set new refresh token cookie
+  AuthAPI --> Frontend : 200 { accessToken: <new>, expiresIn: 900 }
+
+  Frontend -> Frontend : Replace in-memory accessToken\nRetry failed requests
+end
+
+== 6. DEVICE TRACKING & SESSION MANAGEMENT — تتبع الأجهزة وإدارة الجلسات ==
+
+note over TokenSvc, DB
+  **Device Tracking (stored with refresh token):**
+  · IP address
+  · User-Agent string
+  · Device ID (persistent cookie)
+  · Login timestamp
+
+  **Session Limits:**
+  · Max 10 concurrent refresh tokens per user
+  · Oldest session evicted if exceeded
+  · Inactive sessions expire after 7 days
+  · Max total session lifetime: 30 days from initial login
+endnote
+
+TokenSvc -> DB : Check concurrent sessions:\nSELECT COUNT(*) FROM refresh_tokens\nWHERE user_id = ? AND revoked_at IS NULL
+
+alt Exceeds 10 sessions
+  note right of TokenSvc
+    Evict oldest non-current session.
+    User notified of new device login.
+  endnote
+  TokenSvc -> DB : UPDATE refresh_tokens\nSET revoked_at = NOW()\nWHERE id = (oldest session)\nAND user_id = ?
+  TokenSvc -> Notify : Publish security notification:\n"New device login detected"
+end
+
+== 7. LOGOUT — تسجيل الخروج ==
+
+User -> Frontend : Click Logout
+Frontend -> AuthAPI : POST /api/v1/auth/logout\nCookie: refreshToken
+
+AuthAPI -> AuthSvc : logout(userId, refreshToken)
+
+AuthSvc -> TokenSvc : revokeRefreshToken(userId, refreshToken)
+
+TokenSvc -> DB : UPDATE refresh_tokens\nSET revoked_at = NOW()\nWHERE token_hash = SHA256(refreshToken)\nAND user_id = ?
+
+TokenSvc -> Redis : DELETE session:{userId}
+
+TokenSvc --> AuthSvc : Revoked
+
+AuthSvc -> Notify : Publish **UserLoggedOut**\n{ userId, sessionId }
+
+AuthSvc --> AuthAPI : 200
+AuthAPI -> AuthAPI : Clear refresh token cookie:\nSet-Cookie: refreshToken=; Max-Age=0
+AuthAPI --> Frontend : 200 { message: "Logged out" }
+Frontend -> Frontend : 1. Clear in-memory accessToken\n2. Clear any cached user data\n3. Cancel pending requests
+Frontend --> User : Redirect to login page
+
+== 8. SESSION SLIDING EXPIRY — انتهاء الجلسة التدريجي ==
+
+note over TokenSvc, DB
+  **= Token Lifetime Strategy (Sliding Window) =**
+
+  | Token | Expiry | Renewal | Max Lifetime |
+  | Access Token (JWT) | 15 minutes | On refresh | — |
+  | Refresh Token | 7 days sliding | Each refresh extends by 7 days | 30 days total |
+  | Email Verification | 24 hours | Request new one | — |
+  | Password Reset | 1 hour | Request new one | — |
+
+  **After 30 days:** must re-authenticate with password.
+  **Inactivity:** Access token expires in 15 min of no API calls.
+  **Revocation cascade:** Single token reuse → entire family revoked.
+endnote
+
+TokenSvc -> DB : Cron job (every 15 min):\n· DELETE expired refresh tokens (expires_at < NOW())\n· DELETE revoked tokens older than 30 days
+TokenSvc -> Redis : Redis TTL auto-expires session keys
+
+== 9. PASSWORD RESET FLOW — استعادة كلمة المرور ==
+
+opt User forgot password
+  User -> AuthAPI : POST /api/v1/auth/forgot-password\n{ email }
+
+  AuthAPI -> AuthSvc : requestPasswordReset(email)
+
+  AuthSvc -> DB : SELECT id FROM users WHERE email = ?
+  note right of AuthSvc
+    Always return 200 — don't reveal
+    if email exists or not.
+  endnote
+
+  alt User found
+    AuthSvc -> TokenSvc : generatePasswordResetToken(userId)
+
+    TokenSvc -> TokenSvc : Create JWT:\n{ sub: userId, purpose: "password_reset" }\nExpires: 1 hour
+
+    TokenSvc --> AuthSvc : resetToken
+
+    AuthSvc -> Notify : Send reset email with link:\n/reset-password?token=<jwt>
+  end
+
+  AuthSvc --> AuthAPI : 200 { message: "If email exists, reset link sent" }
+
+  User -> Frontend : Click reset link → enter new password
+  Frontend -> AuthAPI : POST /api/v1/auth/reset-password\n{ token, newPassword }
+
+  AuthAPI -> AuthSvc : resetPassword(token, newPassword)
+
+  AuthSvc -> TokenSvc : verifyAndDecode(token)
+  TokenSvc --> AuthSvc : { userId, purpose: "password_reset" }
+
+  AuthSvc -> AuthSvc : Validate new password:\n· Min 8 chars\n· Uppercase + lowercase + digit + special\n· Not in last 5 passwords
+
+  AuthSvc -> DB : UPDATE users SET password_hash = ?
+
+  AuthSvc -> DB : Revoke ALL refresh tokens:\nUPDATE refresh_tokens\nSET revoked_at = NOW()\nWHERE user_id = ? AND revoked_at IS NULL
+
+  note right of AuthSvc
+    RB-IDENTITY-011:
+    Password change revokes all
+    refresh tokens EXCEPT optionally
+    the current session.
+  endnote
+
+  AuthSvc -> Notify : Publish **PasswordChanged**\n{ userId }
+
+  Notify -> User : Email: "تم تغيير كلمة المرور بنجاح"
+
+  AuthSvc --> AuthAPI : 200
+  AuthAPI --> User : Redirect to login
+end
+
+@enduml

@@ -1,0 +1,362 @@
+@startuml order-lifecycle
+' ============================================================
+' AlharisTech Platform — Order Processing Lifecycle Sequence
+' Service Order Flow: Browse → Submit → Review → Process → Complete → Rate
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam participant {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+  FontColor #1A1A1A
+}
+
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #E67E22
+  FontColor #1A1A1A
+}
+
+skinparam database {
+  BackgroundColor #D5F5E3
+  BorderColor #27AE60
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 9
+}
+
+skinparam arrow {
+  FontSize 9
+}
+
+title **AlharisTech Platform — Full Order Processing Lifecycle**
+title **دورة حياة الطلب الكاملة — من التصفح إلى التقييم**
+
+actor "Customer\nالعميل" as Customer
+actor "Employee\nالموظف" as Employee
+participant "Frontend\nNext.js" as Frontend
+participant "Service API\nNestJS" as ServiceAPI
+participant "Order Service\nDomain Logic" as OrderSvc
+participant "Notification\nService" as Notify
+database "PostgreSQL\norders / services" as DB
+database "Object Storage\nDocument Files" as Storage
+
+== PHASE 1: BROWSE & SELECT — تصفح واختيار الخدمة ==
+
+Customer -> Frontend : Browse service catalog
+Frontend -> ServiceAPI : GET /api/v1/services\n?category=legal-services&page=1&limit=20
+ServiceAPI -> DB : SELECT * FROM services\nWHERE is_active = true\nAND category_id = ?
+DB --> ServiceAPI : Paginated service list
+ServiceAPI --> Frontend : 200 { data: [...services], meta: { total, page } }
+Frontend --> Customer : Display service cards
+
+Customer -> Frontend : Search for specific service
+Frontend -> ServiceAPI : GET /api/v1/services\n?q=استشارة قانونية
+ServiceAPI -> DB : Full-text search\nto_tsvector('arabic', name_ar || ' ' || description_ar)
+DB --> ServiceAPI : Search results
+ServiceAPI --> Frontend : 200 { data: [...matching services] }
+
+Customer -> Frontend : View service detail
+Frontend -> ServiceAPI : GET /api/v1/services/slug/{slug}
+ServiceAPI -> DB : SELECT s.*, c.*, AVG(r.rating) as avg_rating\nFROM services s\nJOIN service_categories c\nLEFT JOIN order_ratings r
+DB --> ServiceAPI : { service, category, avg_rating, total_ratings }
+ServiceAPI --> Frontend : 200 { data: { ...serviceInfo, required_documents: [...] } }
+Frontend --> Customer : Show full service detail with requirements
+
+== PHASE 2: ORDER SUBMISSION — تقديم الطلب ==
+
+Customer -> Frontend : Fill order form + upload documents
+Frontend -> Frontend : Collect: notes, documents[file1, file2]
+
+Customer -> Frontend : Submit order
+Frontend -> ServiceAPI : POST /api/v1/orders\n{ serviceId, notes, documents: [...] }
+
+ServiceAPI -> ServiceAPI : Zod validation\n· serviceId: UUID required\n· notes: max 5000 chars\n· documents: valid HTTPS URLs
+
+ServiceAPI -> OrderSvc : submitOrder(dto, customerId)
+
+OrderSvc -> DB : BEGIN TRANSACTION
+
+OrderSvc -> DB : SELECT * FROM services\nWHERE id = ? AND is_active = true
+DB --> OrderSvc : Service record (with required_documents)
+
+alt Service not found or inactive
+  OrderSvc --> ServiceAPI : 404 Not Found
+  ServiceAPI --> Frontend : 404 { error: "Service not found" }
+  Frontend --> Customer : Show error
+else Service valid
+  OrderSvc -> OrderSvc : Validate required documents:\nCheck all required: true docs are provided
+
+  alt Missing required documents
+    OrderSvc --> ServiceAPI : 422 { error: "ORDER_MISSING_DOCUMENTS"\n  details: { missingDocuments: [...] } }
+    ServiceAPI --> Frontend : 422 Validation Error
+    Frontend --> Customer : Highlight missing documents
+  else All documents provided
+    OrderSvc -> OrderSvc : Generate reference_number\nFormat: ORD-YYYYMMDD-XXXX
+
+    OrderSvc -> DB : INSERT INTO orders (\n  customer_id, service_id, status: 'pending',\n  total_amount: service.price, currency: 'SAR',\n  documents: [...], notes, reference_number,\n  status_history: [{ status: 'pending', ... }])
+
+    DB --> OrderSvc : Order created
+
+    note right of OrderSvc
+      **Status Transition:**
+      NULL → pending
+      triggered by: submitOrder()
+    endnote
+
+    OrderSvc -> DB : COMMIT TRANSACTION
+
+    OrderSvc -> Notify : Publish **OrderPlaced** event\n{ orderId, customerId, serviceId,\n  referenceNumber, totalAmount }
+
+    Notify -> Notify : 1. Customer: Order confirmation email\n2. Staff: New order alert (in-app + email)
+
+    OrderSvc --> ServiceAPI : 201 Created
+    ServiceAPI --> Frontend : 201 { data: { id, referenceNumber, status: "pending", ... } }
+    Frontend --> Customer : Confirmation screen\nShow reference number
+  end
+end
+
+== PHASE 3: REVIEW & CLARIFICATION — المراجعة والاستيضاح ==
+
+note over Employee, DB
+  **Manager/Admin assigns order to employee**
+  Only users with role='employee' can be assigned.
+  Assignment auto-transitions pending → in_review.
+endnote
+
+Employee -> ServiceAPI : GET /api/v1/orders?status=pending&assigned_to=null
+ServiceAPI -> DB : SELECT * FROM orders\nWHERE status = 'pending'\nAND assigned_to IS NULL
+DB --> ServiceAPI : Unassigned pending orders
+ServiceAPI --> Employee : 200 { data: [...orders] }
+
+Employee -> ServiceAPI : View order detail
+ServiceAPI -> DB : SELECT * FROM orders WHERE id = ?
+DB --> ServiceAPI : Full order with documents
+ServiceAPI --> Employee : 200 { data: { ...order, documents, notes } }
+
+Employee -> Employee : Review documents:\n· Check national ID validity\n· Verify case documents\n· Assess completeness
+
+alt Documents incomplete or need clarification
+  Employee -> ServiceAPI : PATCH /api/v1/orders/{id}/status\n{ status: "pending", note: "يرجى توفير عقد الملكية" }
+
+  ServiceAPI -> OrderSvc : updateStatus(orderId, "pending", note, employeeId)
+
+  note right of OrderSvc
+    **Status Transition:**
+    in_review → pending
+    (return for clarification)
+  endnote
+
+  OrderSvc -> DB : BEGIN TXN\nUPDATE orders SET status = 'pending'\nAPPEND status_history entry
+  DB --> OrderSvc : Updated
+
+  OrderSvc -> Notify : Publish **OrderStatusChanged**\n{ orderId, oldStatus: in_review,\n  newStatus: pending, note: "طلب مستندات إضافية" }
+
+  Notify -> Customer : Email: "المستندات المطلوبة غير مكتملة"\n+ link to upload portal
+
+  OrderSvc --> ServiceAPI : 200
+  ServiceAPI --> Employee : 200 OK
+
+  Customer -> Frontend : View notification + upload missing docs
+  Frontend -> ServiceAPI : POST /api/v1/orders/{id}/documents\n{ documents: [{ name, url, type }] }
+
+  ServiceAPI -> OrderSvc : uploadDocuments(orderId, documents, customerId)
+
+  OrderSvc -> OrderSvc : Validate:\n· File types against service.required_documents\n· File sizes (max per document)\n· Order not in terminal status
+
+  OrderSvc -> DB : UPDATE orders\nAPPEND documents to JSONB array
+  DB --> OrderSvc : Documents appended
+
+  OrderSvc -> Notify : Publish **DocumentsUploaded**\n{ orderId, documentCount }
+
+  OrderSvc --> ServiceAPI : 200
+  ServiceAPI --> Customer : Confirmation: documents uploaded
+
+  Customer -> ServiceAPI : Response: "تم رفع المستندات المطلوبة"
+
+  note over Employee
+    Employee notified of
+    customer response.
+    Resumes review.
+  endnote
+end
+
+Employee -> ServiceAPI : PATCH /api/v1/orders/{id}/status\n{ status: "in_review" }
+ServiceAPI -> OrderSvc : updateStatus(orderId, "in_review")
+
+note right of OrderSvc
+  **Status Transition:**
+  pending → in_review
+  triggered by: employee accepting order
+endnote
+
+OrderSvc -> DB : UPDATE orders SET status = 'in_review'\nAPPEND status_history
+OrderSvc -> Notify : Publish **OrderStatusChanged**\n(oldStatus: pending → newStatus: in_review)
+Notify -> Customer : Email: "جاري مراجعة طلبك"
+
+== PHASE 4: PROCESSING — المعالجة ==
+
+Employee -> Employee : All documents verified ✓
+Employee -> ServiceAPI : PATCH /api/v1/orders/{id}/status\n{ status: "in_progress", note: "بدء معالجة الطلب" }
+
+ServiceAPI -> OrderSvc : updateStatus(orderId, "in_progress")
+
+note right of OrderSvc
+  **Status Transition:**
+  in_review → in_progress
+  guard: all required docs verified
+endnote
+
+OrderSvc -> OrderSvc : Validate documents:\nAll required documents must be verified = true
+
+alt Documents not verified
+  OrderSvc --> ServiceAPI : 422 { error: "DOCUMENTS_NOT_VERIFIED" }
+else All verified
+  OrderSvc -> DB : BEGIN TXN\nUPDATE orders SET status = 'in_progress'\nAPPEND status_history
+  DB --> OrderSvc : Updated
+
+  OrderSvc -> Notify : Publish **OrderStatusChanged**\n(oldStatus: in_review → newStatus: in_progress)
+
+  Notify -> Customer : Email: "طلبك قيد المعالجة"
+  Notify -> Employee : In-app: "تم تحديث حالة الطلب"
+
+  OrderSvc --> ServiceAPI : 200
+  ServiceAPI --> Employee : 200
+
+  loop Processing work (variable duration)
+    Employee -> Employee : Perform service work\n· Legal consultation\n· Document preparation\n· Case analysis
+
+    opt Customer requests status update
+      Customer -> ServiceAPI : GET /api/v1/orders/{id}
+      ServiceAPI -> DB : SELECT * FROM orders WHERE id = ?
+      DB --> ServiceAPI : Current status
+      ServiceAPI --> Customer : 200 { status: "in_progress", ... }
+    end
+  end
+end
+
+== PHASE 5: COMPLETION — إكمال الطلب ==
+
+Employee -> ServiceAPI : PATCH /api/v1/orders/{id}/status\n{ status: "completed", note: "تم الانتهاء من الاستشارة" }
+
+ServiceAPI -> OrderSvc : updateStatus(orderId, "completed")
+
+note right of OrderSvc
+  **Status Transition:**
+  in_progress → completed (TERMINAL)
+  guard: all documents verified
+endnote
+
+OrderSvc -> DB : BEGIN TXN\nUPDATE orders SET\n  status = 'completed',\n  completed_at = NOW()\nAPPEND status_history
+DB --> OrderSvc : Updated
+
+OrderSvc -> Notify : Publish **OrderCompleted**\n{ orderId, customerId, completedBy, completedAt }
+
+Notify -> Customer : Email: "تم إكمال طلبك - يرجى التقييم"\n+ link to rating page
+Notify -> Employee : In-app: "تم إكمال الطلب بنجاح"
+
+OrderSvc --> ServiceAPI : 200
+ServiceAPI --> Employee : 200 OK
+
+== PHASE 6: RATING — التقييم ==
+
+Customer -> Frontend : Rate the service
+Frontend -> ServiceAPI : POST /api/v1/orders/{id}/rate\n{ rating: 5, comment: "خدمة ممتازة وسريعة" }
+
+ServiceAPI -> OrderSvc : rateOrder(orderId, rating, comment, customerId)
+
+OrderSvc -> OrderSvc : Validate:\n· Order status = 'completed'\n· Order belongs to customer\n· Not already rated\n· Rating in range 1-5
+
+alt Validation fails
+  OrderSvc --> ServiceAPI : 422 / 409 error
+  ServiceAPI --> Customer : Error message
+else Valid rating
+  OrderSvc -> DB : UPDATE orders SET\n  rating = 5, rating_comment = '...',\n  rated_at = NOW()
+  DB --> OrderSvc : Rating saved
+
+  OrderSvc -> Notify : Publish **ServiceRated**\n{ orderId, serviceId, rating, comment }
+
+  Notify -> Employee : In-app: "تقييم جديد: 5/5"
+
+  OrderSvc --> ServiceAPI : 200
+  ServiceAPI --> Customer : 200 { data: { rating, ratedAt } }
+end
+
+== ALTERNATIVE PATH: CANCELLATION — مسار الإلغاء ==
+
+note over Customer, DB
+  **Cancellation Path:**
+  Any non-terminal status (pending, in_review, in_progress)
+  can transition to cancelled with reason.
+  Only Admin can reopen cancelled orders.
+endnote
+
+alt Customer requests cancellation (status = pending)
+  Customer -> ServiceAPI : POST /api/v1/orders/{id}/cancel\n{ reason: "تغيرت احتياجاتي" }
+
+  ServiceAPI -> OrderSvc : updateStatus(orderId, "cancelled", cancelReason)
+
+  note right of OrderSvc
+    **Status Transition:**
+    pending → cancelled
+    guard: cancel_reason required
+  endnote
+
+  OrderSvc -> DB : UPDATE orders SET\n  status = 'cancelled',\n  cancelled_at = NOW(),\n  cancel_reason = ?
+  DB --> OrderSvc : Cancelled
+
+  OrderSvc -> Notify : Publish **OrderCancelled**\n{ orderId, reason, cancelledBy }
+
+  Notify -> Customer : Email: "تم إلغاء طلبك"
+  Notify -> Employee : In-app: "تم إلغاء الطلب"
+
+  OrderSvc --> ServiceAPI : 200
+end
+
+== TIMEOUT HANDLING — معالجة انتهاء المهلة ==
+
+note over OrderSvc, DB
+  **Order Timeout Handling:**
+  · Pending orders with no employee action > 72h:
+    escalate to Manager
+  · In_review orders with no status change > 48h:
+    notify assigned employee
+  · In_progress orders exceeding estimated_duration_days:
+    alert employee + manager
+  · Completed orders with no rating > 14 days:
+    send reminder to customer
+endnote
+
+OrderSvc -> DB : Scheduled cron: Check stale orders\nSELECT * FROM orders\nWHERE status IN ('pending','in_review','in_progress')\nAND updated_at < NOW() - INTERVAL '72 hours'
+
+alt Stale order detected
+  OrderSvc -> Notify : Publish escalation alert\n{ orderId, staleSince, currentStatus }
+  Note over Notify : Escalation to Manager + assigned Employee
+end
+
+== FULL STATUS TRANSITION SUMMARY ==
+
+note over Customer, DB
+  |= From |= To |= Who |= Condition |
+  | **draft** | pending | Customer | Submit complete order |
+  | **pending** | in_review | Employee/System | Auto on assignment |
+  | **pending** | cancelled | Customer/Admin | With cancel_reason |
+  | **pending** | rejected | Employee | With rejection note |
+  | **in_review** | in_progress | Employee | All docs verified |
+  | **in_review** | cancelled | Admin | With cancel_reason |
+  | **in_review** | rejected | Employee | With rejection note |
+  | **in_review** | pending | Employee | Request more docs |
+  | **in_progress** | completed | Employee | Service work done |
+  | **in_progress** | cancelled | Admin | With cancel_reason |
+  | **completed** | → TERMINAL | — | No further transitions |
+  | **cancelled** | → TERMINAL | — | Only Admin can reopen to pending |
+  | **rejected** | → TERMINAL | — | Only Admin can reopen to pending |
+endnote
+
+@enduml
