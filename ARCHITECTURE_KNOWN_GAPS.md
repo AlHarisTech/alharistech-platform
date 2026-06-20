@@ -17,7 +17,8 @@
 - This applies to development only. Production deployment strategy is not yet determined.
 
 ### Known Architectural Risks
-1. **CRBL Centralization:** ContractGuard, PolicyGuard, ContractPipe, ContractInterceptor, EventValidator, and SchemaRegistry all live in the same NestJS process. If CRBL grows further, it may need extraction into a dedicated enforcement service.
+1. **CRBL-001 — ContractPipe DTO Validation Not Active:** `resolveSchema()`, `extractPath()`, and `extractMethod()` in `contract.pipe.ts` are placeholders returning `undefined`, `"/"`, and `"POST"`. The pipe exists in the NestJS lifecycle but does not resolve OpenAPI schemas for actual DTO validation. HTTP enforcement is at ~85-90% — ContractGuard, PolicyGuard, and ContractInterceptor are active; ContractPipe is structurally present but functionally dormant. Planned activation: Sprint 1 bootstrap before first feature.
+2. **CRBL Centralization:** ContractGuard, PolicyGuard, ContractPipe, ContractInterceptor, EventValidator, and SchemaRegistry all live in the same NestJS process. If CRBL grows further, it may need extraction into a dedicated enforcement service.
 2. **EventValidator Runtime Gap:** EventValidator is implemented but BullMQ worker infrastructure is not yet deployed. Event enforcement exists in code but cannot be tested end-to-end without a running worker.
 3. **Single Database Instance:** Current design assumes a single PostgreSQL instance. Read replicas for analytics and horizontal scaling are designed but not implemented.
 4. **No Observability Stack:** Prometheus, Grafana, OpenTelemetry are specified but not configured. Development relies on console logging.

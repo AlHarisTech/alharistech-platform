@@ -70,8 +70,9 @@ export class ContractPipe implements PipeTransform {
     return value;
   }
 
-  private canValidate(metatype: any): boolean {
-    const types: Function[] = [String, Boolean, Number, Array, Object];
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+  private canValidate(metatype: new (...args: unknown[]) => unknown): boolean {
+    const types: Array<new (...args: unknown[]) => unknown> = [String, Boolean, Number, Array, Object];
     return !types.includes(metatype);
   }
 

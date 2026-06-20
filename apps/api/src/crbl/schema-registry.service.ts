@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit, Logger, Inject, Optional } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as yaml from 'js-yaml';
 import Ajv, { ValidateFunction } from 'ajv';
 import { CRBL_CONFIG, CrblConfig, DEFAULT_CRBL_CONFIG } from './crbl.constants';
 
@@ -700,10 +701,9 @@ export class SchemaRegistry implements OnModuleInit {
 
   private parseYaml(content: string): ParsedYaml | null {
     try {
-      const yaml = require('js-yaml');
       return yaml.load(content) as ParsedYaml;
     } catch {
-      this.logger.error('js-yaml is not installed. Run: pnpm add js-yaml @types/js-yaml --filter @aht/api');
+      this.logger.error('Failed to parse YAML content');
       return null;
     }
   }
