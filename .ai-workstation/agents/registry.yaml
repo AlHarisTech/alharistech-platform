@@ -1,0 +1,154 @@
+# Agent Registry
+# AlharisTech Platform — Agent Role Definitions
+
+version: "1.0"
+project: "alharistech"
+
+agents:
+
+  architect:
+    id: "agent-architect"
+    role: "Architect"
+    description: "Makes architecture decisions, writes ADRs, designs system structure"
+    capabilities:
+      - "architecture_design"
+      - "adr_authoring"
+      - "c4_diagramming"
+      - "technology_selection"
+      - "architecture_review"
+    context_files:
+      - ".ai-workstation/project-context.md"
+      - ".ai-workstation/architecture-context.md"
+      - "docs/architecture/enterprise-architecture.md"
+      - "docs/adr/*.md"
+    prompts: "architect-system.md"
+    tools:
+      - "plantuml"
+      - "adr_template"
+
+  spec_writer:
+    id: "agent-spec-writer"
+    role: "Specification Writer"
+    description: "Writes domain specifications, user stories, acceptance criteria"
+    capabilities:
+      - "specification_writing"
+      - "user_story_definition"
+      - "acceptance_criteria"
+      - "data_modeling"
+      - "api_contract_design"
+    context_files:
+      - ".ai-workstation/project-context.md"
+      - "docs/requirements/prd.md"
+      - "docs/requirements/system-requirements.md"
+      - "specs/spec-governance.md"
+    prompts: "spec-writer.md"
+    tools:
+      - "spec_template"
+      - "speckit_specify"
+
+  developer:
+    id: "agent-developer"
+    role: "Developer"
+    description: "Implements features, writes code, creates tests"
+    capabilities:
+      - "code_generation"
+      - "test_writing"
+      - "refactoring"
+      - "debugging"
+      - "code_review"
+    context_files:
+      - ".ai-workstation/project-context.md"
+      - ".ai-workstation/architecture-context.md"
+      - "architecture/coding-standards.md"
+      - "architecture/api-standards.md"
+      - "architecture/security-standards.md"
+    prompts: "developer.md"
+    tools:
+      - "speckit_implement"
+
+  reviewer:
+    id: "agent-reviewer"
+    role: "Code Reviewer"
+    description: "Reviews code for quality, security, architecture compliance"
+    capabilities:
+      - "code_review"
+      - "security_audit"
+      - "architecture_compliance_check"
+      - "test_coverage_analysis"
+      - "performance_review"
+    context_files:
+      - ".ai-workstation/architecture-context.md"
+      - ".governance/enforcement.yaml"
+      - "architecture/coding-standards.md"
+      - "architecture/security-standards.md"
+    prompts: "reviewer.md"
+    tools:
+      - "speckit_converge"
+      - "speckit_analyze"
+
+  devops:
+    id: "agent-devops"
+    role: "DevOps Engineer"
+    description: "Manages CI/CD, infrastructure, deployments, monitoring"
+    capabilities:
+      - "ci_cd_pipeline"
+      - "infrastructure_as_code"
+      - "deployment"
+      - "monitoring_setup"
+      - "backup_management"
+    context_files:
+      - ".ai-workstation/project-context.md"
+      - "infrastructure/"
+    prompts: "devops.md"
+    tools:
+      - "docker"
+      - "github_actions"
+
+  pm:
+    id: "agent-pm"
+    role: "Product Manager"
+    description: "Manages product backlog, priorities, roadmap"
+    capabilities:
+      - "backlog_management"
+      - "priority_triage"
+      - "roadmap_planning"
+      - "stakeholder_communication"
+    context_files:
+      - "docs/vision/README.md"
+      - "docs/business/README.md"
+      - "docs/roadmap/README.md"
+      - "tasks/implementation-master-plan.md"
+    prompts: "pm.md"
+
+  qa:
+    id: "agent-qa"
+    role: "QA Engineer"
+    description: "Validates features, writes test scenarios, performs testing"
+    capabilities:
+      - "test_scenario_design"
+      - "e2e_testing"
+      - "regression_testing"
+      - "performance_testing"
+      - "bug_reporting"
+    context_files:
+      - "docs/requirements/system-requirements.md"
+      - "specs/"
+    prompts: "qa.md"
+    tools:
+      - "speckit_checklist"
+      - "speckit_converge"
+
+  security:
+    id: "agent-security"
+    role: "Security Engineer"
+    description: "Ensures platform security, audits, penetration testing"
+    capabilities:
+      - "threat_modeling"
+      - "security_audit"
+      - "penetration_testing"
+      - "compliance_check"
+      - "secret_management"
+    context_files:
+      - "architecture/security-standards.md"
+      - ".governance/enforcement.yaml"
+    prompts: "security.md"

@@ -1,0 +1,157 @@
+@startuml domain-map
+' ============================================================
+' AlharisTech Platform — Domain Map (Bounded Contexts)
+' DDD-style bounded contexts with relationship types
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam rectangle {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+  FontColor #1A5276
+  FontStyle bold
+  RoundCorner 10
+  FontSize 11
+}
+
+skinparam package {
+  BackgroundColor #F4F6F7
+  BorderColor #AAB7B8
+  FontColor #2C3E50
+  FontSize 9
+}
+
+skinparam arrow {
+  Color #7F8C8D
+  FontSize 9
+  FontColor #2C3E50
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 9
+}
+
+title **AlharisTech Platform — Domain Map (Bounded Contexts)**
+title **خريطة النطاقات — سياقات محدودة مع علاقات DDD**
+
+legend bottom right
+  |= Relationship |= Legend |
+  | <color:#2980B9>─── U/S ───>| **Upstream/Downstream** — U influences D |
+  | <color:#27AE60>─── P ───>| **Partnership** — Mutual dependency |
+  | <color:#8E44AD>═══ SK ═══| **Shared Kernel** — Shared model |
+  | <color:#E67E22>─── CF ───>| **Conformist** — D conforms to U |
+  | <color:#E74C3C>···· EVT ····>| **Domain Events** — Async events published |
+endlegend
+
+' ============================================================
+' Core Domains
+' ============================================================
+package "Core Domains" #E8F0FE {
+
+  rectangle "**Identity**\n=============\nUser, Role, Permission\nSession, Auth Token\nMFA (future)\n=============\n@alharistech/domain-identity" as DOM_Identity
+
+  rectangle "**Customer**\n=============\nCRM Profile, Company\nTags, History\nSegmentation\n=============\n@alharistech/domain-customer" as DOM_Customer
+
+  rectangle "**Service**\n=============\nService Catalog, Order\nWorkflow, Documents\nAssignment\n=============\n@alharistech/domain-service" as DOM_Service
+
+  rectangle "**Commerce**\n=============\nProduct, Category, Cart\nInventory, Pricing\nDiscounts\n=============\n@alharistech/domain-commerce" as DOM_Commerce
+}
+
+package "Supporting Domains" #E8F8F5 {
+
+  rectangle "**Support**\n=============\nTicket, Knowledge Base\nLive Chat, SLA\nFeedback\n=============\n@alharistech/domain-support" as DOM_Support
+
+  rectangle "**Content**\n=============\nPage, Blog, Media\nSEO, Scheduling\nVersioning\n=============\n@alharistech/domain-content" as DOM_Content
+
+  rectangle "**Notification**\n=============\nEmail, SMS, Push\nTemplate, Preference\nDelivery Log\n=============\n@alharistech/domain-notification" as DOM_Notification
+}
+
+package "Intelligence & Analytics" #FDEBD0 {
+
+  rectangle "**Analytics**\n=============\nReport, Dashboard\nKPI, Export\nTrend Engine\n=============\n@alharistech/domain-analytics" as DOM_Analytics
+
+  rectangle "**AI**\n=============\nAgent, RAG Pipeline\nEmbedding, Prompt\nModel Router\n=============\n@alharistech/domain-ai" as DOM_AI
+}
+
+' ============================================================
+' Relationship Types
+' ============================================================
+' Upstream/Downstream
+DOM_Identity -[#2980B9]down-> DOM_Customer : "U/S\nIdentity validates\ncustomer users"
+DOM_Identity -[#2980B9]down-> DOM_Service : "U/S\nIdentity validates\nstaff users"
+
+' Partnership (mutual dependency)
+DOM_Customer -[#27AE60]down-> DOM_Service : "P\nCustomer requests\nservices; Service\nreferences customer"
+DOM_Service -[#27AE60]down-> DOM_Commerce : "P\nService orders\ngenerate invoices\nin Commerce"
+
+' Shared Kernel
+DOM_Notification -[#8E44AD]down-> DOM_Identity : "SK\nShared user\ncontact model"
+DOM_Notification -[#8E44AD]down-> DOM_Customer : "SK\nShared contact\npreferences"
+
+' Conformist
+DOM_Commerce -[#E67E22]down-> DOM_Notification : "CF\nCommerce conforms\nto Notification\ncontracts"
+DOM_Support -[#E67E22]down-> DOM_Notification : "CF\nSupport conforms\nto Notification\ncontracts"
+DOM_Content -[#E67E22]down-> DOM_Notification : "CF\nContent conforms\nto Notification\ncontracts"
+
+' Analytics reads from multiple domains
+DOM_Analytics -[#7F8C8D]up-> DOM_Customer : "Reads customer\ndata"
+DOM_Analytics -[#7F8C8D]up-> DOM_Service : "Reads service\ndata"
+DOM_Analytics -[#7F8C8D]up-> DOM_Commerce : "Reads sales\ndata"
+
+' AI integrates with multiple domains
+DOM_AI -[#27AE60]up-> DOM_Support : "P\nAI enhances\nsupport tickets"
+DOM_AI -[#27AE60]up-> DOM_Content : "P\nAI generates\ncontent"
+DOM_AI -[#7F8C8D]up-> DOM_Customer : "Reads customer\ndata for insights"
+
+' ============================================================
+' Domain Events
+' ============================================================
+note right of DOM_Identity
+  **Published Events:**
+  · UserRegistered
+  · UserLoggedIn
+  · UserLoggedOut
+  · PasswordChanged
+  · RoleAssigned
+endnote
+
+note right of DOM_Service
+  **Published Events:**
+  · OrderPlaced
+  · OrderStatusChanged
+  · OrderAssigned
+  · OrderCompleted
+  · DocumentUploaded
+endnote
+
+note right of DOM_Commerce
+  **Published Events:**
+  · PaymentCompleted
+  · InvoiceGenerated
+  · ProductPurchased
+  · CartAbandoned
+endnote
+
+note right of DOM_Support
+  **Published Events:**
+  · TicketOpened
+  · TicketAssigned
+  · TicketResolved
+  · TicketClosed
+endnote
+
+note right of DOM_Notification
+  **Published Events:**
+  · NotificationSent
+  · EmailDelivered
+  · SMSDelivered
+  · PushDelivered
+  · NotificationFailed
+endnote
+
+@enduml

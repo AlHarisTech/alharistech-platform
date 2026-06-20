@@ -1,0 +1,219 @@
+@startuml infrastructure-topology
+' ============================================================
+' AlharisTech Platform — Infrastructure Topology
+' Development (Docker Compose) → Staging (Swarm/Compose) → Production (Kubernetes)
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam node {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+  FontColor #1A5276
+  FontSize 9
+}
+
+skinparam database {
+  BackgroundColor #D5F5E3
+  BorderColor #27AE60
+  FontSize 9
+}
+
+skinparam cloud {
+  BackgroundColor #FDEBD0
+  BorderColor #E67E22
+}
+
+skinparam package {
+  BackgroundColor #F4F6F7
+  BorderColor #AAB7B8
+  FontColor #2C3E50
+  FontSize 11
+  FontStyle bold
+}
+
+skinparam frame {
+  BackgroundColor #FEFEFE
+  BorderColor #BDC3C7
+  FontColor #2C3E50
+  FontSize 11
+  FontStyle bold
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 9
+}
+
+title **AlharisTech Platform — Infrastructure Topology**
+title **طوبولوجيا البنية التحتية: تطوير → تجربة → إنتاج**
+
+' ============================================================
+' DEVELOPMENT ENVIRONMENT
+' ============================================================
+frame "**Development** — Local (Docker Compose)\nبيئة التطوير المحلية" {
+
+  package "Docker Compose: alharistech-dev" #E8F0FE {
+
+    node "**web-dev**\n@alharistech/web\nNext.js dev server\nPort: 3000\nHot reload: ✓" as DevWeb
+    node "**admin-dev**\n@alharistech/admin\nNext.js dev server\nPort: 3001\nHot reload: ✓" as DevAdmin
+    node "**api-dev**\n@alharistech/api\nNestJS --watch\nPort: 4000\nHot reload: ✓" as DevAPI
+
+    database "**postgres-dev**\nPostgreSQL 16\nPort: 5432\nUser: alharistech\nDB: alharistech_dev" as DevPG
+    database "**redis-dev**\nRedis 7.2\nPort: 6379\nMemory: 256 MB" as DevRedis
+    database "**minio-dev**\nMinIO (S3-compatible)\nPort: 9000 (API)\nPort: 9001 (Console)\nBuckets: alharistech" as DevMinio
+
+    node "**mailhog-dev**\nEmail catcher\nPort: 1025 (SMTP)\nPort: 8025 (Web UI)" as DevMailhog
+  }
+
+  package "Local Network: alharistech-net" #F4F6F7 {
+    node "**Networks**\nBridge: alharistech-net\nSubnet: 172.20.0.0/16" as DevNet
+  }
+
+  package "Volumes (persistent)" #F5EEF8 {
+    database "**postgres_data**\nLocal volume\nDB data persistence" as DevVolPG
+    database "**redis_data**\nLocal volume\nAOF + RDB" as DevVolRedis
+    database "**minio_data**\nLocal volume\nS3 file storage" as DevVolMinio
+  }
+}
+
+' ============================================================
+' STAGING ENVIRONMENT
+' ============================================================
+frame "**Staging** — Docker Swarm / Compose (VM)\nبيئة التجربة" {
+
+  package "Docker Compose: alharistech-staging" #E8F8F5 {
+
+    node "**web-staging (×2)**\nNext.js production build\nPort: 3000 (internal)\nReplicas: 2" as StgWeb
+    node "**admin-staging (×1)**\nNext.js production build\nPort: 3001 (internal)" as StgAdmin
+    node "**api-staging (×3)**\nNestJS production\nPort: 4000 (internal)\nReplicas: 3" as StgAPI
+
+    node "**nginx-staging**\nReverse Proxy\nPort: 443 (HTTPS)\nSSL: Let's Encrypt\nRate limiting: enabled" as StgNginx
+
+    database "**postgres-staging**\nPostgreSQL 16\nPort: 5432\nDB: alharistech_staging\nDaily snapshots" as StgPG
+    database "**redis-staging**\nRedis 7.2\nPort: 6379\nPersistence: AOF" as StgRedis
+    database "**minio-staging**\nMinIO\nPort: 9000" as StgMinio
+
+    node "**bullmq-staging (×2)**\nBackground workers\nEmail · SMS · PDF" as StgBull
+  }
+}
+
+' ============================================================
+' PRODUCTION ENVIRONMENT
+' ============================================================
+frame "**Production** — Kubernetes (Cloud)\nبيئة الإنتاج" {
+
+  package "Kubernetes Cluster: prod" #D5F5E3 {
+
+    package "Namespace: alharistech-prod" {
+
+      package "Deployment: web-prod" #E8F0FE {
+        node "**web (×4 pods)**\nNext.js (standalone)\nLimits: 2 CPU, 1 GB\nRequests: 1 CPU, 512 MB" as ProdWeb
+      }
+
+      package "Deployment: admin-prod" #E8F0FE {
+        node "**admin (×2 pods)**\nNext.js (standalone)\nLimits: 2 CPU, 1 GB" as ProdAdmin
+      }
+
+      package "Deployment: api-prod" #E8F0FE {
+        node "**api (×6 pods)**\nNestJS (standalone)\nLimits: 2 CPU, 2 GB\nRequests: 1 CPU, 1 GB\nHPA: min 4, max 12" as ProdAPI
+      }
+
+      package "Deployment: workers" #FDEBD0 {
+        node "**bullmq (×4 pods)**\nJob processors\nLimits: 1 CPU, 1 GB\nHPA: based on queue depth" as ProdBull
+      }
+
+      package "Deployment: ai-gateway" #F5EEF8 {
+        node "**ai-gateway (×2 pods)**\nAI model router\nLimits: 2 CPU, 2 GB" as ProdAI
+      }
+
+      package "StatefulSet: postgres" #D5F5E3 {
+        database "**postgres-primary**\nPostgreSQL 16\n4 CPU, 16 GB RAM\nPVC: 500 GB SSD" as ProdPG
+        database "**postgres-replica (×2)**\nPostgreSQL Read Replicas\n4 CPU, 16 GB each" as ProdPGRep
+      }
+
+      package "StatefulSet: redis" #D5F5E3 {
+        database "**redis-primary**\nRedis 7.2\n2 CPU, 8 GB RAM\nPVC: 50 GB" as ProdRedis
+        database "**redis-replica (×2)**\nRedis Replicas" as ProdRedisRep
+      }
+
+      package "Service: s3" #FCF3CF {
+        database "**s3 / MinIO**\nObject Storage\nManaged (AWS S3 / MinIO)" as ProdS3
+      }
+    }
+
+    package "Namespace: monitoring" #FDEDEC {
+      node "**prometheus (×1)**\nMetrics + AlertManager" as ProdProm
+      node "**grafana (×1)**\nDashboards" as ProdGrafana
+      node "**loki (×1)**\nLog aggregation" as ProdLoki
+      node "**jaeger (×1)**\nDistributed tracing" as ProdJaeger
+    }
+
+    package "Ingress / Service Mesh" #F4F6F7 {
+      node "**nginx-ingress**\nK8s Ingress Controller\nTLS termination\nWAF rules" as ProdIngress
+      node "**cert-manager**\nAuto TLS certificates\nLet's Encrypt" as ProdCert
+    }
+  }
+}
+
+' ============================================================
+' CONNECTIONS + DATA FLOW
+' ============================================================
+' Dev connections
+DevWeb -down-> DevAPI : "JSON/HTTP"
+DevAdmin -down-> DevAPI : "JSON/HTTP"
+DevAPI -down-> DevPG : "SQL/TCP"
+DevAPI -down-> DevRedis : "Redis/TCP"
+DevAPI -down-> DevMinio : "S3/HTTP"
+DevAPI -down-> DevMailhog : "SMTP"
+DevPG ..> DevVolPG : "persists"
+DevRedis ..> DevVolRedis : "persists"
+DevMinio ..> DevVolMinio : "persists"
+
+' Staging connections
+StgNginx -down-> StgWeb : "proxy"
+StgNginx -down-> StgAdmin : "proxy"
+StgNginx -down-> StgAPI : "proxy"
+StgAPI -down-> StgPG : "SQL"
+StgAPI -down-> StgRedis : "Redis"
+StgAPI -down-> StgMinio : "S3"
+StgBull -down-> StgRedis : "BullMQ"
+
+' Production connections
+ProdIngress -down-> ProdWeb : "route: /*"
+ProdIngress -down-> ProdAdmin : "route: /admin/*"
+ProdIngress -down-> ProdAPI : "route: /api/*"
+ProdAPI -down-> ProdPG : "Write"
+ProdAPI -down-> ProdPGRep : "Read"
+ProdAPI -down-> ProdRedis : "Cache/Queue"
+ProdAPI -down-> ProdS3 : "File storage"
+ProdBull -down-> ProdRedis : "BullMQ jobs"
+ProdAI -down-> ProdAPI : "AI requests"
+ProdCert ..> ProdIngress : "TLS certs"
+ProdProm .up.> ProdAPI : "scrape"
+ProdProm .up.> ProdPG : "exporter"
+ProdLoki .up.> ProdAPI : "logs"
+
+' ============================================================
+' COMPARISON TABLE
+' ============================================================
+note bottom of ProdCert
+  **Environment Comparison:**
+  |===
+  | Aspect | Development | Staging | Production |
+  | **Orchestration** | Docker Compose | Docker Swarm/Compose | Kubernetes |
+  | **Replicas (api)** | 1 | 3 | 4-12 (HPA) |
+  | **Database** | Single instance | Single | Primary + 2 Replicas |
+  | **Redis** | Single | Single | Primary + 2 Replicas |
+  | **TLS** | ✗ (localhost) | Let's Encrypt | cert-manager + Let's Encrypt |
+  | **Monitoring** | ✗ | Basic (Prometheus) | Full stack |
+  | **Backups** | ✗ | Nightly | Continuous (WAL) |
+  | **Scaling** | Manual | Manual (docker compose up --scale) | Auto (HPA) |
+  | **Zero-downtime deploy** | ✗ | ✓ (rolling) | ✓ (rolling + canary) |
+  |===
+endnote
+
+@enduml

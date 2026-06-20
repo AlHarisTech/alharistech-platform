@@ -1,0 +1,256 @@
+@startuml request-lifecycle
+' ============================================================
+' AlharisTech Platform — Request Lifecycle
+' Full HTTP request trace: Browser → CDN → Next.js → API → DB
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 9
+
+skinparam participant {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+  FontSize 9
+}
+
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #E67E22
+}
+
+skinparam database {
+  BackgroundColor #D5F5E3
+  BorderColor #27AE60
+  FontSize 9
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 8
+}
+
+skinparam box {
+  BackgroundColor #F4F6F7
+  BorderColor #AAB7B8
+  FontSize 10
+  FontStyle bold
+}
+
+title **AlharisTech Platform — Full Request Lifecycle**
+title **دورة حياة الطلب: HTTP Request → Response**
+
+actor "Browser\nمتصفح المستخدم" as Browser
+
+box "Edge Network" #E8F0FE
+  participant "CDN\nVercel/CloudFront" as CDN
+endbox
+
+box "Frontend (Next.js)" #FDEBD0
+  participant "Next.js Server\nSSR/ISR/SSG" as NextServer
+  participant "TanStack Query\nClient Cache" as TanstackCache
+  participant "Next.js Middleware\nAuth + Locale" as NextMiddleware
+  participant "SDK Client\n@alharistech/sdk" as SDK
+endbox
+
+box "API Layer (NestJS)" #D5F5E3
+  participant "API Gateway\nNestJS" as Gateway
+  participant "Middleware\nRequest ID, CORS, Helmet" as APIMiddleware
+  participant "Guards\nJWT Auth + RBAC" as Guards
+  participant "Interceptors\nLogging, Response Wrap" as Interceptors
+  participant "Pipes\nZod Validation" as Pipes
+  participant "Controller\nREST / GraphQL" as Controller
+  participant "Application\nService (Use Case)" as AppService
+  participant "Domain\nService (Business Logic)" as DomainService
+  participant "Repository\nData Access (Prisma)" as Repository
+endbox
+
+box "Data Layer" #F5EEF8
+  database "Redis\nCache / Session" as Redis
+  database "PostgreSQL\nPrimary Database" as DB
+  database "S3/MinIO\nFile Storage" as S3
+endbox
+
+box "External Services" #FDEDEC
+  participant "Payment Gateway\nStripe/Moyasar" as Payment
+  participant "Email/SMS\nProviders" as Notify
+endbox
+
+== REQUEST FLOW — Client → CDN → API → Database → Response ==
+
+Browser -> CDN : GET https://alharistech.com/ar/orders/123
+
+alt CDN Cache Hit (static assets / ISR page)
+  CDN -> CDN : Check cache key\n(URL + headers)
+  note right of CDN
+    **CDN Caching Strategy:**
+    · Static assets: 1 hour
+    · ISR pages: revalidate on demand
+    · API responses: no-cache for auth'd data
+    · ETag / Last-Modified headers
+  endnote
+  CDN --> Browser : 200 OK (cached)\nAge: 3600, X-Cache: HIT
+else CDN Cache Miss (dynamic/authenticated)
+  CDN -> NextServer : Proxy request
+
+  NextServer -> NextMiddleware : Middleware runs
+  NextMiddleware -> NextMiddleware : 1. Parse locale from path (/ar/...)\n2. Check auth cookie (refreshToken)\n3. Set X-Tenant-Id header\n4. Apply CSP headers
+
+  alt Auth required and no valid cookie
+    NextMiddleware --> NextServer : Redirect to /ar/login
+    NextServer --> Browser : 302 /ar/login
+  else Auth valid or public route
+    NextMiddleware -> NextServer : Continue
+
+    NextServer -> NextServer : Decide rendering:\nSSR vs ISR vs SSG
+
+    alt SSR (dynamic data needed)
+      NextServer -> TanstackCache : Check query cache\n(queryKey, staleTime)
+
+      alt Cache hit (fresh)
+        TanstackCache --> NextServer : Cached data
+        note right of TanstackCache
+          **TanStack Query Cache:**
+          · staleTime: 5 minutes
+          · gcTime: 30 minutes
+          · In-memory (server-side)
+          · Cache key: [resource, params]
+        endnote
+      else Cache miss or stale
+        TanstackCache -> SDK : fetch data (stale → revalidate)
+        SDK -> Gateway : GET /api/v1/orders/123\nAuthorization: Bearer <jwt>\nX-Request-Id: uuid\nX-Tenant-Id: tenant_xxx
+
+        Gateway -> APIMiddleware : Request enters API
+
+        APIMiddleware -> APIMiddleware : 1. Generate/X-Request-Id\n2. CORS check\n3. Helmet security headers\n4. Compression
+
+        APIMiddleware -> Guards : Pass to guards chain
+
+        Guards -> Guards : **JwtAuthGuard**:\n· Extract JWT from header\n· Verify signature + expiry\n· Decode payload → req.user
+
+        alt JWT invalid/expired
+          Guards --> Gateway : 401 Unauthorized
+          Gateway --> SDK : 401
+          SDK -> SDK : Trigger token refresh\nPOST /api/v1/auth/refresh
+          SDK -> Gateway : Retry original request\nwith new accessToken
+        else JWT valid
+          Guards -> Guards : **RolesGuard**:\nCheck user.role ∈ allowed roles
+
+          alt Role insufficient
+            Guards --> Gateway : 403 Forbidden
+            Gateway --> SDK : 403
+          else Role allowed
+            Guards -> Guards : **PermissionGuard**:\nCheck required perms ∈ user.permissions
+
+            alt Permission denied
+              Guards --> Gateway : 403 Forbidden
+              Gateway --> SDK : 403
+            else Permission granted
+              Guards -> Interceptors : Pass to interceptors
+
+              Interceptors -> Interceptors : **LoggingInterceptor**:\nLog: method, path, userId, requestId
+
+              Interceptors -> Interceptors : **ResponseTimeInterceptor**:\nStart timer
+
+              Interceptors -> Pipes : Pass to validation pipes
+
+              Pipes -> Pipes : **ZodValidationPipe**:\n· Parse & validate params/body\n· whitelist: strip unknowns\n· forbidNonWhitelisted\n· transform types
+
+              alt Validation fails
+                Pipes --> Gateway : 400 Bad Request\n{ error, details }
+                Gateway --> SDK : 400
+              else Validation passes
+                Pipes -> Controller : Validated DTO
+
+                Controller -> AppService : getOrderById(id, user)
+
+                AppService -> AppService : Orchestrate use case:\n· Validate order exists\n· Check data-level access\n  (customer can only see own)
+
+                AppService -> Redis : Check application cache\nKEY: "order:123"
+
+                alt Cache hit (Redis)
+                  Redis --> AppService : Cached data
+                else Cache miss
+                  AppService -> DomainService : Process business logic
+
+                  DomainService -> DomainService : · Apply business rules\n· Calculate derived values\n· Enforce invariants
+
+                  DomainService -> Repository : findById(id)
+
+                  Repository -> Repository : Build Prisma query:\n· WHERE id = ?\n· Include relations\n· Apply data-level scope
+
+                  Repository -> DB : SELECT * FROM orders\nWHERE id = '123'\nAND customer_id = 'user-456'
+
+                  alt Database read replica available
+                    note right of DB
+                      **Read/Write Split:**
+                      · Reads → Read Replica
+                      · Writes → Primary
+                      · Managed by Prisma
+                    endnote
+                  end
+
+                  DB --> Repository : Order row + relations
+
+                  Repository --> DomainService : Order entity
+
+                  DomainService --> AppService : Domain result
+
+                  AppService -> Redis : SET "order:123" <data>\nEX 300 (5 min TTL)
+                end
+
+                AppService --> Controller : Order DTO
+
+                Controller -> Controller : Serialize response\n(remove sensitive fields)
+
+                Controller --> Interceptors : Response data
+
+                Interceptors -> Interceptors : **WrapResponseInterceptor**:\nWrap in envelope:\n{ data, meta: { requestId, timestamp } }
+
+                Interceptors -> Interceptors : **ResponseTimeInterceptor**:\nAdd X-Response-Time header
+
+                Interceptors --> Gateway : Formatted response
+
+                Gateway -> APIMiddleware : Response passes back\nthrough middleware
+
+                APIMiddleware -> APIMiddleware : Add security headers\n· X-Content-Type-Options: nosniff\n· X-Frame-Options: DENY\n· Referrer-Policy: strict-origin\n· Strict-Transport-Security
+
+                Gateway --> SDK : 200 { data: { order },\n  meta: { requestId, timestamp } }
+                SDK -> SDK : Validate response\nagainst Zod schema
+                SDK --> TanstackCache : Typed response
+
+                TanstackCache -> TanstackCache : Update cache
+                TanstackCache --> NextServer : Data
+
+                NextServer -> NextServer : Render page with data\n(React Server Components)
+                NextServer --> CDN : Rendered HTML
+                CDN -> CDN : Optionally cache\n(ISR with revalidation)
+                CDN --> Browser : 200 OK — Full rendered page
+              end
+            end
+          end
+        end
+      end
+    else ISR (static page, revalidate on demand)
+      NextServer --> CDN : Cached/regenerated HTML
+      CDN --> Browser : 200 OK
+    end
+  end
+end
+
+== CACHING SUMMARY ==
+
+note over Browser, DB
+  **AlharisTech Multi-Layer Caching Strategy:**
+  |===
+  | Layer | Technology | TTL | Scope |
+  | **CDN** | Vercel/CloudFront | 1 hour | Static + ISR pages |
+  | **HTTP** | ETag + Last-Modified | Per-resource | Conditional requests |
+  | **TanStack Query** | In-memory (Next.js server) | 5 min staleTime | Per-page queries |
+  | **Application Cache** | Redis | 5-15 min | API responses |
+  | **Database Cache** | PostgreSQL Shared Buffers | Auto | Query plans + data |
+  |===
+endnote
+
+@enduml

@@ -1,0 +1,85 @@
+# .specify Configuration
+# AlharisTech Platform — Spec-Kit Project Configuration
+
+version: "1.0"
+project:
+  name: "AlharisTech Platform"
+  language: "Arabic (primary), English (secondary)"
+  type: "monorepo"
+  domains: 9
+
+# Spec-Kit commands configuration
+commands:
+  constitution:
+    template: ".docs-runtime/templates/spec-template.md"
+    context:
+      - ".ai-workstation/project-context.md"
+      - "docs/vision/README.md"
+
+  specify:
+    template: ".docs-runtime/templates/spec-template.md"
+    output: "specs/features/{feature-name}/spec.md"
+    context:
+      - "docs/requirements/prd.md"
+      - "docs/requirements/system-requirements.md"
+
+  plan:
+    template: "plan-template.md"
+    output: "specs/features/{feature-name}/plan.md"
+    context:
+      - "docs/architecture/enterprise-architecture.md"
+      - "architecture/coding-standards.md"
+      - "architecture/api-standards.md"
+
+  tasks:
+    template: "tasks-template.md"
+    output: "specs/features/{feature-name}/tasks.md"
+    format: "phased-parallel"
+
+  implement:
+    runner: "opencode"
+    phases:
+      - "setup"
+      - "foundational"
+      - "user-stories"
+      - "polish"
+
+  converge:
+    compare:
+      - "spec.md"
+      - "plan.md"
+      - "tasks.md"
+    against: "codebase"
+
+# Quality gates enforced by spec-kit
+quality:
+  constitution_checks:
+    - "no_more_than_3_clarification_markers"
+    - "all_frs_have_ids"
+    - "all_stories_have_acceptance_criteria"
+    - "architecture_constraints_respected"
+    - "monorepo_structure_followed"
+
+  spec_checks:
+    - "bounded_context_defined"
+    - "aggregates_documented"
+    - "use_cases_complete"
+    - "api_endpoints_defined"
+    - "security_requirements_identified"
+
+# Feature naming convention
+naming:
+  format: "{domain}-{feature-description}"
+  examples:
+    - "identity-auth-registration"
+    - "service-order-workflow"
+    - "commerce-checkout-flow"
+
+# Directory mapping
+directories:
+  specs: "specs/"
+  features: "specs/features/"
+  domains: "specs/domains/"
+  templates: ".docs-runtime/templates/"
+  evidence: ".runtime/evidence/"
+  reports: "reports/"

@@ -1,0 +1,59 @@
+# AlharisTech Platform — Git Ignore
+# Architecture Baseline — No production code in this baseline
+
+# Dependencies (future)
+node_modules/
+.pnpm-store/
+
+# Build output (future)
+.next/
+dist/
+build/
+*.tsbuildinfo
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker (future)
+docker-compose.override.yml
+
+# Database (future)
+*.db
+*.sqlite
+pgdata/
+
+# Logs
+*.log
+logs/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Terraform (future)
+*.tfstate
+*.tfstate.backup
+.terraform/
+
+# Archives
+*.tar.gz
+*.zip
+
+# OpenCode
+.opencode/

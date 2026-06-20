@@ -1,0 +1,241 @@
+# Integration Bridge
+# Maps Spec-Kit ↔ ai-workstation-core ↔ Project Lifecycle
+
+version: "1.0"
+project: "alharistech"
+
+# ─── Pipeline Flow ───
+# This defines the complete flow from Vision to Release
+# and how Spec-Kit and ai-workstation-core coordinate at each stage
+
+pipeline:
+
+  - stage: "constitution"
+    description: "Establish project governing principles"
+    speckit_command: "/speckit.constitution"
+    workstation_action: "Load project-context.md, architecture-context.md"
+    input:
+      - "docs/vision/README.md"
+      - "docs/business/README.md"
+      - ".ai-workstation/project-context.md"
+    output:
+      - ".specify/memory/constitution.md"
+    gate: "G0_Vision"
+    owner: "pm"
+
+  - stage: "specify"
+    description: "Define what to build"
+    speckit_command: "/speckit.specify"
+    workstation_action: "Load PRD, System Requirements, Domain Architecture"
+    input:
+      - "docs/requirements/prd.md"
+      - "docs/requirements/system-requirements.md"
+      - "docs/architecture/enterprise-architecture.md"
+    output:
+      - "specs/domains/{domain}/spec.md"
+    gate: "G1_Requirements"
+    owner: "spec_writer"
+
+  - stage: "clarify"
+    description: "Resolve ambiguities"
+    speckit_command: "/speckit.clarify"
+    workstation_action: "Run 5-question structured clarification"
+    input:
+      - "specs/domains/{domain}/spec.md"
+    output:
+      - "specs/domains/{domain}/spec.md (refined)"
+    gate: null
+    owner: "spec_writer"
+
+  - stage: "plan"
+    description: "Create technical implementation plan"
+    speckit_command: "/speckit.plan"
+    workstation_action: "Load Coding Standards, API Standards, DB Standards"
+    input:
+      - "specs/domains/{domain}/spec.md"
+      - "architecture/coding-standards.md"
+      - "architecture/api-standards.md"
+      - "architecture/database-standards.md"
+    output:
+      - "specs/features/{feature}/plan.md"
+      - "specs/features/{feature}/research.md"
+      - "specs/features/{feature}/data-model.md"
+      - "specs/features/{feature}/contracts/"
+    gate: "G2_Architecture"
+    owner: "architect"
+
+  - stage: "tasks"
+    description: "Generate executable task breakdown"
+    speckit_command: "/speckit.tasks"
+    workstation_action: "Load Implementation Master Plan, Sprint Plan"
+    input:
+      - "specs/features/{feature}/plan.md"
+      - "tasks/implementation-master-plan.md"
+    output:
+      - "specs/features/{feature}/tasks.md"
+    gate: "G3_Design"
+    owner: "developer"
+
+  - stage: "implement"
+    description: "Execute implementation"
+    speckit_command: "/speckit.implement"
+    workstation_action: "Load Developer prompt, Coding Standards, Security Standards"
+    input:
+      - "specs/features/{feature}/tasks.md"
+      - ".ai-workstation/prompts/developer.md"
+    output:
+      - "apps/, packages/, domains/ (code)"
+      - ".runtime/evidence/ (build logs, test results)"
+    gate: "G4_Implementation"
+    owner: "developer"
+
+  - stage: "converge"
+    description: "Assess implementation against specification"
+    speckit_command: "/speckit.converge"
+    workstation_action: "Load Reviewer prompt, Quality Gates"
+    input:
+      - "specs/features/{feature}/spec.md"
+      - "specs/features/{feature}/plan.md"
+      - "specs/features/{feature}/tasks.md"
+      - "apps/, packages/, domains/ (code)"
+    output:
+      - "reports/convergence-report.md"
+      - ".runtime/evidence/convergence-{feature}.yaml"
+    gate: "G5_Validation"
+    owner: "reviewer"
+
+  - stage: "analyze"
+    description: "Cross-artifact consistency check"
+    speckit_command: "/speckit.analyze"
+    workstation_action: "Load Context Map, all specs, all ADRs"
+    input:
+      - "specs/registry/spec-registry.yaml"
+      - ".runtime/context-map.yaml"
+    output:
+      - "reports/cross-artifact-analysis.md"
+    gate: "G5_Validation"
+    owner: "reviewer"
+
+  - stage: "checklist"
+    description: "Generate quality checklist"
+    speckit_command: "/speckit.checklist"
+    workstation_action: "Load Review Checklist Template"
+    input:
+      - "specs/features/{feature}/spec.md"
+      - ".ai-workstation/templates/review-checklist.md"
+    output:
+      - "specs/features/{feature}/checklist.md"
+    gate: "G5_Validation"
+    owner: "qa"
+
+  - stage: "release"
+    description: "Release to production"
+    speckit_command: null
+    workstation_action: "Trigger CI/CD pipeline, run pre-release hooks"
+    input:
+      - "specs/releases/release-tracker.yaml"
+      - "CHANGELOG.md"
+    output:
+      - "Deployed release"
+      - ".runtime/evidence/release-{version}.yaml"
+    gate: "G6_Release"
+    owner: "devops"
+
+# ─── Gate Dependencies ───
+# Maps each gate to the pipeline stages that must complete before it
+
+gates:
+  G0_Vision:
+    requires: ["constitution"]
+  G1_Requirements:
+    requires: ["G0_Vision", "specify"]
+  G2_Architecture:
+    requires: ["G1_Requirements", "clarify", "plan"]
+  G3_Design:
+    requires: ["G2_Architecture", "tasks"]
+  G4_Implementation:
+    requires: ["G3_Design", "implement"]
+  G5_Validation:
+    requires: ["G4_Implementation", "converge", "analyze", "checklist"]
+  G6_Release:
+    requires: ["G5_Validation", "release"]
+  G7_Operations:
+    requires: ["G6_Release"]
+
+# ─── Agent Handoff Protocol ───
+# When one stage completes, which agent takes over the next stage
+
+agent_handoff:
+  constitution → specify:
+    from: "pm"
+    to: "spec_writer"
+    trigger: "Constitution approved"
+
+  specify → clarify:
+    from: "spec_writer"
+    to: "spec_writer"
+    trigger: "Spec draft complete"
+
+  clarify → plan:
+    from: "spec_writer"
+    to: "architect"
+    trigger: "Spec clarified"
+
+  plan → tasks:
+    from: "architect"
+    to: "developer"
+    trigger: "Plan approved"
+
+  tasks → implement:
+    from: "developer"
+    to: "developer"
+    trigger: "Tasks generated"
+
+  implement → converge:
+    from: "developer"
+    to: "reviewer"
+    trigger: "Code complete, tests pass"
+
+  converge → analyze:
+    from: "reviewer"
+    to: "reviewer"
+    trigger: "Convergence check done"
+
+  analyze → checklist:
+    from: "reviewer"
+    to: "qa"
+    trigger: "Analysis clean"
+
+  checklist → release:
+    from: "qa"
+    to: "devops"
+    trigger: "Checklist passed"
+
+# ─── Evidence Collection ───
+# What evidence is collected at each stage
+
+evidence:
+  constitution:
+    - "Constitution approval record"
+  specify:
+    - "Spec review comments"
+    - "Spec approval record"
+  plan:
+    - "ADR references"
+    - "Technology research notes"
+  tasks:
+    - "Task dependency graph"
+  implement:
+    - "Build logs"
+    - "Test results (unit + integration)"
+    - "Coverage report"
+  converge:
+    - "Convergence report (gaps found)"
+  analyze:
+    - "Cross-artifact consistency report"
+  checklist:
+    - "Completed checklist"
+  release:
+    - "Deployment log"
+    - "Smoke test results"
+    - "Release notes"

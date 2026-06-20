@@ -1,0 +1,268 @@
+# Context Map
+# AlharisTech Platform
+# Maps all knowledge sources, their relationships, and loading order.
+# Generated: 2026-06-20
+
+version: "1.0"
+
+context_sources:
+  project_identity:
+    path: ".ai-workstation/project-context.md"
+    type: "permanent"
+    content:
+      - "project_name"
+      - "vision"
+      - "mission"
+      - "core_values"
+      - "guiding_principles"
+      - "stakeholders"
+      - "success_metrics"
+
+  architecture:
+    path: ".ai-workstation/architecture-context.md"
+    type: "long-lived"
+    content:
+      - "architecture_overview"
+      - "c4_diagrams"
+      - "adr_summary"
+      - "technology_stack"
+      - "patterns_in_use"
+      - "design_constraints"
+
+  requirements:
+    paths:
+      - "docs/requirements/prd.md"
+      - "docs/requirements/system-requirements.md"
+    type: "long-lived"
+    content:
+      - "product_objectives"
+      - "user_personas"
+      - "functional_requirements"
+      - "non_functional_requirements"
+      - "use_cases"
+      - "user_journeys"
+
+  business:
+    path: "docs/business/README.md"
+    type: "long-lived"
+    content:
+      - "business_model"
+      - "growth_phases"
+      - "revenue_model"
+      - "competitive_advantage"
+      - "kpis"
+      - "risks"
+
+  adrs:
+    path: "docs/adr/"
+    type: "long-lived"
+    content:
+      - "architecture_decisions"
+      - "decision_rationale"
+      - "rejected_alternatives"
+      - "consequences"
+
+  diagrams:
+    paths:
+      - "docs/c4/"
+      - "docs/diagrams/"
+    type: "long-lived"
+    content:
+      - "system_context"
+      - "container_diagram"
+      - "component_diagram"
+      - "code_diagram"
+      - "deployment_diagram"
+      - "sequence_diagrams"
+
+  roadmap:
+    path: "docs/roadmap/README.md"
+    type: "long-lived"
+    content:
+      - "phases"
+      - "milestones"
+      - "timeline"
+      - "dependencies"
+
+  governance:
+    paths:
+      - "docs/governance/README.md"
+      - "docs/governance/ai-workstation-core-integration.md"
+    type: "long-lived"
+    content:
+      - "development_workflow"
+      - "code_review_policy"
+      - "branching_strategy"
+      - "commit_conventions"
+      - "quality_gates"
+      - "documentation_policy"
+
+  specifications:
+    path: "specs/"
+    type: "incremental"
+    content:
+      - "domain_specifications"
+      - "api_specifications"
+      - "data_models"
+      - "business_rules"
+
+  tasks:
+    paths:
+      - "tasks/master-plan.md"
+      - "tasks/phase-*/"
+    type: "incremental"
+    content:
+      - "implementation_plans"
+      - "sprint_plans"
+      - "task_breakdowns"
+      - "dependency_graphs"
+
+  session:
+    path: ".runtime/sessions/"
+    type: "ephemeral"
+    content:
+      - "current_work"
+      - "decisions_made"
+      - "files_modified"
+      - "agent_state"
+
+loading_order:
+  - project_identity
+  - business
+  - requirements
+  - architecture
+  - adrs
+  - diagrams
+  - governance
+  - roadmap
+  - specifications
+  - tasks
+  - session
+
+cross_references:
+  vision_to_requirements:
+    source: "project_identity.vision"
+    targets: ["requirements.product_objectives"]
+    relationship: "drives"
+
+  requirements_to_architecture:
+    source: "requirements"
+    targets: ["architecture", "adrs"]
+    relationship: "informs"
+
+  architecture_to_specifications:
+    source: "architecture"
+    targets: ["specifications"]
+    relationship: "constrains"
+
+  specifications_to_tasks:
+    source: "specifications"
+    targets: ["tasks"]
+    relationship: "decomposes_into"
+
+  adrs_to_everything:
+    source: "adrs"
+    targets: ["architecture", "specifications", "tasks"]
+    relationship: "governs"
+
+domain_relationships:
+  identity_to_all:
+    from: "identity"
+    to: ["customer", "service", "commerce", "support", "content", "notification", "analytics", "ai"]
+    relationship: "authenticates_and_authorizes"
+
+  customer_to_service:
+    from: "customer"
+    to: "service"
+    relationship: "requests_services"
+
+  customer_to_commerce:
+    from: "customer"
+    to: "commerce"
+    relationship: "purchases_products"
+
+  customer_to_support:
+    from: "customer"
+    to: "support"
+    relationship: "opens_tickets"
+
+  service_to_notification:
+    from: "service"
+    to: "notification"
+    relationship: "triggers_notifications"
+
+  commerce_to_notification:
+    from: "commerce"
+    to: "notification"
+    relationship: "triggers_notifications"
+
+  support_to_notification:
+    from: "support"
+    to: "notification"
+    relationship: "triggers_notifications"
+
+  analytics_from_all:
+    from: ["customer", "service", "commerce", "support"]
+    to: "analytics"
+    relationship: "provides_data"
+
+  ai_to_all:
+    from: "ai"
+    to: ["support", "content", "analytics", "commerce", "service"]
+    relationship: "enhances"
+
+technology_map:
+  frontend:
+    - name: "Next.js"
+      version: "15+"
+      purpose: "Web + Admin frontend"
+      adr: "ADR-001"
+    - name: "React"
+      version: "19+"
+      purpose: "Component library"
+      adr: "ADR-001"
+    - name: "TailwindCSS"
+      version: "4+"
+      purpose: "Styling"
+      adr: "ADR-013"
+    - name: "shadcn/ui"
+      purpose: "UI component library"
+      adr: "ADR-013"
+
+  backend:
+    - name: "NestJS"
+      version: "11+"
+      purpose: "API Gateway + Services"
+      adr: "ADR-002"
+    - name: "GraphQL"
+      purpose: "Complex queries"
+      adr: "ADR-008"
+    - name: "BullMQ"
+      purpose: "Background jobs"
+      adr: "ADR-009"
+
+  data:
+    - name: "PostgreSQL"
+      version: "16"
+      purpose: "Primary database"
+      adr: "ADR-003"
+    - name: "Redis"
+      version: "7"
+      purpose: "Cache + Sessions"
+      adr: "ADR-004"
+    - name: "S3/MinIO"
+      purpose: "File storage"
+      adr: "ADR-010"
+
+  devops:
+    - name: "Turborepo"
+      purpose: "Monorepo management"
+      adr: "ADR-012"
+    - name: "pnpm"
+      version: "9+"
+      purpose: "Package manager"
+    - name: "Docker"
+      purpose: "Containerization"
+      adr: "ADR-011"
+    - name: "GitHub Actions"
+      purpose: "CI/CD"

@@ -1,0 +1,205 @@
+@startuml data-flow-diagram
+' ============================================================
+' AlharisTech Platform — Data Flow Diagram
+' How data moves: Browser ↔ Next.js ↔ NestJS ↔ PostgreSQL/Redis/S3
+' Async flows: BullMQ, email/SMS, payment callbacks, webhooks
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam rectangle {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+  FontColor #1A5276
+  FontSize 9
+  RoundCorner 6
+}
+
+skinparam database {
+  BackgroundColor #D5F5E3
+  BorderColor #27AE60
+  FontSize 9
+}
+
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #E67E22
+}
+
+skinparam cloud {
+  BackgroundColor #E8F0FE
+  BorderColor #5DADE2
+}
+
+skinparam component {
+  BackgroundColor #F5EEF8
+  BorderColor #8E44AD
+  FontSize 9
+}
+
+skinparam arrow {
+  FontSize 8
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 9
+}
+
+title **AlharisTech Platform — Data Flow Diagram**
+title **تدفق البيانات — المتزامن وغير المتزامن**
+
+actor "User\nBrowser" as Browser
+
+' ============================================================
+' FRONTEND LAYER
+' ============================================================
+rectangle "**Next.js Frontend**\n========================\n· React Server Components\n· TanStack Query (client state)\n· SDK Client (@alharistech/sdk)\n· Next.js API Routes (proxy)" as Frontend
+
+' ============================================================
+' API LAYER
+' ============================================================
+rectangle "**NestJS API Gateway**\n========================\n· REST Controllers (/api/v1/*)\n· GraphQL Resolvers (/graphql)\n· Webhook Handlers (/webhooks/*)\n· Guards (JWT, RBAC, Throttle)\n· Pipes (Zod Validation)" as API
+
+' ============================================================
+' DATA STORES
+' ============================================================
+database "**PostgreSQL**\n========================\n· users, customers, orders\n· services, products, tickets\n· payments, invoices\n· audit_logs\n· content_pages" as PG
+database "**Redis**\n========================\n· Session cache\n· Application cache\n· Rate limit counters\n· BullMQ job queues\n· Pub/Sub channels" as Redis
+database "**S3 / MinIO**\n========================\n· User uploads\n· Media library\n· Documents (PDFs)\n· Backups\n· Static assets" as S3
+
+' ============================================================
+' ASYNC WORKERS
+' ============================================================
+rectangle "**BullMQ Workers**\n========================\n· Email processing\n· SMS processing\n· PDF generation\n· Data export\n· Image optimization" as Workers
+
+' ============================================================
+' EXTERNAL SERVICES
+' ============================================================
+cloud "**Payment Gateway**\nStripe / Moyasar\n========================\n· Payment processing\n· Webhook callbacks\n· Refunds" as PaymentGW
+cloud "**Email Provider**\nSendGrid / Resend\n========================\n· Transactional emails\n· Templates\n· Tracking" as EmailProv
+cloud "**SMS Provider**\nTwilio / Unifonic\n========================\n· OTP messages\n· Notifications\n· Delivery reports" as SMSProv
+cloud "**AI Providers**\nOpenAI / Anthropic\n========================\n· Chat completions\n· Embeddings\n· Content generation" as AIProv
+
+' ============================================================
+' SYNCHRONOUS FLOWS
+' ============================================================
+== Synchronous Data Flows (Request → Response) ==
+
+Browser --> Frontend : "[1] User action (click, form submit)"
+Frontend --> Frontend : "[2] TanStack Query check cache\n(staleTime: 5 min)"
+Frontend --> API : "[3] HTTP Request\nGET/POST /api/v1/resource\nAuthorization: Bearer <JWT>\nX-Request-Id: <uuid>\nContent-Type: application/json"
+
+API --> API : "[4] Middleware + Guards:\n· JWT verify → req.user\n· RBAC role check\n· Permission check\n· Zod validation"
+
+alt Write Operation (POST/PUT/PATCH/DELETE)
+  API --> PG : "[5a] Write to Primary\nINSERT/UPDATE/DELETE"
+  PG --> API : "[6a] Confirmation"
+  API --> Redis : "[7a] Invalidate cache\nDEL cache:resource:*"
+  API --> Redis : "[8a] Publish domain event\nPUBLISH order:created"
+end
+
+alt Read Operation (GET)
+  API --> Redis : "[5b] Check cache\nGET cache:order:123"
+
+  alt Cache Miss
+    API --> PG : "[6b] Read from Replica\nSELECT ... WHERE ..."
+    PG --> API : "[7b] Row data"
+    API --> Redis : "[8b] Populate cache\nSETEX cache:order:123 300 <data>"
+  else Cache Hit
+    Redis --> API : "[6b] Cached data"
+  end
+end
+
+API --> API : "[9] Serialize → DTO\nApply response envelope:\n{ data, meta: { requestId } }"
+
+API --> Frontend : "[10] JSON Response\n200/201/400/401/403\nX-Response-Time: 45ms\nX-Request-Id: <uuid>"
+
+Frontend --> Frontend : "[11] TanStack Query\nupdate cache + state"
+Frontend --> Browser : "[12] Re-render UI"
+
+' ============================================================
+' ASYNCHRONOUS FLOWS
+' ============================================================
+== Asynchronous Data Flows (Background Jobs) ==
+
+API --> Redis : "[A1] Enqueue job\nBullMQ: email:send\n{ to, template, data }"
+Redis --> Workers : "[A2] Dequeue job"
+Workers --> EmailProv : "[A3] Send via SMTP/REST\nPOST /v3/mail/send"
+EmailProv --> Workers : "[A4] Delivery status"
+Workers --> PG : "[A5] Log delivery\nINSERT INTO email_logs"
+Workers --> Redis : "[A6] Publish event\nPUBLISH email:sent"
+
+API --> Redis : "[B1] Enqueue job\nBullMQ: sms:send"
+Redis --> Workers : "[B2] Dequeue job"
+Workers --> SMSProv : "[B3] Send via REST\nPOST /Messages"
+SMSProv --> Workers : "[B4] Delivery status"
+Workers --> PG : "[B5] Log delivery"
+
+' ============================================================
+' PAYMENT FLOW (Async + Sync)
+' ============================================================
+== Payment Processing Flow ==
+
+Browser --> Frontend : "[P1] Initiate payment"
+Frontend --> API : "[P2] POST /api/v1/payments\n{ amount, currency, orderId }"
+API --> PG : "[P3] Create pending payment\nINSERT INTO payments"
+API --> PaymentGW : "[P4] Create payment intent\nPOST /v1/payment_intents"
+PaymentGW --> API : "[P5] Payment intent (client_secret)"
+API --> Redis : "[P6] Enqueue payment:timeout\n(delay: 30 min)"
+API --> Frontend : "[P7] { clientSecret, paymentId }"
+
+Browser --> PaymentGW : "[P8] Complete payment\n(Stripe.js / redirect)"
+
+PaymentGW --> API : "[P9] **Webhook Callback**\nPOST /webhooks/payment\nX-Signature: <hash>"
+API --> API : "[P10] Verify webhook signature"
+API --> PG : "[P11] UPDATE payments SET status = 'completed'"
+API --> Redis : "[P12] Cancel payment:timeout job"
+API --> Redis : "[P13] PUBLISH payment:completed"
+Redis --> Workers : "[P14] Process: send receipt email"
+
+' ============================================================
+' WEBHOOK FLOW (Outbound)
+' ============================================================
+== Webhook Delivery (Partner Integrations) ==
+
+API --> PG : "[W1] Check webhook subscriptions\nSELECT * FROM webhook_subscriptions"
+API --> Redis : "[W2] Enqueue webhook:deliver\n{ url, event, payload }"
+Redis --> Workers : "[W3] Dequeue webhook job"
+Workers --> Workers : "[W4] Sign payload with webhook secret"
+Workers --> Cloud : "[W5] POST to partner URL\nX-Webhook-Signature: <hmac>\nRetry: up to 5 times (exponential backoff)"
+Workers --> PG : "[W6] Log delivery attempt\nINSERT INTO webhook_deliveries"
+
+' ============================================================
+' SUMMARY TABLE
+' ============================================================
+note bottom of AIProv
+  **Data Flow Classification:**
+  |===
+  | Flow | Type | Protocol | Latency |
+  | Browser → Frontend | Sync | HTTPS/HTTP2 | < 50ms (CDN) |
+  | Frontend → API | Sync | HTTPS/JSON | < 100ms |
+  | API → PostgreSQL | Sync | SQL/TCP (TLS) | < 10ms (queries) |
+  | API → Redis (cache) | Sync | Redis Protocol | < 1ms |
+  | API → Redis (queue) | Sync (enqueue) | BullMQ/Redis | < 1ms |
+  | Redis → Workers | Async (poll) | BullMQ/Redis | < 500ms |
+  | Workers → Email/SMS | Async | REST/SMTP | 1-30s |
+  | Payment GW → API | Async (webhook) | HTTPS | 1-30s |
+  | Workers → Partners | Async (webhook) | HTTPS | 1-10s |
+  |===
+
+  **Data at rest:**
+  · PostgreSQL: AES-256 (disk encryption)
+  · Redis: AOF persistence + RDB snapshots
+  · S3/MinIO: Server-side AES-256 encryption
+
+  **Data in transit:**
+  · TLS 1.3 for all external connections
+  · TLS for internal service-to-service
+  · TLS for database connections (SSL mode: require)
+endnote
+
+@enduml

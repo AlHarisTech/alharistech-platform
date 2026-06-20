@@ -1,0 +1,158 @@
+# Governance Enforcement Rules
+# AlharisTech Platform
+# These rules are enforced by CI/CD gates
+
+version: "1.0"
+
+principles:
+  - id: "PERP-SEC"
+    name: "Security First"
+    rules:
+      - "no hardcoded secrets in code"
+      - "all inputs validated and sanitized"
+      - "auth required for protected routes"
+      - "rate limiting on public endpoints"
+      - "CORS configured explicitly"
+    enforcement: "pre-commit + CI"
+
+  - id: "PERP-SCA"
+    name: "Scalability First"
+    rules:
+      - "no N+1 queries"
+      - "database queries have indexes"
+      - "stateless services (no in-memory state)"
+      - "pagination on list endpoints"
+    enforcement: "code review + load test"
+
+  - id: "PERP-MNT"
+    name: "Maintainability First"
+    rules:
+      - "test coverage >= 80%"
+      - "no TODO without issue reference"
+      - "no commented-out code"
+      - "documentation updated with code changes"
+    enforcement: "CI + code review"
+
+  - id: "PERP-MIN"
+    name: "Minimal Complexity"
+    rules:
+      - "prefer standard library over custom implementations"
+      - "no premature optimization"
+      - "no premature abstraction"
+      - "single responsibility per module"
+    enforcement: "architecture review"
+
+  - id: "PERP-EVI"
+    name: "Evidence First"
+    rules:
+      - "ADR required for architecture decisions"
+      - "benchmark data for performance claims"
+      - "issue reference for bug fixes"
+    enforcement: "PR template check"
+
+  - id: "PERP-MOD"
+    name: "Modular First"
+    rules:
+      - "domains must not import from each other directly"
+      - "shared code goes in packages/"
+      - "each domain has clear public API"
+    enforcement: "dependency analysis (CI)"
+
+  - id: "PERP-API"
+    name: "API First"
+    rules:
+      - "OpenAPI spec before implementation"
+      - "breaking changes require version bump"
+      - "API documented in Swagger UI"
+    enforcement: "CI validation"
+
+  - id: "PERP-FCL"
+    name: "Fail Closed"
+    rules:
+      - "default deny for permissions"
+      - "default deny for CORS"
+      - "default deny for network policies"
+    enforcement: "security audit"
+
+quality_gates:
+  gate_lint:
+    name: "Lint Gate"
+    checks:
+      - "ESLint: 0 errors"
+      - "Prettier: formatted"
+      - "TypeScript: strict mode, 0 errors"
+    fail_action: "block PR"
+
+  gate_test:
+    name: "Test Gate"
+    checks:
+      - "Unit tests: pass + coverage >= 80%"
+      - "Integration tests: pass + coverage >= 70%"
+      - "No skipped tests without justification"
+    fail_action: "block PR"
+
+  gate_security:
+    name: "Security Gate"
+    checks:
+      - "No secrets in code (detect-secrets)"
+      - "Dependencies: no critical vulnerabilities (npm audit)"
+      - "SAST: no high/critical findings (CodeQL)"
+    fail_action: "block PR"
+
+  gate_build:
+    name: "Build Gate"
+    checks:
+      - "Build succeeds"
+      - "Bundle size <= 200KB gzipped (web)"
+      - "No TypeScript errors"
+    fail_action: "block PR"
+
+  gate_performance:
+    name: "Performance Gate"
+    checks:
+      - "Lighthouse >= 90 (web)"
+      - "API p95 latency < 200ms"
+      - "No N+1 queries detected"
+    fail_action: "warning (dev) / block (main)"
+
+  gate_review:
+    name: "Review Gate"
+    checks:
+      - "1+ approvals (2 for major changes)"
+      - "All review comments resolved"
+      - "PR template fully completed"
+    fail_action: "block merge"
+
+review_policies:
+  code_review:
+    required_approvals:
+      minor_change: 1
+      feature: 1
+      major_feature: 2
+      architecture_change: 2
+      security_change: 2
+
+    required_checkers:
+      - "security: secrets, auth, input validation"
+      - "architecture: layer placement, ADR compliance"
+      - "performance: N+1, indexing, caching"
+      - "testing: coverage, edge cases, regression"
+      - "documentation: API docs, changelog"
+
+    auto_checks:
+      - "lint"
+      - "typecheck"
+      - "unit_tests"
+      - "integration_tests"
+      - "build"
+
+  architecture_review:
+    required_participants:
+      - "tech_lead"
+      - "domain_expert"
+    review_period: "48 hours"
+    criteria:
+      - "aligns with architecture principles"
+      - "impact analysis complete"
+      - "migration plan documented (if breaking)"
+      - "ADR template complete"

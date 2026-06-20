@@ -1,0 +1,222 @@
+@startuml network-diagram
+' ============================================================
+' AlharisTech Platform — Network Diagram
+' Security zones, firewalls, load balancers, internal routing
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam rectangle {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+  FontColor #1A5276
+  FontSize 9
+  RoundCorner 6
+}
+
+skinparam node {
+  BackgroundColor #FDEBD0
+  BorderColor #E67E22
+  FontSize 9
+}
+
+skinparam cloud {
+  BackgroundColor #E8F0FE
+  BorderColor #5DADE2
+}
+
+skinparam database {
+  BackgroundColor #D5F5E3
+  BorderColor #27AE60
+  FontSize 9
+}
+
+skinparam frame {
+  BackgroundColor #F4F6F7
+  BorderColor #AAB7B8
+  FontColor #2C3E50
+  FontSize 12
+  FontStyle bold
+}
+
+skinparam arrow {
+  FontSize 8
+}
+
+skinparam firewall {
+  BackgroundColor #E74C3C
+  FontColor #FFFFFF
+  BorderColor #C0392B
+}
+
+title **AlharisTech Platform — Network Architecture**
+title **معمارية الشبكة — مناطق الأمان والجدران النارية والتوجيه**
+
+' ============================================================
+' INTERNET (Untrusted)
+' ============================================================
+frame "**Internet — الإنترنت (Untrusted)**" #FDEDEC {
+  cloud "**Users**\nالمستخدمون\n(Global)" as Users
+  cloud "**Attackers**\nهجمات\n(DDoS, Scans)" as Attackers
+  cloud "**External APIs**\nPayment · SMS · Email · AI" as ExtAPIs
+}
+
+' ============================================================
+' EDGE LAYER
+' ============================================================
+frame "**Edge Layer — طبقة الحافة**" #E8F0FE {
+  rectangle "**Cloudflare / Vercel Edge**\n========================\n· Global CDN\n· DDoS Protection\n· WAF (Web Application Firewall)\n· Bot Management\n· Rate Limiting\n· SSL Termination" as Edge
+
+  rectangle "**DNS**\n========================\n· alharistech.com\n· admin.alharistech.com\n· api.alharistech.com\n· staging.alharistech.com\n· GeoDNS routing" as DNS
+}
+
+' ============================================================
+' PERIMETER FIREWALL
+' ============================================================
+rectangle "**Perimeter Firewall 1**\n========================\n· Allow: 443 (HTTPS) only\n· Allow: 80 → 443 redirect\n· Rate limiting (per IP)\n· Geo-blocking (optional)\n· DDoS thresholds" #E74C3C as FW1
+
+' ============================================================
+' DMZ — PUBLIC-FACING
+' ============================================================
+frame "**DMZ — المنطقة المنزوعة السلاح**\nSubnet: 10.0.1.0/24" #FDEDEC {
+
+  rectangle "**Load Balancer (Nginx / ALB)**\n========================\n· SSL termination\n· Round-robin / least-conn\n· Health checks (GET /api/health)\n· Sticky sessions (disabled)\n· Rate limiting: 100 req/s per IP\n· Request buffering" as LB
+
+  rectangle "**Web Frontend (×3)**\n========================\n· 10.0.1.10-12\n· Next.js SSR\n· Port 3000\n· No database access\n· Outbound: API only" as DMZ_Web
+
+  rectangle "**Admin Dashboard (×2)**\n========================\n· 10.0.1.20-21\n· Next.js SSR\n· Port 3001\n· No database access\n· Outbound: API only" as DMZ_Admin
+
+  rectangle "**API Gateway (×4)**\n========================\n· 10.0.1.30-33\n· NestJS\n· Port 4000\n· Outbound: DB, Redis, S3" as DMZ_API
+}
+
+' ============================================================
+' INTERNAL FIREWALL
+' ============================================================
+rectangle "**Internal Firewall 2**\n========================\n· DMZ → App: Redis (6379), BullMQ\n· DMZ → Data: PostgreSQL (5432)\n· DMZ → Management: Prometheus (9090)\n· App → Data: PostgreSQL (5432), Redis (6379)\n· App → Internet: restricted egress only\n· Data → Internet: BLOCKED" #E67E22 as FW2
+
+' ============================================================
+' APPLICATION SUBNET
+' ============================================================
+frame "**Application Subnet — شبكة التطبيقات**\nSubnet: 10.0.2.0/24" #E8F8F5 {
+
+  rectangle "**BullMQ Workers (×3)**\n========================\n· 10.0.2.10-12\n· Job processors\n· Email sending\n· SMS delivery\n· PDF generation\n· Data export" as App_Bull
+
+  rectangle "**Payment Webhook Handler**\n========================\n· 10.0.2.20\n· Stripe/Moyasar webhooks\n· Idempotency checks\n· Signature verification" as App_Payment
+
+  rectangle "**AI Gateway (×2)**\n========================\n· 10.0.2.30-31\n· OpenAI / Anthropic / Local\n· Token counting + billing\n· Rate limiting" as App_AI
+}
+
+' ============================================================
+' DATA FIREWALL
+' ============================================================
+rectangle "**Data Firewall 3**\n========================\n· App → Data: PostgreSQL (5432), Redis (6379), S3 (443)\n· No direct internet access\n· Egress via NAT gateway only\n· All connections TLS encrypted" #E74C3C as FW3
+
+' ============================================================
+' DATA SUBNET
+' ============================================================
+frame "**Data Subnet — شبكة البيانات**\nSubnet: 10.0.3.0/24" #F5EEF8 {
+
+  database "**PostgreSQL Primary**\n========================\n· 10.0.3.10\n· Port 5432 (TLS)\n· WAL archiving\n· Daily backups" as Data_PG
+
+  database "**PostgreSQL Replica**\n========================\n· 10.0.3.11\n· Read-only\n· Async replication" as Data_PGRep
+
+  database "**Redis Primary**\n========================\n· 10.0.3.20\n· Port 6379 (TLS)\n· Cache + Session\n· BullMQ backend" as Data_Redis
+
+  database "**Redis Replica**\n========================\n· 10.0.3.21\n· Read-only cache\n· Failover target" as Data_RedisRep
+
+  database "**S3 / MinIO**\n========================\n· 10.0.3.30\n· Port 443\n· Object storage\n· Cross-region replication" as Data_S3
+}
+
+' ============================================================
+' MANAGEMENT FIREWALL
+' ============================================================
+rectangle "**Management Firewall 4**\n========================\n· VPN only (WireGuard)\n· MFA required\n· SSH bastion access only\n· Audit all connections" #E74C3C as FW4
+
+' ============================================================
+' MANAGEMENT SUBNET
+' ============================================================
+frame "**Management Subnet — شبكة الإدارة**\nSubnet: 10.0.4.0/24" #FCF3CF {
+
+  rectangle "**Bastion Host**\n========================\n· 10.0.4.10\n· SSH jump box\n· MFA authentication\n· Session recording" as Mgmt_Bastion
+
+  rectangle "**Prometheus**\n========================\n· 10.0.4.20\n· Metrics collection\n· AlertManager" as Mgmt_Prom
+
+  rectangle "**Grafana**\n========================\n· 10.0.4.21\n· Dashboards\n· Alerting" as Mgmt_Grafana
+
+  rectangle "**ELK / Loki Stack**\n========================\n· 10.0.4.30-32\n· Elasticsearch + Logstash + Kibana\n· Log retention: 90 days" as Mgmt_ELK
+
+  rectangle "**Jaeger**\n========================\n· 10.0.4.40\n· Distributed tracing\n· Span retention: 7 days" as Mgmt_Jaeger
+
+  rectangle "**Vault**\n========================\n· 10.0.4.50\n· HashiCorp Vault\n· Secrets management\n· Encryption as a Service" as Mgmt_Vault
+}
+
+' ============================================================
+' CONNECTIONS
+' ============================================================
+Users -down-> Edge : "HTTPS (443)\nTLS 1.3"
+Attackers -down-> Edge : "Blocked by WAF/DDoS"
+Edge -down-> FW1 : "Filtered traffic"
+FW1 -down-> LB : "HTTPS (443)"
+
+LB -down-> DMZ_Web : "HTTP (3000)\nInternal LB"
+LB -down-> DMZ_Admin : "HTTP (3001)"
+LB -down-> DMZ_API : "HTTP (4000)"
+
+DMZ_Web -down-> FW2 : "API calls"
+DMZ_Admin -down-> FW2 : "API calls"
+FW2 -down-> DMZ_API : "Forward to API"
+
+DMZ_API -down-> FW2 : "DB/Redis requests"
+FW2 -down-> Data_PG : "Port 5432"
+FW2 -down-> Data_Redis : "Port 6379"
+FW2 -down-> Data_S3 : "Port 443"
+
+App_Bull -down-> FW3 : "DB/Redis/S3"
+App_Payment -down-> FW3 : "DB/Redis"
+App_AI -down-> FW3 : "Outbound to AI providers"
+
+FW3 -down-> Data_PG : "SQL"
+FW3 -down-> Data_Redis : "Redis"
+FW3 -down-> Data_S3 : "S3 API"
+
+Data_PG -right-> Data_PGRep : "WAL Streaming\nPort 5432"
+
+Mgmt_Prom -left-> FW4 : "Scrape metrics"
+FW4 -left-> DMZ_API : "Metrics endpoint"
+FW4 -left-> App_Bull : "Metrics endpoint"
+
+Mgmt_ELK -left-> FW4 : "Collect logs"
+FW4 -left-> DMZ_API : "Fluentd/Filebeat"
+
+ExtAPIs -up-> FW1 : "Webhook callbacks"
+
+LB ..> DNS : "DNS resolution"
+
+' ============================================================
+' SECURITY RULES SUMMARY
+' ============================================================
+note bottom of Mgmt_Vault
+  **Network Security Rules Summary:**
+  =================================
+  | From | To | Protocol/Port | Action |
+  | Internet | Edge | 443 (HTTPS) | ALLOW |
+  | Edge | DMZ (Web/API) | 443 → 3000/4000 | ALLOW |
+  | DMZ | App Subnet | 6379 (Redis) | ALLOW |
+  | DMZ | Data Subnet | 5432 (PG), 443 (S3) | ALLOW |
+  | App | Data | 5432, 6379, 443 | ALLOW |
+  | App | Internet | SMTP, REST APIs | ALLOW (restricted) |
+  | Management | All | Various (monitoring) | ALLOW |
+  | Management | — | VPN only | ALLOW |
+  | Data | Internet | — | **BLOCKED** |
+  | Internet | Data | — | **BLOCKED** |
+  | Internet | App | — | **BLOCKED** |
+  | Internet | Management | — | **BLOCKED** |
+  | All | All (default) | — | **DENY** |
+  |===
+  **Encryption in Transit:** TLS 1.3 everywhere.
+  **Encryption at Rest:** AES-256 (DB, S3, Backups).
+endnote
+
+@enduml

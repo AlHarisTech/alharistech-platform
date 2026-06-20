@@ -1,0 +1,82 @@
+# Runner Definitions
+# AlharisTech Platform — How agents execute tasks
+
+version: "1.0"
+
+runners:
+
+  # ─── OpenCode Runner (Primary) ───
+  opencode:
+    name: "OpenCode Agent Runner"
+    description: "Executes development tasks using OpenCode agent"
+    agent_types: ["developer", "reviewer", "spec_writer"]
+    config:
+      working_directory: "/home/asem/workspace/projects/Alharistech"
+      context_load_order:
+        - ".ai-workstation/project-context.md"
+        - ".ai-workstation/architecture-context.md"
+        - ".runtime/context-map.yaml"
+        - ".runtime/project-runtime-manifest.yaml"
+      session_dir: ".runtime/sessions/"
+      evidence_dir: ".runtime/evidence/"
+
+  # ─── Spec-Kit Runner ───
+  speckit:
+    name: "Spec-Kit Runner"
+    description: "Executes spec-driven development workflows"
+    agent_types: ["spec_writer", "developer", "reviewer"]
+    config:
+      cli: "specify"
+      project_root: "/home/asem/workspace/projects/Alharistech"
+      constitution: ".specify/memory/constitution.md"
+      specs_dir: "specs/"
+      templates:
+        spec: "spec-template.md"
+        plan: "plan-template.md"
+        tasks: "tasks-template.md"
+      lifecycle:
+        - "constitution"
+        - "specify"
+        - "clarify"
+        - "plan"
+        - "tasks"
+        - "implement"
+        - "converge"
+        - "analyze"
+        - "checklist"
+
+  # ─── Shell Runner ───
+  shell:
+    name: "Shell Script Runner"
+    description: "Executes shell scripts for automation"
+    agent_types: ["devops"]
+    config:
+      scripts_dir: "scripts/"
+      bash: "/bin/bash"
+      timeout: 300
+
+  # ─── GitHub Actions Runner ───
+  github_actions:
+    name: "GitHub Actions Runner"
+    description: "Executes CI/CD pipelines"
+    agent_types: ["devops", "qa"]
+    config:
+      workflows_dir: ".github/workflows/"
+      triggers:
+        push: ["lint", "typecheck", "test"]
+        pull_request: ["lint", "typecheck", "test", "security-scan", "build"]
+        release: ["full-test", "security-audit", "deploy"]
+
+  # ─── Manual Runner ───
+  manual:
+    name: "Manual/Human Runner"
+    description: "Tasks requiring human execution or approval"
+    agent_types: ["pm", "architect", "security"]
+    config:
+      approval_gates:
+        - "architecture_review"
+        - "security_signoff"
+        - "production_deploy"
+      notification_channels:
+        - "github_issue"
+        - "pr_comment"

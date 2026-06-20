@@ -1,0 +1,188 @@
+@startuml cicd-diagram
+' ============================================================
+' AlharisTech Platform — CI/CD Pipeline
+' GitHub Actions: Build → Test → Scan → Deploy Staging → Production
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam rectangle {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+  FontColor #1A5276
+  FontStyle bold
+  RoundCorner 6
+}
+
+skinparam diamond {
+  BackgroundColor #FDEBD0
+  BorderColor #E67E22
+  FontColor #1A1A1A
+  FontSize 9
+}
+
+skinparam actor {
+  BackgroundColor #FDEDEC
+  BorderColor #E74C3C
+}
+
+skinparam node {
+  BackgroundColor #D5F5E3
+  BorderColor #27AE60
+  FontSize 9
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 9
+}
+
+skinparam arrow {
+  Color #7F8C8D
+  FontSize 9
+}
+
+title **AlharisTech Platform — CI/CD Pipeline**
+title **خط أنابيب التكامل والنشر المستمر — GitHub → Production**
+
+actor "Developer\nمطور" as Dev
+rectangle "**GitHub**\nSource Control" as GitHub #F4F6F7
+
+' ============================================================
+' CI PIPELINE (per PR / push)
+' ============================================================
+package "CI Pipeline — Feature Branch / PR" #E8F0FE {
+
+  rectangle "**1. Checkout**\nClone repository\nSet up Node.js 20\npnpm install --frozen-lockfile" as CI_Checkout
+  rectangle "**2. Format Check**\nprettier --check\nbiome format --check" as CI_Format
+  rectangle "**3. Lint**\nturbo lint\nESLint + Biome\n(all packages in parallel)" as CI_Lint
+  rectangle "**4. TypeCheck**\nturbo typecheck\ntsc --noEmit\n(all packages in parallel)" as CI_TypeCheck
+  rectangle "**5. Unit Tests**\nturbo test\nVitest + coverage\n≥ 80% threshold" as CI_UnitTest
+  rectangle "**6. Integration Tests**\nDocker Compose up\n(Services: DB, Redis, S3)\nJest + Supertest\nAPI endpoint testing" as CI_IntTest
+  rectangle "**7. Security Scan**\npnpm audit --audit-level=high\nCodeQL SAST analysis\nSecret scanning (truffleHog)" as CI_Security
+  rectangle "**8. Build Artifact**\nturbo build\nDocker build\nPush to registry" as CI_Build
+
+  diamond "**Gate**\nAll checks\npassed?" as CI_Gate
+}
+
+' ============================================================
+' PR REVIEW
+' ============================================================
+package "PR Review — مراجعة الطلب" #FDEBD0 {
+  rectangle "**Code Review**\n≥ 1 approve required\nReviewer checklist" as Review
+  diamond "**Gate**\nApproved?" as ReviewGate
+}
+
+' ============================================================
+' STAGING DEPLOY
+' ============================================================
+package "Staging Deployment — النشر على بيئة التجربة" #E8F8F5 {
+
+  rectangle "**Deploy to Staging**\nRun database migrations\nkubectl apply -k staging\nDocker Compose staging\nHealth check endpoints" as DeployStaging
+  rectangle "**E2E Tests**\nPlaywright full suite\nCritical user journeys\nCross-browser testing\nAPI contract tests" as E2E
+  rectangle "**Performance Test**\nk6 load testing\nStress test critical paths" as Perf
+
+  diamond "**Gate**\nStaging\nhealthy?" as StagingGate
+}
+
+' ============================================================
+' PRODUCTION DEPLOY
+' ============================================================
+package "Production Deployment — النشر على بيئة الإنتاج" #D5F5E3 {
+
+  rectangle "**Pre-deploy Checklist**\n· Manual approval (≥ 2 approvers)\n· DB backup completed\n· Rollback plan verified\n· Change log published" as PreDeploy
+  rectangle "**Canary Deploy (10%)**\nkubectl set image canary\nRoute 10% traffic\nMonitor 5 minutes" as Canary
+  rectangle "**Progressive Rollout**\nkubectl rollout\n10% → 50% → 100%\nMonitor at each step" as Rollout
+  rectangle "**Post-deploy**\nSmoke tests\nMonitor dashboards\nAlert verification" as PostDeploy
+
+  diamond "**Gate**\nProduction\nstable?" as ProdGate
+}
+
+' ============================================================
+' FLOW
+' ============================================================
+Dev --> GitHub : git push feature/branch
+GitHub --> CI_Checkout : Trigger CI workflow
+CI_Checkout --> CI_Format
+CI_Format --> CI_Lint
+CI_Lint --> CI_TypeCheck
+CI_TypeCheck --> CI_UnitTest
+CI_UnitTest --> CI_IntTest
+CI_IntTest --> CI_Security
+CI_Security --> CI_Build
+CI_Build --> CI_Gate
+
+CI_Gate --> Review : ✓ PASS — Open PR
+CI_Gate --> Dev : ✗ FAIL — Fix issues & repush
+
+Review --> ReviewGate
+ReviewGate --> Dev : ✗ Changes requested
+ReviewGate --> DeployStaging : ✓ APPROVED — Merge to develop
+
+DeployStaging --> E2E
+E2E --> Perf
+Perf --> StagingGate
+
+StagingGate --> Dev : ✗ FAIL — Rollback & fix
+StagingGate --> PreDeploy : ✓ PASS — Ready for production
+
+' Manual trigger: merge develop → main
+PreDeploy --> Canary : Merge to main\n(manual trigger)
+Canary --> Rollout : Metrics OK
+
+note right of Canary
+  **Auto-rollback if:**
+  · Error rate > 1%
+  · p95 latency > 500ms
+  · Health check fails
+  · CPU/Memory > 90%
+endnote
+
+Rollout --> PostDeploy
+PostDeploy --> ProdGate
+
+ProdGate --> GitHub : ✓ STABLE — Tag release
+ProdGate --> Dev : ✗ ISSUE — Rollback pipeline
+
+' ============================================================
+' SUPPORTING INFRASTRUCTURE
+' ============================================================
+package "Supporting Infrastructure" #F4F6F7 {
+  node "**Docker Registry**\nregistry.alharistech.com" as Registry
+  node "**Kubernetes Cluster**\nStaging + Production" as K8s
+  node "**Secrets Vault**\nGitHub Secrets +\nHashiCorp Vault (prod)" as Vault
+  node "**Notifications**\nSlack / Email\nDeploy notifications" as Slack
+}
+
+CI_Build -down-> Registry : Push Docker images
+DeployStaging -down-> K8s : kubectl apply -k staging
+Rollout -down-> K8s : kubectl apply -k production
+PreDeploy -down-> Vault : Fetch production secrets
+Slack <-down- DeployStaging : Deploy notification
+Slack <-down- PostDeploy : Deploy notification
+
+' ============================================================
+' TIMELINE SUMMARY
+' ============================================================
+note bottom of ProdGate
+  **Pipeline Timeline (typical):**
+  ==============================
+  | Step | Duration |
+  | Format + Lint + TypeCheck | ~2 min (cached) |
+  | Unit Tests | ~3 min (parallel) |
+  | Integration Tests | ~5 min (Docker) |
+  | Security Scan | ~3 min |
+  | Build + Docker Push | ~5 min |
+  | **Total CI (PR)** | **~15 min** |
+  | E2E Tests | ~10 min |
+  | Deploy Staging | ~3 min |
+  | **Total Staging** | **~13 min** |
+  | Canary + Rollout | ~15 min |
+  | **Total Production** | **~30 min** |
+  ==============================
+endnote
+
+@enduml

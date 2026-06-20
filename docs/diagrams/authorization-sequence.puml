@@ -1,0 +1,172 @@
+@startuml authorization-sequence
+' ============================================================
+' AlharisTech Platform — Authorization Sequence Diagram
+' RBAC Flow: Request → Auth Guard → Permission Check → Resource
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam participant {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+}
+
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #E67E22
+}
+
+skinparam database {
+  BackgroundColor #D5F5E3
+  BorderColor #27AE60
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 9
+}
+
+title **AlharisTech Platform — Authorization Sequence (RBAC)**
+title **تدفق الصلاحيات — تحقق الدور والأذونات**
+
+actor "Admin\nمدير" as Admin
+actor "Employee\nموظف" as Employee
+actor "Customer\nعميل" as Customer
+participant "API Gateway\nNestJS" as Gateway
+participant "JwtAuthGuard\nحارس المصادقة" as AuthGuard
+participant "RolesGuard\nحارس الصلاحيات" as RolesGuard
+participant "PermissionGuard\nحارس الأذونات" as PermGuard
+participant "Resource\nController/Service" as Resource
+database "PostgreSQL" as DB
+
+== SCENARIO 1: Admin accessing admin-only resource ==
+
+Admin -> Gateway : GET /api/v1/users\nAuthorization: Bearer <token>
+Gateway -> AuthGuard : canActivate(context)
+
+AuthGuard -> AuthGuard : Extract JWT from\nAuthorization header
+AuthGuard -> AuthGuard : Verify JWT signature\n& expiration
+AuthGuard -> AuthGuard : Decode payload:\n{ sub, email, role: "super_admin",\n  permissions: ["users:*", "reports:*"] }
+
+alt JWT invalid or expired
+  AuthGuard --> Gateway : 401 Unauthorized
+  Gateway --> Admin : 401 { error: "Unauthorized" }
+else JWT valid
+  AuthGuard -> Gateway : req.user = { id, email, role, permissions }
+  Gateway -> RolesGuard : canActivate(context)
+
+  note right of RolesGuard
+    @Roles(SUPER_ADMIN, ADMIN)
+    decorator on controller
+  endnote
+
+  RolesGuard -> RolesGuard : Check: user.role ∈ [SUPER_ADMIN, ADMIN]?
+
+  alt Role not allowed
+    RolesGuard --> Gateway : 403 Forbidden
+    Gateway --> Admin : 403 { error: "Insufficient role" }
+  else Role allowed (SUPER_ADMIN ✓)
+    RolesGuard -> Gateway : Authorized (role)
+
+    Gateway -> PermGuard : canActivate(context)
+
+    note right of PermGuard
+      @RequirePermission("users:read")
+      decorator on endpoint
+    endnote
+
+    PermGuard -> PermGuard : Check: "users:read" ∈ user.permissions?
+
+    alt Permission missing
+      PermGuard --> Gateway : 403 Forbidden
+      Gateway --> Admin : 403 { error: "Missing permission: users:read" }
+    else Permission granted ("users:*" ✓)
+      PermGuard -> Gateway : Authorized (permission)
+
+      Gateway -> Resource : findAll()
+      Resource -> DB : SELECT * FROM users
+      DB --> Resource : [user1, user2, ...]
+      Resource --> Gateway : 200 { data: [users] }
+      Gateway --> Admin : 200 OK — Full user list
+    end
+  end
+end
+
+== SCENARIO 2: Employee accessing restricted resource ==
+
+Employee -> Gateway : DELETE /api/v1/users/123\nAuthorization: Bearer <token>
+Gateway -> AuthGuard : canActivate(context)
+AuthGuard -> AuthGuard : Verify & decode JWT\n{ role: "employee",\n  permissions: ["orders:read", "orders:update"] }
+AuthGuard --> Gateway : req.user = { role: "employee", permissions: [...] }
+
+Gateway -> RolesGuard : canActivate(context)
+note right of RolesGuard : @Roles(SUPER_ADMIN) required
+RolesGuard -> RolesGuard : user.role "employee" ∉ [SUPER_ADMIN]
+RolesGuard --> Gateway : 403 Forbidden (role mismatch)
+Gateway --> Employee : 403 { error: "Insufficient role" }
+
+== SCENARIO 3: Customer accessing own data (data-level auth) ==
+
+Customer -> Gateway : GET /api/v1/orders\nAuthorization: Bearer <token>
+Gateway -> AuthGuard : canActivate(context)
+AuthGuard -> AuthGuard : Verify & decode JWT\n{ sub: "user-456", role: "customer",\n  permissions: ["orders:read"] }
+AuthGuard --> Gateway : req.user = { id: "user-456", role: "customer", ... }
+
+Gateway -> RolesGuard : canActivate(context)
+note right of RolesGuard : @Roles(CUSTOMER, EMPLOYEE, ADMIN, SUPER_ADMIN)
+RolesGuard -> RolesGuard : user.role "customer" ∈ allowed roles ✓
+RolesGuard --> Gateway : Authorized
+
+Gateway -> PermGuard : canActivate(context)
+note right of PermGuard : @RequirePermission("orders:read")
+PermGuard -> PermGuard : "orders:read" ∈ user.permissions ✓
+PermGuard --> Gateway : Authorized
+
+Gateway -> Resource : findAll(req.user)
+note right of Resource
+  **Data-Level Authorization:**
+  Customer can ONLY see
+  their own orders.
+  Filter enforced at
+  repository level.
+endnote
+Resource -> Resource : Apply scope:\ncustomerId = req.user.id
+Resource -> DB : SELECT * FROM orders\nWHERE customer_id = 'user-456'
+DB --> Resource : [order1, order2] (customer's only)
+Resource --> Gateway : 200 { data: [orders] }
+Gateway --> Customer : 200 OK — Own orders only
+
+== SCENARIO 4: Unauthenticated access to public endpoint ==
+
+Customer -> Gateway : GET /api/v1/services\n(no auth header)
+Gateway -> AuthGuard : canActivate(context)
+note right of AuthGuard : @Public() decorator\nskips authentication
+AuthGuard -> AuthGuard : Route is marked @Public()
+AuthGuard --> Gateway : Bypass auth (public route)
+Gateway -> Resource : findAll()
+Resource -> DB : SELECT * FROM services WHERE is_active = true
+DB --> Resource : [service1, service2, ...]
+Resource --> Gateway : 200 { data: [services] }
+Gateway --> Customer : 200 OK — Public data
+
+== PERMISSION HIERARCHY TABLE ==
+
+note over Admin, DB
+  |= Role |= Default Permissions |
+  | **SUPER_ADMIN** | All permissions (*:*) |
+  | **ADMIN** | users:read, users:create, users:update, orders:*, reports:view |
+  | **EMPLOYEE** | orders:read, orders:update, customers:read, tickets:* |
+  | **CUSTOMER** | orders:read (own), orders:create, tickets:create (own), profile:update (own) |
+  | **GUEST** | services:read (public), content:read (public) |
+  ============
+  Guards execution order:
+  1. JwtAuthGuard (authentication)
+  2. RolesGuard (role check)
+  3. PermissionGuard (fine-grained permission check)
+  4. Data-level scope (repository filter by user context)
+endnote
+
+@enduml

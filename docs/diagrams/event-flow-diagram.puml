@@ -1,0 +1,160 @@
+@startuml event-flow-diagram
+' ============================================================
+' AlharisTech Platform — Event Flow Diagram
+' Shows key domain events, which domains publish/consume them
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam rectangle {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+  FontColor #1A5276
+  FontStyle bold
+  RoundCorner 8
+  FontSize 10
+}
+
+skinparam oval {
+  BackgroundColor #FADBD8
+  BorderColor #E74C3C
+  FontColor #922B21
+  FontSize 9
+}
+
+skinparam arrow {
+  Color #7F8C8D
+  FontSize 8
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 9
+}
+
+skinparam package {
+  BackgroundColor #F4F6F7
+  BorderColor #BDC3C7
+  FontColor #2C3E50
+  FontSize 10
+  FontStyle bold
+}
+
+title **AlharisTech Platform — Domain Event Flow**
+title **تدفق أحداث النطاق بين النطاقات المختلفة**
+
+' ============================================================
+' DOMAINS
+' ============================================================
+package "Identity Domain\nنطاق الهوية" #E8F0FE {
+  rectangle "Identity\nService" as ID_SVC
+}
+
+package "Customer Domain\nنطاق العملاء" #E8F8F5 {
+  rectangle "Customer\nService" as CUS_SVC
+}
+
+package "Service Domain\nنطاق الخدمات" #FDEBD0 {
+  rectangle "Service\nModule" as SRV_SVC
+}
+
+package "Commerce Domain\nنطاق المتجر" #F5EEF8 {
+  rectangle "Commerce\nModule" as COM_SVC
+}
+
+package "Support Domain\nنطاق الدعم" #FDEDEC {
+  rectangle "Support\nModule" as SUP_SVC
+}
+
+package "Notification Domain\nنطاق الإشعارات" #D5F5E3 {
+  rectangle "Notification\nModule" as NOT_SVC
+}
+
+package "Analytics Domain\nنطاق التحليلات" #FCF3CF {
+  rectangle "Analytics\nModule" as ANL_SVC
+}
+
+' ============================================================
+' EVENT BUS
+' ============================================================
+rectangle "**Event Bus**\nNestJS EventEmitter / BullMQ\nناقل الأحداث" as EVENT_BUS #E5E7E9
+
+' ============================================================
+' DOMAIN EVENTS
+' ============================================================
+oval "**UserRegistered**\n· userId, email\n· timestamp" as EVT_UserReg
+oval "**OrderPlaced**\n· orderId, customerId\n· serviceId, amount" as EVT_OrderPlaced
+oval "**OrderStatusChanged**\n· orderId, oldStatus\n· newStatus, changedBy" as EVT_OrderStatus
+oval "**TicketOpened**\n· ticketId, customerId\n· priority, category" as EVT_TicketOpened
+oval "**PaymentCompleted**\n· paymentId, orderId\n· amount, gateway" as EVT_Payment
+oval "**InvoiceGenerated**\n· invoiceId, orderId\n· amount, dueDate" as EVT_Invoice
+oval "**NotificationSent**\n· notificationId, channel\n· recipient, status" as EVT_NotifSent
+
+' ============================================================
+' EVENT PUBLISHERS → EVENT BUS
+' ============================================================
+ID_SVC -down-> EVENT_BUS : "**publishes**\nUserRegistered"
+SRV_SVC -down-> EVENT_BUS : "**publishes**\nOrderPlaced\nOrderStatusChanged"
+SUP_SVC -down-> EVENT_BUS : "**publishes**\nTicketOpened"
+COM_SVC -down-> EVENT_BUS : "**publishes**\nPaymentCompleted\nInvoiceGenerated"
+NOT_SVC -down-> EVENT_BUS : "**publishes**\nNotificationSent"
+
+' Event bus to events
+EVENT_BUS -down-> EVT_UserReg
+EVENT_BUS -down-> EVT_OrderPlaced
+EVENT_BUS -down-> EVT_OrderStatus
+EVENT_BUS -down-> EVT_TicketOpened
+EVENT_BUS -down-> EVT_Payment
+EVENT_BUS -down-> EVT_Invoice
+EVENT_BUS -down-> EVT_NotifSent
+
+' ============================================================
+' EVENT CONSUMERS
+' ============================================================
+' UserRegistered consumers
+EVT_UserReg -[#2980B9]down-> CUS_SVC : "**consumes**\nCreate customer\nprofile"
+EVT_UserReg -[#2980B9]down-> NOT_SVC : "**consumes**\nSend welcome\nemail/SMS"
+EVT_UserReg -[#2980B9]down-> ANL_SVC : "**consumes**\nTrack user\nacquisition"
+
+' OrderPlaced consumers
+EVT_OrderPlaced -[#27AE60]down-> NOT_SVC : "**consumes**\nNotify customer\n& assigned staff"
+EVT_OrderPlaced -[#27AE60]down-> ANL_SVC : "**consumes**\nTrack order\nmetrics"
+EVT_OrderPlaced -[#27AE60]down-> CUS_SVC : "**consumes**\nUpdate customer\nhistory"
+
+' OrderStatusChanged consumers
+EVT_OrderStatus -[#8E44AD]down-> NOT_SVC : "**consumes**\nSend status\nupdate notification"
+EVT_OrderStatus -[#8E44AD]down-> ANL_SVC : "**consumes**\nTrack status\ntransitions"
+EVT_OrderStatus -[#8E44AD]down-> COM_SVC : "**consumes**\nGenerate invoice\non completion"
+
+' TicketOpened consumers
+EVT_TicketOpened -[#E67E22]down-> NOT_SVC : "**consumes**\nNotify support\nstaff"
+EVT_TicketOpened -[#E67E22]down-> ANL_SVC : "**consumes**\nTrack support\nvolume"
+
+' PaymentCompleted consumers
+EVT_Payment -[#E74C3C]down-> COM_SVC : "**consumes**\nUpdate order\npayment status"
+EVT_Payment -[#E74C3C]down-> NOT_SVC : "**consumes**\nSend payment\nconfirmation"
+EVT_Payment -[#E74C3C]down-> ANL_SVC : "**consumes**\nTrack revenue\nmetrics"
+
+' InvoiceGenerated consumers
+EVT_Invoice -[#2C3E50]down-> NOT_SVC : "**consumes**\nSend invoice\nemail"
+EVT_Invoice -[#2C3E50]down-> CUS_SVC : "**consumes**\nUpdate customer\nbilling history"
+EVT_Invoice -[#2C3E50]down-> ANL_SVC : "**consumes**\nTrack billing\nmetrics"
+
+' NotificationSent consumers
+EVT_NotifSent -[#1ABC9C]down-> ANL_SVC : "**consumes**\nTrack delivery\nrates"
+EVT_NotifSent -[#1ABC9C]down-> CUS_SVC : "**consumes**\nUpdate comm\nlog"
+
+note bottom of ANL_SVC
+  Analytics domain is a **read-side**
+  consumer of most events.
+  It never publishes business events —
+  only consumes for aggregation.
+  ============
+  Future: CQRS with separate
+  read models powered by events.
+endnote
+
+@enduml

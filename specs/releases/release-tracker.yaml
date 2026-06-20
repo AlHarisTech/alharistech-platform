@@ -1,0 +1,71 @@
+# Release Tracker
+# AlharisTech Platform — Release tracking
+
+version: "1.0"
+updated: "2026-06-20"
+
+releases:
+
+  - version: "0.1.0"
+    name: "First Contact"
+    name_ar: "أول تواصل"
+    phase: "phase-1"
+    status: "planned"
+    target_date: "2026-10"
+    scope: "Public website + Auth + CMS + Service Orders"
+    specs:
+      - "SPEC-FEAT-001"  # Auth
+      - "SPEC-FEAT-002"  # Website
+      - "SPEC-FEAT-003"  # CMS
+      - "SPEC-FEAT-004"  # Services
+    fr_coverage:
+      - "FR-101"  # Auth
+      - "FR-109"  # Auth end
+      - "FR-301"  # Services
+      - "FR-308"  # Services end
+      - "FR-401"  # CMS
+      - "FR-408"  # CMS end
+    success_criteria:
+      - "Public website live with all core pages"
+      - "User registration and login functional"
+      - "CMS operational for content editors"
+      - "Service catalog visible; order submission works"
+      - "Lighthouse score ≥ 90"
+      - "API p95 latency < 200ms"
+    rollback_plan: "Revert to previous Docker image; restore database from backup"
+
+  - version: "0.2.0"
+    name: "Command Center"
+    name_ar: "مركز القيادة"
+    phase: "phase-2"
+    status: "planned"
+    target_date: "2027-04"
+    scope: "Admin Dashboard + CRM + Invoices + Tickets + Notifications"
+    depends_on: ["0.1.0"]
+
+  - version: "1.0.0"
+    name: "Commerce Engine"
+    name_ar: "محرك التجارة"
+    phase: "phase-3"
+    status: "planned"
+    target_date: "2027-10"
+    scope: "E-Commerce store + Payments + Inventory + Shipping"
+    depends_on: ["0.2.0"]
+
+  - version: "1.5.0"
+    name: "Omni-Channel"
+    name_ar: "متعدد القنوات"
+    phase: "phase-4"
+    status: "planned"
+    target_date: "2028-06"
+    scope: "Desktop App + Android App + iOS App"
+    depends_on: ["1.0.0"]
+
+  - version: "2.0.0"
+    name: "Platform"
+    name_ar: "المنصة"
+    phase: "phase-5"
+    status: "planned"
+    target_date: "2029-07"
+    scope: "Multi-Tenant SaaS + Marketplace + AI Platform"
+    depends_on: ["1.5.0"]

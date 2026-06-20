@@ -1,0 +1,198 @@
+@startuml disaster-recovery
+' ============================================================
+' AlharisTech Platform — Disaster Recovery Diagram
+' Primary region → DR region, replication, failover, RTO/RPO
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam rectangle {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+  FontColor #1A5276
+  FontSize 9
+  RoundCorner 6
+}
+
+skinparam database {
+  BackgroundColor #D5F5E3
+  BorderColor #27AE60
+  FontSize 9
+}
+
+skinparam cloud {
+  BackgroundColor #FDEBD0
+  BorderColor #E67E22
+}
+
+skinparam node {
+  BackgroundColor #FDEDEC
+  BorderColor #E74C3C
+  FontSize 9
+}
+
+skinparam frame {
+  BackgroundColor #F4F6F7
+  BorderColor #AAB7B8
+  FontColor #2C3E50
+  FontSize 12
+  FontStyle bold
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 9
+}
+
+title **AlharisTech Platform — Disaster Recovery Architecture**
+title **معمارية التعافي من الكوارث — المنطقة الأساسية ومنطقة الطوارئ**
+
+' ============================================================
+' PRIMARY REGION
+' ============================================================
+frame "**Primary Region — المنطقة الأساسية**\nRegion: me-south-1 (Riyadh) / AWS Bahrain\nStatus: **ACTIVE**" #E8F8F5 {
+
+  rectangle "**DNS (Primary)**\n========================\n· alharistech.com → Primary IP\n· TTL: 60 seconds (low for fast cutover)\n· Health check: TCP 443 every 30s\n· GeoDNS: route to nearest region" as PrimDNS
+
+  rectangle "**Load Balancer (Primary)**\n========================\n· Public IP: 1.2.3.4\n· SSL termination\n· Routing: web → api" as PrimLB
+
+  rectangle "**Web / Admin (Primary)**\n========================\n· Next.js (×3 instances)\n· CDN: Vercel/CloudFront\n· Stateless" as PrimWeb
+
+  rectangle "**API Gateway (Primary)**\n========================\n· NestJS (×4 instances)\n· Stateless" as PrimAPI
+
+  rectangle "**BullMQ Workers (Primary)**\n========================\n· ×3 Background workers\n· Email, SMS, PDF, Export\n· Stateless" as PrimBull
+
+  database "**PostgreSQL Primary**\n========================\n· Write operations\n· WAL archiving enabled\n· Daily full backup\n· Continuous WAL shipping" as PrimPG
+
+  database "**Redis Primary**\n========================\n· Cache + Session + Queue\n· AOF persistence: everysec\n· RDB snapshots: hourly" as PrimRedis
+
+  database "**S3 Primary**\n========================\n· Object storage\n· Server-side encryption\n· Versioning enabled\n· Cross-region replication" as PrimS3
+
+  rectangle "**Monitoring (Primary)**\n========================\n· Prometheus + Grafana\n· ELK / Loki\n· Jaeger" as PrimMon
+}
+
+' ============================================================
+' REPLICATION LINKS
+' ============================================================
+rectangle "**Replication — النسخ**" #FDEBD0 as ReplBox {
+
+  rectangle "**PostgreSQL Streaming Replication**\n========================\n· Async streaming (WAL)\n· Replication slots\n· Lag: < 1 second (normal)\n· Max lag: 10 seconds" as Repl_PG
+  rectangle "**S3 Cross-Region Replication**\n========================\n· Async replication\n· Versioning replicated\n· Delete markers replicated\n· Lag: < 15 minutes" as Repl_S3
+  rectangle "**Redis Replication**\n========================\n· Async replica\n· Read-only in DR\n· AOF+RDB shipped" as Repl_Redis
+  rectangle "**Backup Replication**\n========================\n· Daily DB dumps → S3 (DR)\n· Weekly full backups → Glacier\n· Encrypted (AES-256)" as Repl_Backup
+}
+
+' ============================================================
+' DR REGION
+' ============================================================
+frame "**DR Region — منطقة التعافي**\nRegion: eu-west-1 (Ireland) / AWS Frankfurt\nStatus: **STANDBY**" #FDEDEC {
+
+  rectangle "**DNS (DR)**\n========================\n· Pre-configured, inactive\n· CNAME: dr.alharistech.com\n· Health check: monitors primary" as DRDNS
+
+  rectangle "**Load Balancer (DR)**\n========================\n· Standby (scaled to 0 or min size)\n· Pre-configured rules\n· SSL certs pre-installed" as DRLB
+
+  rectangle "**Web / Admin (DR — Warm)**\n========================\n· Next.js (×1 min instance)\n· Can scale up on failover\n· Pre-built Docker images cached" as DRWeb
+
+  rectangle "**API Gateway (DR — Warm)**\n========================\n· NestJS (×1 min instance)\n· Can scale to full capacity\n· Pre-built images" as DRAPI
+
+  rectangle "**BullMQ Workers (DR — Cold)**\n========================\n· Scaled to 0\n· Start on failover" as DRBull
+
+  database "**PostgreSQL Standby**\n========================\n· Read replica (standby)\n· Receiving WAL stream\n· Can promote to primary\n· Warm standby" as DRPG
+
+  database "**Redis Replica (DR)**\n========================\n· Standby replica\n· Read-only\n· Can promote on failover" as DRRedis
+
+  database "**S3 DR (Replica)**\n========================\n· Cross-region replicated\n· All objects + versions\n· Lifecycle policies synced" as DRS3
+
+  rectangle "**Monitoring (DR)**\n========================\n· Standby Prometheus + Grafana\n· Minimal instance\n· Alert if replication breaks" as DRMon
+}
+
+' ============================================================
+' CONNECTIONS
+' ============================================================
+PrimPG -down-> Repl_PG : "WAL streaming\nPort 5432"
+PrimS3 -down-> Repl_S3 : "CRR (async)"
+PrimRedis -down-> Repl_Redis : "Replication"
+
+Repl_PG -down-> DRPG : "WAL apply"
+Repl_S3 -down-> DRS3 : "Object sync"
+Repl_Redis -down-> DRRedis : "Sync"
+
+PrimMon -down-> DRMon : "Monitor replication\nhealth"
+
+' ============================================================
+' FAILOVER PROCESS
+' ============================================================
+== FAILOVER PROCESS — عملية التحويل ==
+
+note over PrimDNS, DRS3
+  **Automated Failover Trigger Conditions:**
+  =========================================
+  1. Health checks fail for > 2 consecutive minutes
+  2. Error rate exceeds 50% for 5 minutes
+  3. Database becomes unresponsive for 60 seconds
+  4. Manual trigger by on-call engineer (PagerDuty)
+
+  **Manual Failover Decision (if automated disabled):**
+  · On-call engineer receives PagerDuty alert
+  · Assess severity and expected MTTR
+  · If MTTR > 15 minutes → execute failover
+  · SRE manager approval required (2-person rule)
+endnote
+
+' ============================================================
+' FAILOVER STEPS (SEQUENCE-LIKE)
+' ============================================================
+rectangle "**Step 1: Detect**\n========================\n· Uptime monitoring alert fires\n· Prometheus AlertManager → PagerDuty\n· On-call engineer acknowledges" as Step1
+rectangle "**Step 2: Decide**\n========================\n· Assess MTTR of primary\n· Check replication lag\n· If safe to failover → proceed\n· 2-person approval" as Step2
+rectangle "**Step 3: Stop Primary Writes**\n========================\n· Set application to maintenance mode\n· Stop BullMQ workers\n· Complete inflight transactions\n· Final WAL flush" as Step3
+rectangle "**Step 4: Promote DR Database**\n========================\n· pg_ctl promote on DR standby\n· Verify data consistency\n· WAL replay complete (lag: 0)" as Step4
+rectangle "**Step 5: Scale DR Services**\n========================\n· Scale API to full capacity (×4)\n· Scale Web to full capacity (×3)\n· Start BullMQ workers (×3)\n· Verify all health checks" as Step5
+rectangle "**Step 6: DNS Cutover**\n========================\n· Update DNS: alharistech.com → DR IP\n· TTL: 60s (pre-set)\n· Verify propagation\n· CDN origin switch" as Step6
+rectangle "**Step 7: Verify & Monitor**\n========================\n· Smoke test critical paths\n· Check error rates and latency\n· Monitor for 30 minutes\n· Page if issues" as Step7
+rectangle "**Step 8: Post-Failover**\n========================\n· Document incident\n· Root cause analysis\n· Restore primary when ready\n· Reverse replication" as Step8
+
+Step1 -down-> Step2
+Step2 -down-> Step3
+Step3 -down-> Step4
+Step4 -down-> Step5
+Step5 -down-> Step6
+Step6 -down-> Step7
+Step7 -down-> Step8
+
+' ============================================================
+' RTO / RPO TIMELINE
+' ============================================================
+note bottom of Step8
+  **RTO / RPO Targets:**
+  ======================
+  | Metric | Target | Measurement |
+  | **RTO** (Recovery Time Objective) | **< 15 minutes** | Time from failure detection to DR fully operational |
+  | **RPO** (Recovery Point Objective) | **< 5 minutes** | Maximum acceptable data loss |
+  |===
+  | Phase | Duration | Cumulative |
+  | Detection | 1-2 min | 2 min |
+  | Decision | 1-2 min | 4 min |
+  | DB Promotion | 1-3 min | 7 min |
+  | Scale Services | 2-3 min | 10 min |
+  | DNS Cutover | 1-2 min | 12 min |
+  | Verification | 3 min | 15 min |
+  | **Total RTO** | **~15 min** |
+  |===
+
+  **Backup Strategy:**
+  |===
+  | Type | Frequency | Retention | Storage |
+  | PostgreSQL WAL | Continuous | 7 days | S3 |
+  | PostgreSQL Full | Daily | 30 days | S3 (primary + DR) |
+  | PostgreSQL Weekly | Weekly | 12 weeks | S3 Glacier |
+  | PostgreSQL Monthly | Monthly | 12 months | S3 Glacier Deep |
+  | S3 (CRR) | Continuous (async) | — | DR region |
+  | Redis RDB | Hourly | 24 hours | S3 |
+  | Redis AOF | Every second | 1 day | Local disk |
+  |===
+endnote
+
+@enduml

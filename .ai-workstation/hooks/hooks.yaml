@@ -1,0 +1,149 @@
+# Lifecycle Hooks
+# AlharisTech Platform — Automated enforcement hooks
+
+version: "1.0"
+
+hooks:
+
+  # ─── Pre-Commit Hooks ───
+  pre_commit:
+    - id: "secret-detection"
+      description: "Scan staged files for secrets, keys, tokens"
+      command: "detect-secrets-hook"
+      severity: "block"
+      config: ".secrets.baseline"
+
+    - id: "lint-staged"
+      description: "Run linter on staged files"
+      command: "lint-staged"
+      severity: "block"
+      config:
+        "*.{ts,tsx}": ["eslint --fix", "prettier --write"]
+        "*.{md,yaml,json}": ["prettier --write"]
+
+    - id: "typecheck-staged"
+      description: "Run TypeScript type checking on affected packages"
+      command: "turbo typecheck --filter=[HEAD^1]"
+      severity: "block"
+
+    - id: "conventional-commit"
+      description: "Validate commit message follows Conventional Commits"
+      command: "commitlint"
+      severity: "block"
+
+  # ─── Pre-Push Hooks ───
+  pre_push:
+    - id: "unit-tests"
+      description: "Run unit tests for affected packages"
+      command: "turbo test --filter=[HEAD^1]"
+      severity: "block"
+
+    - id: "build-check"
+      description: "Verify build succeeds"
+      command: "turbo build --filter=[HEAD^1]"
+      severity: "block"
+
+  # ─── Post-Commit Hooks ───
+  post_commit:
+    - id: "update-context"
+      description: "Update session context with commit info"
+      action: "record_commit_in_session"
+
+    - id: "notify-team"
+      description: "Send commit notification to team channel"
+      action: "notify"
+      enabled: false
+
+  # ─── Pre-Merge Hooks (CI) ───
+  pre_merge:
+    - id: "full-test-suite"
+      description: "Run full test suite"
+      command: "turbo test"
+      severity: "block"
+
+    - id: "integration-tests"
+      description: "Run integration tests"
+      command: "turbo test:integration"
+      severity: "block"
+
+    - id: "security-scan"
+      description: "Run SAST and dependency audit"
+      commands:
+        - "npm audit --audit-level=high"
+        - "codeql-analysis"
+      severity: "block"
+
+    - id: "architecture-compliance"
+      description: "Check architecture compliance against ADRs"
+      action: "validate_architecture"
+      severity: "warning"
+
+    - id: "bundle-size"
+      description: "Check bundle size budget"
+      command: "turbo analyze"
+      severity: "warning"
+
+  # ─── Post-Merge Hooks ───
+  post_merge:
+    - id: "deploy-staging"
+      description: "Deploy to staging environment"
+      action: "trigger_deploy_staging"
+      auto: true
+
+    - id: "e2e-tests"
+      description: "Run E2E tests on staging"
+      action: "trigger_e2e_tests"
+      auto: true
+
+  # ─── Pre-Release Hooks ───
+  pre_release:
+    - id: "version-bump"
+      description: "Validate version bump per SemVer"
+      action: "check_semver"
+
+    - id: "changelog"
+      description: "Ensure CHANGELOG is updated"
+      action: "check_changelog"
+
+    - id: "full-qa"
+      description: "Run complete QA suite"
+      command: "turbo test:e2e"
+      severity: "block"
+
+    - id: "performance-benchmark"
+      description: "Run performance benchmarks"
+      command: "k6 run tests/performance/"
+      severity: "warning"
+
+    - id: "security-audit"
+      description: "Run full security audit"
+      command: "owasp-zap-scan"
+      severity: "block"
+
+  # ─── Post-Release Hooks ───
+  post_release:
+    - id: "smoke-tests"
+      description: "Run smoke tests in production"
+      action: "trigger_smoke_tests"
+
+    - id: "monitor"
+      description: "Monitor production for anomalies"
+      action: "activate_monitoring"
+      duration: "24h"
+
+  # ─── Scheduled Hooks ───
+  scheduled:
+    - id: "daily-backup"
+      description: "Run daily database and file backup"
+      schedule: "0 2 * * *"
+      workflow: "backup_recovery"
+
+    - id: "weekly-dependency-audit"
+      description: "Audit dependencies for vulnerabilities"
+      schedule: "0 8 * * 1"
+      command: "npm audit"
+
+    - id: "monthly-architecture-review"
+      description: "Review architecture compliance"
+      schedule: "0 10 1 * *"
+      action: "arch_assess"

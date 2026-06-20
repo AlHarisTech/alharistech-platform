@@ -1,0 +1,84 @@
+# Plugin Registry
+# AlharisTech Platform — Extensibility plugins
+
+version: "1.0"
+
+plugins:
+
+  spec_kit:
+    name: "Spec-Kit Integration"
+    description: "Integrates github/spec-kit specification-driven development workflows"
+    location: "tools/spec-kit/"
+    status: "installed"
+    commands:
+      - "speckit_constitution"
+      - "speckit_specify"
+      - "speckit_clarify"
+      - "speckit_plan"
+      - "speckit_tasks"
+      - "speckit_implement"
+      - "speckit_converge"
+      - "speckit_analyze"
+      - "speckit_checklist"
+      - "speckit_taskstoissues"
+    hooks:
+      - "pre_merge.architecture-compliance"
+      - "post_merge.deploy-staging"
+
+  plantuml:
+    name: "PlantUML Diagram Generator"
+    description: "Generates and validates PlantUML architecture diagrams"
+    commands:
+      - "arch_c4"
+      - "arch_diagram"
+    templates: ".docs-runtime/templates/diagrams/"
+    hooks:
+      - "pre_release.documentation-check"
+
+  git_workflow:
+    name: "Git Workflow Automation"
+    description: "Automates branching, commits, PRs per governance rules"
+    commands:
+      - "dev_feature"
+      - "dev_fix"
+      - "review_code"
+    hooks:
+      - "pre_commit.conventional-commit"
+      - "pre_merge.full-test-suite"
+
+  quality_gates:
+    name: "Quality Gate Enforcement"
+    description: "Enforces quality gates at each lifecycle phase"
+    config: ".governance/enforcement.yaml"
+    hooks:
+      - "pre_commit.lint-staged"
+      - "pre_push.unit-tests"
+      - "pre_merge.security-scan"
+      - "pre_release.full-qa"
+
+  evidence_collector:
+    name: "Evidence Collector"
+    description: "Collects and records evidence for decisions and reviews"
+    output: ".runtime/evidence/"
+    hooks:
+      - "post_commit.update-context"
+      - "pre_merge.architecture-compliance"
+
+  docker_runtime:
+    name: "Docker Runtime"
+    description: "Manages Docker-based development environment"
+    commands:
+      - "ops_deploy"
+    config: "infrastructure/docker/"
+    status: "pending"  # Requires docker-compose.yml creation
+
+  ci_cd:
+    name: "CI/CD Pipeline"
+    description: "GitHub Actions CI/CD integration"
+    config: ".github/workflows/"
+    status: "pending"  # Requires workflow file creation
+
+  monitoring:
+    name: "Monitoring & Observability"
+    description: "Prometheus, Grafana, logging integration"
+    status: "planned"  # Phase 2+

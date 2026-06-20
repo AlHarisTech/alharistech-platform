@@ -1,0 +1,313 @@
+# Workflows Definition
+# AlharisTech Platform — Engineering Operating System
+# All repeatable engineering workflows
+# Generated: 2026-06-20
+
+version: "1.0"
+
+workflows:
+
+  # ─── Feature Development ─────────────────────────────────────
+  feature_development:
+    id: "WF-DEV-001"
+    name: "Feature Development"
+    trigger: "Specification approved"
+    steps:
+      - id: "task-breakdown"
+        action: "Decompose specification into tasks"
+        output: "tasks/phase-N/feature-name.md"
+        gate: "G3_Design"
+
+      - id: "sprint-assignment"
+        action: "Assign tasks to sprint"
+        output: "Sprint board updated"
+
+      - id: "create-branch"
+        action: "Create feature branch from develop"
+        command: "git checkout -b feature/{id} develop"
+
+      - id: "implementation"
+        action: "Implement feature"
+        policies: ["PERP-SEC", "PERP-MNT", "PERP-MOD", "PERP-MIN"]
+
+      - id: "unit-tests"
+        action: "Write and run unit tests"
+        criteria: "coverage >= 80%"
+
+      - id: "integration-tests"
+        action: "Write and run integration tests"
+        criteria: "all pass"
+
+      - id: "code-review"
+        action: "Submit PR for review"
+        criteria: ["1+ approvals", "CI passes", "no secrets"]
+
+      - id: "merge-to-develop"
+        action: "Squash & merge to develop"
+        command: "git merge --squash feature/{id}"
+
+      - id: "deploy-staging"
+        action: "Deploy to staging environment"
+
+      - id: "e2e-tests"
+        action: "Run end-to-end tests on staging"
+        criteria: "core flows pass"
+
+      - id: "qa-approval"
+        action: "QA review and approval"
+
+      - id: "merge-to-main"
+        action: "Merge to main for production"
+
+      - id: "deploy-production"
+        action: "Deploy to production"
+        criteria: ["rollback plan ready", "monitoring active"]
+
+      - id: "monitor"
+        action: "Monitor production for 24h"
+
+      - id: "close-task"
+        action: "Close task and update documentation"
+
+  # ─── Bug Fix ─────────────────────────────────────────────────
+  bug_fix:
+    id: "WF-FIX-001"
+    name: "Bug Fix"
+    trigger: "Bug reported (GitHub Issue)"
+    steps:
+      - id: "triage"
+        action: "Assess severity and priority"
+
+      - id: "assign"
+        action: "Assign developer"
+
+      - id: "create-branch"
+        action: "Create fix branch"
+        command: "git checkout -b fix/{issue-id} develop"
+
+      - id: "implement"
+        action: "Implement fix"
+
+      - id: "regression-tests"
+        action: "Write regression tests"
+        criteria: "bug reproduction covered"
+
+      - id: "code-review"
+        action: "Code review"
+
+      - id: "merge"
+        action: "Merge to develop (or hotfix to main)"
+
+      - id: "deploy"
+        action: "Deploy"
+
+      - id: "verify"
+        action: "Verify fix in production"
+
+      - id: "close"
+        action: "Close issue"
+
+  # ─── Architecture Change ─────────────────────────────────────
+  architecture_change:
+    id: "WF-ARC-001"
+    name: "Architecture Change (ADR)"
+    trigger: "Architecture change proposed"
+    steps:
+      - id: "draft-adr"
+        action: "Create ADR draft using template"
+        output: "docs/adr/adr-XXX-title.md"
+
+      - id: "review-board"
+        action: "Architecture review board evaluation"
+        criteria: ["principles check", "impact analysis"]
+
+      - id: "decision"
+        action: "Accept / Reject / Request Changes"
+        output: "ADR status updated"
+
+      - id: "propagate"
+        action: "Propagate decisions to affected artifacts"
+        sub_steps:
+          - "Update C4 diagrams"
+          - "Update specifications"
+          - "Update implementation plans"
+          - "Update context map"
+
+      - id: "communicate"
+        action: "Broadcast decision to team"
+
+      - id: "enforce"
+        action: "Update CI/CD gates if needed"
+
+  # ─── Code Review ─────────────────────────────────────────────
+  code_review:
+    id: "WF-REV-001"
+    name: "Code Review"
+    trigger: "PR opened"
+    steps:
+      - id: "automated-checks"
+        actions:
+          - "Lint (ESLint/Biome)"
+          - "Type check (TypeScript)"
+          - "Unit tests"
+          - "Integration tests"
+          - "Build check"
+          - "Bundle size check"
+        criteria: "all pass"
+
+      - id: "security-scan"
+        actions:
+          - "Secret detection"
+          - "Dependency audit"
+          - "SAST (CodeQL)"
+
+      - id: "human-review"
+        actions:
+          - reviewer_checks:
+              - "Security: no secrets, input validation, auth checks"
+              - "Performance: no N+1, proper indexing, caching"
+              - "Architecture: follows ADRs, correct layer placement"
+              - "Testing: adequate coverage, edge cases"
+              - "Documentation: API docs updated, changelog entry"
+              - "Style: follows coding standards"
+        criteria: "1+ approvals (2 for major features)"
+
+      - id: "merge"
+        action: "Squash & merge"
+        criteria: ["all checks passed", "reviews approved", "branch up to date"]
+
+  # ─── Release ─────────────────────────────────────────────────
+  release:
+    id: "WF-REL-001"
+    name: "Release"
+    trigger: "Release milestone reached"
+    steps:
+      - id: "version-bump"
+        action: "Bump version per SemVer"
+
+      - id: "changelog"
+        action: "Update CHANGELOG.md"
+
+      - id: "release-branch"
+        action: "Create release branch"
+
+      - id: "final-qa"
+        action: "Full QA pass on staging"
+
+      - id: "security-audit"
+        action: "OWASP ZAP scan"
+
+      - id: "performance-benchmark"
+        action: "Run k6 load tests"
+
+      - id: "tag"
+        action: "Create git tag"
+        command: "git tag -a v{version} -m 'Release v{version}'"
+
+      - id: "deploy-production"
+        action: "Deploy to production"
+
+      - id: "smoke-tests"
+        action: "Run smoke tests in production"
+
+      - id: "announce"
+        action: "Publish release notes"
+
+  # ─── Documentation Lifecycle ─────────────────────────────────
+  documentation_lifecycle:
+    id: "WF-DOC-001"
+    name: "Documentation Lifecycle"
+    trigger: "Document created or modified"
+    steps:
+      - id: "draft"
+        action: "Create document in appropriate location"
+
+      - id: "review"
+        action: "Peer review for accuracy and completeness"
+
+      - id: "approve"
+        action: "Owner approval"
+
+      - id: "publish"
+        action: "Merge to main"
+
+      - id: "maintain"
+        action: "Review per schedule (quarterly/phase)"
+
+      - id: "archive"
+        action: "Archive when superseded"
+
+  # ─── Sprint Ceremonies ──────────────────────────────────────
+  sprint_ceremonies:
+    id: "WF-SPR-001"
+    name: "Sprint Ceremonies"
+    schedule: "2-week sprint"
+    events:
+      - name: "Sprint Planning"
+        day: "Monday (start)"
+        duration: "2 hours"
+        output: "Sprint backlog"
+
+      - name: "Daily Standup"
+        day: "Daily"
+        duration: "15 minutes"
+        output: "Status update"
+
+      - name: "Sprint Review"
+        day: "Friday (end)"
+        duration: "1 hour"
+        output: "Demo + feedback"
+
+      - name: "Sprint Retrospective"
+        day: "Friday (end)"
+        duration: "1 hour"
+        output: "Action items"
+
+  # ─── Backup & Recovery ──────────────────────────────────────
+  backup_recovery:
+    id: "WF-OPS-001"
+    name: "Backup & Recovery"
+    schedule: "Daily automated"
+    steps:
+      - id: "database-backup"
+        action: "pg_dump to S3"
+        retention: "7 daily, 4 weekly, 3 monthly"
+
+      - id: "file-backup"
+        action: "Sync S3 bucket"
+        retention: "7 daily, 4 weekly, 3 monthly"
+
+      - id: "verify"
+        action: "Verify backup integrity"
+
+      - id: "alert"
+        action: "Alert on failure"
+        channels: ["email", "ops-channel"]
+
+  # ─── Incident Response ──────────────────────────────────────
+  incident_response:
+    id: "WF-OPS-002"
+    name: "Incident Response"
+    trigger: "Alert triggered or incident reported"
+    steps:
+      - id: "detect"
+        action: "Alert received via monitoring"
+
+      - id: "triage"
+        action: "Assess severity (P0-P4)"
+
+      - id: "respond"
+        action: "Assign response team"
+
+      - id: "mitigate"
+        action: "Apply immediate mitigation"
+
+      - id: "resolve"
+        action: "Implement permanent fix"
+
+      - id: "post-mortem"
+        action: "Write incident report"
+        output: "reports/incidents/{date}-{incident}.md"
+
+      - id: "improve"
+        action: "Update monitoring/processes to prevent recurrence"

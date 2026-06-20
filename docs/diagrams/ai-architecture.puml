@@ -1,0 +1,264 @@
+@startuml ai-architecture
+' ============================================================
+' AlharisTech Platform — AI Architecture
+' AI Gateway, Model Router, RAG Pipeline, Agents, Safety
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam rectangle {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+  FontColor #1A5276
+  FontSize 9
+  RoundCorner 6
+}
+
+skinparam database {
+  BackgroundColor #D5F5E3
+  BorderColor #27AE60
+  FontSize 9
+}
+
+skinparam component {
+  BackgroundColor #F5EEF8
+  BorderColor #8E44AD
+  FontSize 9
+}
+
+skinparam cloud {
+  BackgroundColor #FDEBD0
+  BorderColor #E67E22
+}
+
+skinparam node {
+  BackgroundColor #E8F0FE
+  BorderColor #5DADE2
+  FontSize 9
+}
+
+skinparam frame {
+  BackgroundColor #F4F6F7
+  BorderColor #AAB7B8
+  FontColor #2C3E50
+  FontSize 12
+  FontStyle bold
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 9
+}
+
+skinparam arrow {
+  FontSize 8
+}
+
+title **AlharisTech Platform — AI Architecture**
+title **معمارية الذكاء الاصطناعي — البوابة، التضمين، الوكلاء، الأمان**
+
+' ============================================================
+' AI GATEWAY — ENTRY POINT
+' ============================================================
+frame "**AI Gateway — بوابة الذكاء الاصطناعي**" #E8F0FE {
+
+  rectangle "**AI Controller**\nNestJS Module\n========================\n· POST /api/v1/ai/chat\n· POST /api/v1/ai/embed\n· POST /api/v1/ai/agent/run\n· GET /api/v1/ai/usage\n· Streaming (SSE) support" as AI_Controller
+
+  rectangle "**AI Orchestrator**\nApplication Service\n========================\n· Model selection (routing)\n· Prompt resolution + versioning\n· Tool/function calling\n· Conversation state management\n· Usage tracking + billing" as AI_Orchestrator
+
+  rectangle "**Configuration Service**\n========================\n· Feature flags\n· Provider weights\n· Rate limits per user/role\n· Model allow/block lists" as AI_Config
+}
+
+' ============================================================
+' MODEL ROUTER
+' ============================================================
+frame "**Model Router — موجه النماذج**" #FDEBD0 {
+
+  rectangle "**Router Logic**\n========================\n· Task classification\n· Cost optimization\n· Latency optimization\n· Fallback chains\n· A/B testing" as Router_Logic
+
+  rectangle "**Provider Adapters**\nPlugin Architecture\n========================\n· Unified interface:\n  - chat(messages, options)\n  - stream(messages, options)\n  - embed(text)\n· Adapters: OpenAI, Anthropic,\n  Azure, Local (Ollama), Gemini" as Router_Adapters
+
+  cloud "**OpenAI**\nGPT-4o-mini\nGPT-4o\n========================\n· Chat completions\n· Embeddings (text-embedding-3)\n· Function calling\n· Vision" as Prov_OpenAI
+
+  cloud "**Anthropic**\nClaude 3.5 Sonnet\nClaude 3 Haiku\n========================\n· Long context (200K)\n· Tool use\n· Vision\n· Safety-focused" as Prov_Anthropic
+
+  cloud "**Azure OpenAI**\nGPT-4o\nGPT-4o-mini\n========================\n· Enterprise compliance\n· VNet integration\n· Data residency\n· Private endpoints" as Prov_Azure
+
+  cloud "**Local / Self-Hosted**\nOllama / vLLM\n========================\n· Llama 3, Mistral\n· No data leaves infra\n· Lower cost\n· Offline capable" as Prov_Local
+}
+
+' ============================================================
+' RAG PIPELINE
+' ============================================================
+frame "**RAG Pipeline — خط أنابيب التوليد المعزز**" #D5F5E3 {
+
+  package "Document Ingestion — استيعاب المستندات" #E8F8F5 {
+    rectangle "**Document Loaders**\n========================\n· PDF, DOCX, TXT, HTML\n· Web scraping\n· API data\n· Database exports" as RAG_Loaders
+    rectangle "**Text Splitter**\n========================\n· Recursive character split\n· Chunk size: 1000 tokens\n· Chunk overlap: 200 tokens\n· Preserve metadata" as RAG_Splitter
+  }
+
+  package "Embedding — التضمين" #E8F8F5 {
+    rectangle "**Embedding Service**\n========================\n· Model: text-embedding-3\n· Dimensions: 1536\n· Batch processing\n· Caching layer (Redis)" as RAG_Embed
+  }
+
+  package "Vector Store — مخزن المتجهات" #D5F5E3 {
+    database "**pgvector**\nPostgreSQL Extension\n========================\n· Cosine similarity\n· L2 distance\n· IVFFlat indexing\n· Metadata filtering\n· Hybrid search: vector + keyword" as RAG_VectorDB
+  }
+
+  package "Retrieval — الاسترجاع" #E8F8F5 {
+    rectangle "**Retrieval Service**\n========================\n· Query embedding\n· Similarity search (top-k)\n· Re-ranking (cross-encoder)\n· Metadata filtering\n· Hybrid: vector + BM25\n· Fallback: keyword search" as RAG_Retrieval
+  }
+
+  package "Generation — التوليد" #D5F5E3 {
+    rectangle "**Generation Service**\n========================\n· Prompt template injection\n· Context window management\n· Citation/reference tracking\n· Hallucination guard\n· Streaming output" as RAG_Generation
+  }
+}
+
+' ============================================================
+' AI AGENTS
+' ============================================================
+frame "**AI Agents — الوكلاء الأذكياء**" #F5EEF8 {
+
+  rectangle "**Agent Framework**\n========================\n· ReAct pattern\n· Tool definitions\n· Memory (short + long term)\n· Planning + execution\n· Multi-agent coordination" as Agent_Framework
+
+  rectangle "**Support Agent**\nوكيل الدعم الفني\n========================\n· Auto-triage tickets\n· Knowledge base search\n· Suggested replies\n· Escalation detection\n· Sentiment analysis" as Agent_Support
+
+  rectangle "**Content Agent**\nوكيل المحتوى\n========================\n· Blog post generation\n· Product descriptions\n· SEO optimization\n· Multi-language (AR/EN)\n· Image alt-text generation" as Agent_Content
+
+  rectangle "**Analytics Agent**\nوكيل التحليلات\n========================\n· Natural language → SQL\n· Report generation\n· Anomaly detection\n· Trend summarization\n· Recommendation engine" as Agent_Analytics
+
+  rectangle "**Customer Agent**\nوكيل العملاء\n========================\n· Chatbot (website)\n· Order status queries\n· FAQ answering\n· Lead qualification\n· Personalized recommendations" as Agent_Customer
+}
+
+' ============================================================
+' SAFETY LAYER
+' ============================================================
+frame "**Safety Layer — طبقة الأمان**" #FDEDEC {
+
+  rectangle "**Content Filter**\n========================\n· Toxicity detection\n· Harmful content blocking\n· Prompt injection detection\n· Jailbreak prevention\n· Input + Output filtering" as Safety_Filter
+
+  rectangle "**PII Detector**\nكاشف البيانات الشخصية\n========================\n· Email, phone, national ID\n· Credit card numbers\n· Addresses\n· PII masking/redaction\n· GDPR compliance" as Safety_PII
+
+  rectangle "**Rate Limiter**\nمحدد المعدل\n========================\n· Per-user quotas\n· Per-IP limits\n· Token-based billing\n· Spike protection\n· Cost caps" as Safety_RateLimit
+
+  rectangle "**Audit Logger**\nسجل التدقيق\n========================\n· All AI interactions logged\n· Prompt + response stored\n· Token count + cost\n· Model + provider tracking\n· For compliance & debugging" as Safety_Audit
+
+  rectangle "**Fallback Manager**\n========================\n· Graceful degradation\n· Cached responses\n· Static fallback messages\n· Queue when overloaded\n· Offline mode (local models)" as Safety_Fallback
+}
+
+' ============================================================
+' DATA STORES
+' ============================================================
+database "**PostgreSQL**\n========================\n· ai_prompts (templates)\n· ai_conversations (history)\n· ai_usage_logs (billing)\n· ai_agents (configs)" as AI_PG
+database "**Redis**\n========================\n· Embedding cache\n· Rate limit counters\n· Session/conversation state\n· Prompt cache" as AI_Redis
+database "**Vector DB**\npgvector\n========================\n· Document embeddings\n· Semantic search indexes" as AI_VectorDB
+
+' ============================================================
+' CONNECTIONS
+' ============================================================
+
+' Gateway → Orchestrator
+AI_Controller -down-> AI_Orchestrator : "Route request"
+AI_Controller -down-> AI_Config : "Check limits"
+
+' Orchestrator → Safety (always first)
+AI_Orchestrator -down-> Safety_RateLimit : "[1] Check rate limit"
+Safety_RateLimit -down-> Safety_PII : "[2] Detect/redact PII"
+Safety_PII -down-> Safety_Filter : "[3] Content safety check"
+
+alt Unsafe / PII / Rate limited
+  Safety_Filter -up-> AI_Orchestrator : "Reject request"
+  AI_Orchestrator -up-> AI_Controller : "429 / 400 / 403"
+else Safe
+  Safety_Filter -down-> Router_Logic : "[4] Route to model"
+
+  ' Router → Provider
+  Router_Logic -down-> Router_Adapters : "Select provider\n+ model"
+  Router_Adapters -down-> Prov_OpenAI : "OpenAI API"
+  Router_Adapters -down-> Prov_Anthropic : "Anthropic API"
+  Router_Adapters -down-> Prov_Azure : "Azure API"
+  Router_Adapters -down-> Prov_Local : "Ollama API"
+  Router_Adapters -up-> Router_Logic : "Response"
+  Router_Logic -up-> AI_Orchestrator : "[5] Model response"
+
+  ' Logging
+  AI_Orchestrator -down-> Safety_Audit : "[6] Log interaction"
+  Safety_Audit -down-> AI_PG : "Store conversation"
+  AI_Orchestrator -down-> AI_Redis : "Update usage\ncounters"
+
+  AI_Orchestrator -up-> AI_Controller : "Final response\n(streaming or JSON)"
+end
+
+' RAG Pipeline flow
+RAG_Loaders -down-> RAG_Splitter : "Raw docs → chunks"
+RAG_Splitter -down-> RAG_Embed : "Chunks → embeddings"
+RAG_Embed -down-> RAG_VectorDB : "Store vectors\n+ metadata"
+RAG_VectorDB -down-> RAG_Retrieval : "Query → similar docs"
+RAG_Retrieval -down-> RAG_Generation : "Context + query → LLM"
+RAG_Generation -down-> AI_Orchestrator : "Augmented response"
+
+' Agents → Orchestrator
+Agent_Support -down-> AI_Orchestrator : "Use tools"
+Agent_Content -down-> AI_Orchestrator : "Generate content"
+Agent_Analytics -down-> AI_Orchestrator : "Query + analyze"
+Agent_Customer -down-> AI_Orchestrator : "Chat + recommend"
+
+' Orchestrator → Agents (tool execution)
+AI_Orchestrator -down-> Agent_Framework : "Execute agent tools"
+Agent_Framework -down-> Agent_Support : "Search KB, create ticket"
+Agent_Framework -down-> Agent_Content : "Generate, optimize"
+Agent_Framework -down-> Agent_Analytics : "SQL → chart"
+Agent_Framework -down-> Agent_Customer : "FAQ, order lookup"
+
+' Data stores connections
+AI_Orchestrator -down-> AI_PG : "Persist prompts\n+ conversations"
+AI_Orchestrator -down-> AI_Redis : "Cache embeddings\n+ session state"
+RAG_Embed -down-> AI_Redis : "Cache embeddings"
+RAG_Retrieval -down-> AI_VectorDB : "Vector search"
+
+' Safety fallback
+Safety_Fallback -down-> Prov_Local : "Fall back to\nlocal model"
+
+' ============================================================
+' USAGE WORKFLOW
+' ============================================================
+note over AI_Controller, Safety_Audit
+  **AI Request Processing Pipeline:**
+  ==================================
+  
+  **1. Request enters AI Gateway:**
+  · Authenticate user (JWT)
+  · Authorize (RBAC: ai:chat, ai:embed)
+  · Load user quotas + limits
+  
+  **2. Safety Checks (sequential, fail-fast):**
+  a. Rate Limiter: check user + IP quotas
+  b. PII Detector: scan input for PII, mask if needed
+  c. Content Filter: toxicity, injection, jailbreak
+  
+  **3. Model Routing (config-driven):**
+  · Task type → preferred model mapping
+  · Cost optimization: route simple queries to cheaper models
+  · Latency optimization: route urgent to fastest model
+  · Fallback: if primary fails, try backup
+  
+  **4. Response Processing:**
+  · Content Filter: check output safety
+  · PII Detector: verify no PII leaked in output
+  · Format response (text, JSON, streaming)
+  
+  **5. Audit & Billing:**
+  · Log: user, model, tokens, cost, latency
+  · Update usage counters (monthly budget)
+  · If streaming: log per chunk
+  
+  **RAG Pipeline Flow:**
+  · Document ingress → chunk → embed → vector store
+  · Query → embed → vector search → re-rank → augment prompt → generate
+  · Citations: trace generated text back to source chunks
+endnote
+
+@enduml

@@ -1,0 +1,181 @@
+# Commands Registry
+# AlharisTech Platform — Available Commands for Agents
+
+version: "1.0"
+
+commands:
+
+  # ─── Architecture Commands ───
+  arch:
+    assess:
+      description: "Assess repository architecture compliance"
+      agent: "architect"
+      action: "Run architecture compliance check against PERP principles"
+      output: "reports/architecture-compliance.md"
+
+    adr:
+      description: "Create a new Architecture Decision Record"
+      agent: "architect"
+      template: ".docs-runtime/templates/adr-template.md"
+      output: "docs/adr/adr-XXX-title.md"
+
+    c4:
+      description: "Generate/update C4 diagrams"
+      agent: "architect"
+      sub_commands:
+        context: "System Context diagram"
+        container: "Container diagram"
+        component: "Component diagram"
+        code: "Code/Module diagram"
+      output: "docs/c4/*.puml"
+
+    diagram:
+      description: "Generate architecture diagram"
+      agent: "architect"
+      types:
+        - "business-capability"
+        - "domain-map"
+        - "event-flow"
+        - "deployment"
+        - "network"
+        - "data-flow"
+        - "infrastructure"
+        - "observability"
+        - "ai-architecture"
+      output: "docs/diagrams/*.puml"
+
+  # ─── Specification Commands ───
+  spec:
+    create:
+      description: "Create a new domain/feature specification"
+      agent: "spec_writer"
+      template: ".docs-runtime/templates/spec-template.md"
+      args:
+        domain: "Domain name (identity, customer, service...)"
+        feature: "Feature name"
+      output: "specs/domains/{domain}/{feature}.md"
+
+    validate:
+      description: "Validate specification completeness and consistency"
+      agent: "reviewer"
+      action: "Check spec against template, constitution, and cross-references"
+      output: "reports/spec-validation.md"
+
+    pipeline:
+      description: "Show specification pipeline status"
+      agent: "pm"
+      action: "Display all specs and their pipeline stage"
+      output: "terminal"
+
+  # ─── Development Commands ───
+  dev:
+    feature:
+      description: "Start implementing a feature from spec"
+      agent: "developer"
+      workflow: "feature_development"
+      args:
+        spec_id: "Specification ID"
+      steps:
+        - "task_breakdown"
+        - "create_branch"
+        - "implement"
+        - "test"
+        - "review"
+        - "merge"
+
+    fix:
+      description: "Fix a bug"
+      agent: "developer"
+      workflow: "bug_fix"
+
+    review:
+      description: "Submit code for review"
+      agent: "developer"
+      action: "Create PR with template"
+      template: ".github/PULL_REQUEST_TEMPLATE.md"
+
+  # ─── Review Commands ───
+  review:
+    code:
+      description: "Perform code review"
+      agent: "reviewer"
+      checks:
+        - "security"
+        - "architecture_compliance"
+        - "performance"
+        - "testing"
+        - "documentation"
+
+    arch:
+      description: "Perform architecture review"
+      agent: "architect"
+      checks:
+        - "adr_compliance"
+        - "layer_violation"
+        - "dependency_analysis"
+
+    converge:
+      description: "Converge implementation against specification"
+      agent: "reviewer"
+      tool: "speckit_converge"
+
+    analyze:
+      description: "Cross-artifact consistency analysis"
+      agent: "reviewer"
+      tool: "speckit_analyze"
+
+  # ─── Quality Commands ───
+  qa:
+    test:
+      description: "Run test suite"
+      agent: "qa"
+      sub_commands:
+        unit: "Run unit tests"
+        integration: "Run integration tests"
+        e2e: "Run end-to-end tests"
+        performance: "Run performance tests"
+
+    checklist:
+      description: "Generate quality checklist for feature"
+      agent: "qa"
+      tool: "speckit_checklist"
+
+    gate:
+      description: "Check quality gate status"
+      agent: "qa"
+      action: "Validate all quality gates for current phase"
+
+  # ─── Operations Commands ───
+  ops:
+    deploy:
+      description: "Deploy to environment"
+      agent: "devops"
+      args:
+        env: "staging|production"
+
+    backup:
+      description: "Run backup"
+      agent: "devops"
+      action: "Execute backup workflow"
+
+    monitor:
+      description: "Check system health"
+      agent: "devops"
+      action: "Run health checks and report status"
+
+  # ─── Project Commands ───
+  project:
+    status:
+      description: "Show project status"
+      agent: "pm"
+      action: "Display current phase, sprint, progress, blockers"
+
+    roadmap:
+      description: "Show/update roadmap"
+      agent: "pm"
+      action: "Display or update project roadmap"
+
+    gate:
+      description: "Check gate pass/fail status"
+      agent: "pm"
+      action: "Validate current gate criteria"

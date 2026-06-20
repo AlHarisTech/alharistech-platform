@@ -1,0 +1,242 @@
+@startuml repository-architecture
+' ============================================================
+' AlharisTech Platform — Repository Architecture (Monorepo)
+' apps/ packages/ domains/ infrastructure/ with dependency arrows
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam component {
+  BackgroundColor<<app>> #1168BD
+  FontColor<<app>> #FFFFFF
+  BorderColor<<app>> #0B4884
+  BackgroundColor<<package>> #438DD5
+  FontColor<<package>> #FFFFFF
+  BorderColor<<package>> #2E6290
+  BackgroundColor<<domain>> #6A0DAD
+  FontColor<<domain>> #FFFFFF
+  BorderColor<<domain>> #4B0082
+  BackgroundColor<<infra>> #228B22
+  FontColor<<infra>> #FFFFFF
+  BorderColor<<infra>> #006400
+  BackgroundColor<<tool>> #DAA520
+  FontColor<<tool>> #000000
+  BorderColor<<tool>> #B8860B
+  RoundCorner 8
+  FontSize 9
+}
+
+skinparam package {
+  BackgroundColor #F4F6F7
+  BorderColor #AAB7B8
+  FontColor #2C3E50
+  FontSize 11
+  FontStyle bold
+}
+
+skinparam arrow {
+  FontSize 8
+  Color #7F8C8D
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 9
+}
+
+title **AlharisTech Platform — Repository Architecture (Monorepo)**
+title **هندسة المستودع — apps/, packages/, domains/, infrastructure/**
+
+' ============================================================
+' LAYER 5: APPS
+' ============================================================
+package "**apps/** — Applications (Layer 5)\nالتطبيقات — نقطة الدخول النهائية" {
+
+  component "**web**\nNext.js\nالموقع الرسمي\nPort 3000" <<app>> as App_Web
+  component "**admin**\nNext.js\nلوحة التحكم\nPort 3001" <<app>> as App_Admin
+  component "**api**\nNestJS\nAPI Gateway\nPort 4000" <<app>> as App_API
+  component "**desktop**\nTauri + React\nسطح المكتب" <<app>> as App_Desktop
+  component "**mobile**\nReact Native\nالجوال" <<app>> as App_Mobile
+}
+
+' ============================================================
+' LAYER 4: DOMAINS
+' ============================================================
+package "**domains/** — Domain Modules (Layer 4)\nنطاقات الأعمال (DDD) — imported by api only" {
+
+  component "**identity**\nAuth · RBAC\nSessions" <<domain>> as Dom_Identity
+  component "**customer**\nCRM · Profiles\nHistory" <<domain>> as Dom_Customer
+  component "**service**\nServices · Orders\nWorkflow" <<domain>> as Dom_Service
+  component "**commerce**\nProducts · Cart\nInventory" <<domain>> as Dom_Commerce
+  component "**support**\nTickets · KB\nChat" <<domain>> as Dom_Support
+  component "**content**\nCMS · Blog\nMedia" <<domain>> as Dom_Content
+  component "**notification**\nEmail · SMS\nPush" <<domain>> as Dom_Notification
+  component "**analytics**\nReports · Dashboards\nKPIs" <<domain>> as Dom_Analytics
+  component "**ai**\nAgents · RAG\nEmbeddings" <<domain>> as Dom_AI
+}
+
+' ============================================================
+' LAYER 3: PACKAGES (DEPENDENT)
+' ============================================================
+package "**packages/** — Shared Libraries (Layer 3)\nمكتبات مشتركة — قابلة للاستيراد من apps والـ domains" {
+
+  component "**ui**\nshadcn/ui\nمكونات واجهة" <<package>> as Pkg_UI
+  component "**auth**\nClient/Server\nمصادقة مشتركة" <<package>> as Pkg_Auth
+  component "**database**\nPrisma\nقاعدة بيانات" <<package>> as Pkg_DB
+  component "**sdk**\nTyped API Client\nSDK للتكاملات" <<package>> as Pkg_SDK
+  component "**logger**\nWinston\nتسجيل الأحداث" <<package>> as Pkg_Logger
+}
+
+' ============================================================
+' LAYER 2: PACKAGES (UTILITY)
+' ============================================================
+package "**packages/** — Utility (Layer 2)\nحزم مساعدة — تعتمد على Layer 1 فقط" {
+  component "**utils**\ndate · string\nvalidation · format" <<package>> as Pkg_Utils
+}
+
+' ============================================================
+' LAYER 1: FOUNDATION
+' ============================================================
+package "**packages/** — Foundation (Layer 1)\nحزم الأساس — لا تعتمد على أي حزمة داخلية" {
+  component "**types**\nInterfaces · Types\nEnums · Zod Schemas" <<package>> as Pkg_Types
+  component "**config**\nESLint · TS · Tailwind\nVitest · Prettier" <<package>> as Pkg_Config
+}
+
+' ============================================================
+' INFRASTRUCTURE & TOOLS
+' ============================================================
+package "**infrastructure/** — Deployment\nالبنية التحتية — Docker, K8s, Terraform" {
+  component "**docker**\nCompose\nDockerfiles" <<infra>> as Infra_Docker
+  component "**k8s**\nKubernetes\nManifests" <<infra>> as Infra_K8s
+  component "**terraform**\nIaC\nTerraform" <<infra>> as Infra_TF
+}
+
+package "**Tools & Docs**\nأدوات وتوثيق" {
+  component "**docs/**\nDocumentation" <<tool>> as Docs
+  component "**specs/**\nSpecifications" <<tool>> as Specs
+  component "**tasks/**\nImplementation Plans" <<tool>> as Tasks
+  component "**tools/**\nInternal Tooling" <<tool>> as Tools
+}
+
+' ============================================================
+' DEPENDENCY ARROWS
+' ============================================================
+
+' Apps → Packages
+App_Web --> Pkg_UI : "import"
+App_Web --> Pkg_Auth : "import"
+App_Web --> Pkg_SDK : "import"
+App_Web --> Pkg_Types : "import"
+App_Web --> Pkg_Utils : "import"
+
+App_Admin --> Pkg_UI : "import"
+App_Admin --> Pkg_Auth : "import"
+App_Admin --> Pkg_SDK : "import"
+App_Admin --> Pkg_Types : "import"
+App_Admin --> Pkg_Utils : "import"
+
+App_API --> Pkg_Auth : "import"
+App_API --> Pkg_DB : "import"
+App_API --> Pkg_Logger : "import"
+App_API --> Pkg_Types : "import"
+App_API --> Pkg_Utils : "import"
+App_API -[#6A0DAD,bold]down-> Pkg_Config : "extends (dev)"
+
+App_Desktop --> Pkg_UI : "import"
+App_Desktop --> Pkg_SDK : "import"
+App_Desktop --> Pkg_Types : "import"
+App_Desktop --> Pkg_Utils : "import"
+
+App_Mobile --> Pkg_UI : "import"
+App_Mobile --> Pkg_SDK : "import"
+App_Mobile --> Pkg_Types : "import"
+App_Mobile --> Pkg_Utils : "import"
+
+' API → Domains (only api imports domains)
+App_API --> Dom_Identity : "NestJS import"
+App_API --> Dom_Customer : "NestJS import"
+App_API --> Dom_Service : "NestJS import"
+App_API --> Dom_Commerce : "NestJS import"
+App_API --> Dom_Support : "NestJS import"
+App_API --> Dom_Content : "NestJS import"
+App_API --> Dom_Notification : "NestJS import"
+App_API --> Dom_Analytics : "NestJS import"
+App_API --> Dom_AI : "NestJS import"
+
+' Domains → Packages
+Dom_Identity --> Pkg_DB : "import"
+Dom_Identity --> Pkg_Logger : "import"
+Dom_Identity --> Pkg_Types : "import"
+Dom_Identity --> Pkg_Utils : "import"
+Dom_Identity --> Pkg_Auth : "import"
+
+Dom_Customer --> Pkg_DB : "import"
+Dom_Customer --> Pkg_Types : "import"
+Dom_Customer -[#6A0DAD,dashed]-> Dom_Identity : "DI (NestJS)"
+
+Dom_Service --> Pkg_DB : "import"
+Dom_Service --> Pkg_Types : "import"
+Dom_Service -[#6A0DAD,dashed]-> Dom_Notification : "DI (NestJS)"
+
+Dom_Commerce --> Pkg_DB : "import"
+Dom_Commerce -[#6A0DAD,dashed]-> Dom_Notification : "DI (NestJS)"
+
+Dom_Support -[#6A0DAD,dashed]-> Dom_Notification : "DI (NestJS)"
+
+Dom_Content --> Pkg_DB : "import"
+
+Dom_Notification --> Pkg_DB : "import"
+Dom_Notification --> Pkg_Logger : "import"
+
+Dom_Analytics --> Pkg_DB : "import"
+Dom_Analytics -[#6A0DAD,dashed]-> Dom_Customer : "DI (read data)"
+Dom_Analytics -[#6A0DAD,dashed]-> Dom_Service : "DI (read data)"
+Dom_Analytics -[#6A0DAD,dashed]-> Dom_Commerce : "DI (read data)"
+
+Dom_AI -[#6A0DAD,dashed]-> Dom_Support : "DI (enhance)"
+Dom_AI -[#6A0DAD,dashed]-> Dom_Content : "DI (generate)"
+Dom_AI -[#6A0DAD,dashed]-> Dom_Customer : "DI (insights)"
+
+' Package → Package (within layers)
+Pkg_Utils --> Pkg_Types : "depends"
+Pkg_Logger --> Pkg_Types : "depends"
+Pkg_Auth --> Pkg_Types : "depends"
+Pkg_Auth --> Pkg_Utils : "depends"
+Pkg_DB --> Pkg_Types : "depends"
+Pkg_DB --> Pkg_Utils : "depends"
+Pkg_UI --> Pkg_Types : "depends"
+Pkg_UI --> Pkg_Utils : "depends"
+Pkg_SDK --> Pkg_Types : "depends"
+Pkg_SDK --> Pkg_Utils : "depends"
+
+' Infrastructure
+Infra_Docker --> App_API : "runs"
+Infra_K8s --> App_API : "deploys"
+Infra_TF --> Infra_K8s : "provisions"
+
+' ============================================================
+' IMPORT BOUNDARY RULES
+' ============================================================
+note bottom of App_API
+  **Import Boundary Rules (Enforced by ESLint):**
+  ================================================
+  ✅ Apps CAN import from: packages/**, domains/**
+  ❌ Apps CANNOT import from: other apps/
+  ❌ Packages CANNOT import from: apps/, domains/
+  ❌ Domains CANNOT import from: apps/, other domains/
+  ❌ types + config: must have ZERO internal deps
+  ❌ No circular dependencies (enforced by madge)
+  ❌ config in devDependencies only (never at runtime)
+  ================================================
+  **Build Order (Turborepo):**
+  Phase 1: types + config (parallel)
+  Phase 2: utils, logger (parallel)
+  Phase 3: ui, auth, database, sdk (parallel)
+  Phase 4: domains/ (all 9 parallel)
+  Phase 5: apps/ (all 5 parallel)
+endnote
+
+@enduml

@@ -1,0 +1,219 @@
+@startuml deployment-diagram
+' ============================================================
+' AlharisTech Platform — Deployment Diagram
+' Nodes: CDN, Web, API, PostgreSQL, Redis, S3, BullMQ, Monitoring
+' Network zones: DMZ, App, Data
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam node {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+  FontColor #1A5276
+  FontStyle bold
+}
+
+skinparam database {
+  BackgroundColor #D5F5E3
+  BorderColor #27AE60
+}
+
+skinparam cloud {
+  BackgroundColor #FDEBD0
+  BorderColor #E67E22
+}
+
+skinparam frame {
+  BackgroundColor #F4F6F7
+  BorderColor #AAB7B8
+  FontColor #2C3E50
+  FontSize 11
+  FontStyle bold
+}
+
+skinparam rectangle {
+  BackgroundColor #E8F0FE
+  BorderColor #5DADE2
+}
+
+skinparam arrow {
+  Color #7F8C8D
+  FontSize 9
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 9
+}
+
+title **AlharisTech Platform — Deployment Diagram**
+title **مخطط النشر — العقد والشبكات ومناطق الأمان**
+
+' ============================================================
+' INTERNET ZONE
+' ============================================================
+cloud "Internet\nالإنترنت" as Internet {
+  rectangle "Users\nالمستخدمون" as Users
+  rectangle "Partners\nالشركاء" as Partners
+  rectangle "Developers\nالمطورون" as Devs
+}
+
+' ============================================================
+' DMZ — Public-Facing
+' ============================================================
+frame "DMZ — المنطقة المنزوعة السلاح" #FDEDEC {
+
+  cloud "**Cloudflare / Vercel**\nCDN + WAF + DDoS Protection\nشبكة توصيل المحتوى وجدار الحماية" as CDN_Cloud {
+  }
+
+  node "**Web Server (×3)**\nNext.js Frontend\n========================\n· Node.js 20\n· SSR / ISR / SSG\n· Port: 3000\n· 2 vCPU, 1 GB RAM" as WebServer {
+  }
+
+  node "**Admin Server (×2)**\nNext.js Admin Dashboard\n========================\n· Node.js 20\n· SSR\n· Port: 3001\n· 2 vCPU, 1 GB RAM" as AdminServer {
+  }
+
+  node "**API Server (×4)**\nNestJS API Gateway\n========================\n· Node.js 20\n· REST + GraphQL\n· Port: 4000\n· 2 vCPU, 2 GB RAM" as APIServer {
+  }
+
+  node "**Load Balancer**\nNginx / ALB\n========================\n· Round-robin\n· Health checks\n· SSL termination\n· Rate limiting" as LoadBalancer {
+  }
+}
+
+' ============================================================
+' APPLICATION ZONE
+' ============================================================
+frame "Application Subnet — شبكة التطبيقات" #E8F8F5 {
+
+  node "**BullMQ Workers (×3)**\nBackground Job Processors\n========================\n· Email sending\n· SMS delivery\n· PDF generation\n· Data processing\n· 1 vCPU, 1 GB RAM" as BullMQWorkers {
+  }
+
+  node "**Payment Processor (×1)**\nPayment Webhook Handler\n========================\n· Stripe / Moyasar\n· Idempotency handling\n· 1 vCPU, 512 MB RAM" as PaymentWorker {
+  }
+
+  node "**AI Gateway (×2)**\nAI Provider Router\n========================\n· OpenAI / Anthropic / Local\n· Rate limiting\n· Token counting\n· 2 vCPU, 2 GB RAM" as AIGateway {
+  }
+}
+
+' ============================================================
+' DATA ZONE
+' ============================================================
+frame "Data Subnet — شبكة البيانات" #F5EEF8 {
+
+  database "**PostgreSQL Primary**\n========================\n· Version: 16\n· 4 vCPU, 16 GB RAM\n· 500 GB SSD\n· WAL archiving\n· Daily backups" as PG_Primary {
+  }
+
+  database "**PostgreSQL Read Replica**\n========================\n· Async streaming replication\n· Read-only queries\n· Reporting/analytics loads\n· 4 vCPU, 16 GB RAM" as PG_Replica {
+  }
+
+  database "**Redis Primary**\n========================\n· Version: 7.2\n· Cache + Session + Queue\n· 2 vCPU, 8 GB RAM\n· AOF persistence\n· eviction: allkeys-lru" as Redis_Primary {
+  }
+
+  database "**Redis Replica**\n========================\n· Read-only cache\n· Failover target\n· 2 vCPU, 8 GB RAM" as Redis_Replica {
+  }
+
+  database "**S3 / MinIO**\n========================\n· File storage\n· Media, documents\n· Backups\n· Cross-region replication" as S3_Storage {
+  }
+}
+
+' ============================================================
+' MANAGEMENT ZONE
+' ============================================================
+frame "Management Subnet — شبكة الإدارة" #FCF3CF {
+
+  node "**Prometheus (×1)**\nMetrics Collection\n========================\n· Scrape interval: 15s\n· Retention: 30 days\n· AlertManager rules" as Prometheus {
+  }
+
+  node "**Grafana (×1)**\nDashboards & Visualization\n========================\n· Real-time dashboards\n· Alerting\n· Multi-tenant" as Grafana {
+  }
+
+  node "**ELK / Loki Stack**\nLog Aggregation\n========================\n· Structured JSON logs\n· Full-text search\n· Retention: 90 days" as ELK {
+  }
+
+  node "**Jaeger (×1)**\nDistributed Tracing\n========================\n· OpenTelemetry\n· Span collection\n· Retention: 7 days" as Jaeger {
+  }
+
+  node "**Bastion Host**\nSSH Jump Box\n========================\n· Admin access only\n· MFA required\n· Audit logged" as Bastion {
+  }
+}
+
+' ============================================================
+' EXTERNAL SERVICES
+' ============================================================
+frame "External Services — خدمات خارجية" #E8F0FE {
+
+  cloud "**Payment Gateways**\nStripe / Moyasar / HyperPay" as ExtPay
+  cloud "**SMS Providers**\nTwilio / Unifonic" as ExtSMS
+  cloud "**Email Providers**\nSendGrid / Resend" as ExtEmail
+  cloud "**AI Providers**\nOpenAI / Anthropic / Azure" as ExtAI
+  cloud "**External APIs**\nMaps, Shipping, Calendar" as ExtAPI
+}
+
+' ============================================================
+' CONNECTIONS
+' ============================================================
+Internet -down-> CDN_Cloud : "HTTPS (TLS 1.3)\nPort 443"
+CDN_Cloud -down-> LoadBalancer : "HTTPS\nPort 443"
+LoadBalancer -down-> WebServer : "HTTP\nPort 3000"
+LoadBalancer -down-> AdminServer : "HTTP\nPort 3001"
+LoadBalancer -down-> APIServer : "HTTP\nPort 4000"
+
+WebServer -down-> APIServer : "JSON/HTTPS\nInternal API"
+AdminServer -down-> APIServer : "JSON/HTTPS\nInternal API"
+
+APIServer -down-> PG_Primary : "SQL/TCP (TLS)\nPort 5432\nWrite operations"
+APIServer -down-> PG_Replica : "SQL/TCP (TLS)\nPort 5432\nRead operations"
+APIServer -down-> Redis_Primary : "Redis Protocol/TCP\nPort 6379\nCache + Queue"
+APIServer -down-> S3_Storage : "S3 API/HTTPS\nPort 443\nFile operations"
+
+BullMQWorkers -down-> Redis_Primary : "BullMQ\nQueue consumption"
+BullMQWorkers -down-> ExtEmail : "SMTP/REST\nEmail delivery"
+BullMQWorkers -down-> ExtSMS : "REST/HTTPS\nSMS delivery"
+PaymentWorker -down-> ExtPay : "REST/HTTPS\nPayment processing"
+
+PG_Primary -down-> PG_Replica : "**Streaming Replication**\nWAL shipping\nAsync"
+Redis_Primary -down-> Redis_Replica : "**Replication**\nAsync"
+
+AIGateway -down-> ExtAI : "REST/HTTPS\nAI model calls"
+
+' Monitoring
+Prometheus -up-> APIServer : "Metrics scrape\n/metrics endpoint"
+Prometheus -up-> PG_Primary : "PostgreSQL Exporter\nPort 9187"
+Prometheus -up-> Redis_Primary : "Redis Exporter\nPort 9121"
+Prometheus -up-> BullMQWorkers : "Custom metrics"
+Grafana -up-> Prometheus : "PromQL queries"
+ELK -up-> APIServer : "Log shipping\nFluentd / Filebeat"
+Jaeger -up-> APIServer : "OpenTelemetry\nSpan export"
+
+' Security
+Bastion -down-> APIServer : "SSH\nPort 22"
+Bastion -down-> PG_Primary : "SSH\nPort 22"
+
+' ============================================================
+' NETWORK SECURITY NOTES
+' ============================================================
+note bottom of LoadBalancer
+  **Network Security Zones:**
+  =========================
+  **DMZ:** CDN, WAF, Web, Admin, API, LB
+  (Public-facing, strict firewall rules)
+
+  **Application Subnet:** BullMQ Workers, Payment Processor, AI Gateway
+  (No public IP, private subnet only)
+
+  **Data Subnet:** PostgreSQL, Redis, S3
+  (No public IP, no internet access, only app subnet)
+
+  **Management:** Monitoring, Logging, Bastion
+  (VPN + MFA access only)
+
+  **Inter-zone traffic:**
+  · DMZ → App: HTTPS/Redis/TCP (firewall rules)
+  · App → Data: TCP on specific ports only
+  · Data → Internet: BLOCKED (egress only via NAT for updates)
+endnote
+
+@enduml

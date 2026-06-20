@@ -1,0 +1,201 @@
+@startuml observability-architecture
+' ============================================================
+' AlharisTech Platform — Observability Architecture
+' Three Pillars: Logging (ELK/Loki) + Metrics (Prometheus/Grafana) + Tracing (Jaeger/OTel)
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam rectangle {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+  FontColor #1A5276
+  FontSize 9
+  RoundCorner 6
+}
+
+skinparam database {
+  BackgroundColor #D5F5E3
+  BorderColor #27AE60
+  FontSize 9
+}
+
+skinparam node {
+  BackgroundColor #FDEBD0
+  BorderColor #E67E22
+  FontSize 9
+}
+
+skinparam cloud {
+  BackgroundColor #E8F0FE
+  BorderColor #5DADE2
+}
+
+skinparam actor {
+  BackgroundColor #FDEDEC
+  BorderColor #E74C3C
+}
+
+skinparam frame {
+  BackgroundColor #F4F6F7
+  BorderColor #AAB7B8
+  FontColor #2C3E50
+  FontSize 12
+  FontStyle bold
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 9
+}
+
+title **AlharisTech Platform — Observability Architecture**
+title **معمارية المراقبة — السجلات، المقاييس، والتتبع الموزع**
+
+actor "SRE / DevOps\nفريق العمليات" as SRE
+actor "Developers\nالمطورون" as Devs
+actor "Managers\nالمدراء" as Mgrs
+
+' ============================================================
+' INSTRUMENTED SERVICES
+' ============================================================
+frame "**Instrumented Services — الخدمات المراقبة**" #E8F0FE {
+
+  rectangle "**Next.js Frontend**\n========================\n· OpenTelemetry JS\n· Winston logger\n· Web Vitals (LCP, FID, CLS)\n· Custom spans (SSR timing)" as Svc_Frontend
+
+  rectangle "**NestJS API Gateway**\n========================\n· OpenTelemetry (auto-instrumentation)\n· Pino/Winston structured logger\n· Prometheus metrics endpoint\n· Request/Response interceptors\n· Guards timing spans" as Svc_API
+
+  rectangle "**BullMQ Workers**\n========================\n· Job lifecycle spans\n· Custom metrics (queue depth)\n· Structured logging\n· Error tracking" as Svc_Bull
+
+  rectangle "**Next.js Admin**\n========================\n· OpenTelemetry JS\n· Web Vitals\n· API call tracing" as Svc_Admin
+}
+
+' ============================================================
+' PILLAR 1: LOGGING
+' ============================================================
+frame "**Pillar 1: Logging — السجلات**" #E8F8F5 {
+
+  rectangle "**Application Logs**\nStructured JSON\n========================\n{\n  level: 'info',\n  message: 'Order created',\n  requestId: 'uuid',\n  userId: 'user-123',\n  orderId: 'ord-456',\n  traceId: 'trace-xxx',\n  spanId: 'span-yyy',\n  timestamp: 'ISO8601',\n  service: 'api-gateway',\n  duration: 45\n}" as Log_Schema
+
+  rectangle "**Log Shippers**\nFluentd / Filebeat\n========================\n· Tail container logs\n· Parse + enrich\n· Buffer + retry\n· Multi-destination" as Log_Shipper
+
+  rectangle "**Elasticsearch**\nSearch & Index Engine\n========================\n· Full-text search\n· Aggregations\n· Index per day (lifecycle)\n· 3-node cluster\n· Hot/Warm/Cold tiers" as Log_ES
+
+  rectangle "**Logstash**\nLog Processor\n========================\n· Parse JSON → structured\n· Filter + transform\n· GeoIP enrichment\n· Sensitive data masking" as Log_Logstash
+
+  rectangle "**Kibana**\nLog Visualization\n========================\n· Discover (search)\n· Dashboards\n· Alerting rules\n· Saved queries" as Log_Kibana
+
+  rectangle "**Loki (Alternative)**\nLog Aggregation\n========================\n· Grafana-native\n· Label-based indexing\n· Lower cost than ELK\n· S3 backend" as Log_Loki
+}
+
+' ============================================================
+' PILLAR 2: METRICS
+' ============================================================
+frame "**Pillar 2: Metrics — المقاييس**" #FDEBD0 {
+
+  rectangle "**Application Metrics**\nCustom + Auto\n========================\n· HTTP request duration (histogram)\n· HTTP request count (counter)\n· Active connections (gauge)\n· BullMQ queue depth (gauge)\n· DB query duration (histogram)\n· Cache hit ratio (gauge)\n· External API call duration" as Met_App
+
+  rectangle "**Infrastructure Metrics**\nNode + DB exporters\n========================\n· CPU usage (node_exporter)\n· Memory usage\n· Disk I/O\n· Network throughput\n· PostgreSQL (postgres_exporter)\n· Redis (redis_exporter)\n· Nginx (nginx_exporter)" as Met_Infra
+
+  rectangle "**Prometheus**\nTime-Series Database\n========================\n· Scrape interval: 15s\n· Retention: 30 days\n· TSDB storage\n· AlertManager rules\n· Recording rules" as Met_Prom
+
+  rectangle "**AlertManager**\nAlerting Engine\n========================\n· Routing tree\n· Silence + inhibition\n· PagerDuty integration\n· Slack notifications\n· Email alerts" as Met_Alert
+
+  rectangle "**Grafana**\nDashboards\n========================\n· Real-time panels\n· Alert rules\n· Multi-tenant (orgs)\n· Provisioned dashboards\n· Annotation support" as Met_Grafana
+}
+
+' ============================================================
+' PILLAR 3: TRACING
+' ============================================================
+frame "**Pillar 3: Tracing — التتبع الموزع**" #F5EEF8 {
+
+  rectangle "**OpenTelemetry SDK**\nInstrumentation\n========================\n· Auto-instrumentation (NestJS, Express, HTTP)\n· Custom spans (service calls, DB queries)\n· Context propagation (W3C TraceContext)\n· Span: name, attributes, events, status\n· Sampling: head-based (10% prod, 100% dev)" as Trc_OTel
+
+  rectangle "**OpenTelemetry Collector**\nPipeline\n========================\n· Receivers: OTLP, Jaeger\n· Processors: batch, tail sampling\n· Exporters: Jaeger, Prometheus\n· Multi-pipeline" as Trc_Collector
+
+  rectangle "**Jaeger**\nDistributed Tracing\n========================\n· Span storage (Cassandra/Elasticsearch)\n· Trace search + visualization\n· Dependency graph\n· Performance analysis\n· Retention: 7 days" as Trc_Jaeger
+
+  rectangle "**Tempo (Alternative)**\nDistributed Tracing\n========================\n· Grafana-native\n· S3/GCS backend\n· No sampling required (100%)\n· Integrated with Loki + Grafana" as Trc_Tempo
+}
+
+' ============================================================
+' PILLAR 4: ALERTING & SLO
+' ============================================================
+frame "**Pillar 4: Alerting + SLOs — التنبيهات**" #FDEDEC {
+
+  rectangle "**SLO Definitions**\n========================\n· API Availability: 99.9%\n· API p95 latency: < 200ms\n· Error rate: < 0.5%\n· Uptime: 99.95%" as SLO_Def
+
+  rectangle "**Error Budget**\n========================\n· Monthly budget: 43 min downtime\n· Burn rate alerts\n· Freeze deployments if budget exhausted\n· Auto-create incident tickets" as SLO_ErrorBudget
+
+  rectangle "**Alert Rules**\n========================\n| Alert | Threshold |\n| API Down | Health check fail > 2 min |\n| High Error Rate | > 5% for 5 min |\n| High Latency | p95 > 500ms for 10 min |\n| DB Connection Pool | > 80% utilization |\n| Redis Memory | > 85% |\n| Queue Depth | > 1000 pending jobs |\n| Disk Space | < 20% free |\n| SSL Expiry | < 30 days |" as SLO_Alerts
+}
+
+' ============================================================
+' CONNECTIONS — DATA FLOW
+' ============================================================
+
+' Logging flow
+Svc_API -down-> Log_Shipper : "Structured JSON\n(stdout/file)"
+Svc_Frontend -down-> Log_Shipper : "JSON logs"
+Svc_Bull -down-> Log_Shipper : "JSON logs"
+Svc_Admin -down-> Log_Shipper : "JSON logs"
+
+Log_Shipper -down-> Log_Logstash : "Forward\n(Beats protocol)"
+Log_Logstash -down-> Log_ES : "Index\n(bulk API)"
+Log_ES -down-> Log_Kibana : "Query\n(Search API)"
+Log_Shipper -down-> Log_Loki : "Push\n(Loki API)"
+
+' Metrics flow
+Svc_API -down-> Met_Prom : "Expose /metrics\n(Prometheus endpoint)"
+Svc_Frontend -down-> Met_Prom : "Custom metrics\n(if exposed)"
+Met_Infra -down-> Met_Prom : "Scrape targets\n(exporters)"
+Met_Prom -down-> Met_Alert : "Evaluate rules"
+Met_Prom -down-> Met_Grafana : "PromQL queries"
+Met_Alert -down-> SRE : "PagerDuty / Slack"
+
+' Tracing flow
+Svc_API -down-> Trc_OTel : "Create spans"
+Svc_Frontend -down-> Trc_OTel : "Create spans"
+Svc_Bull -down-> Trc_OTel : "Create spans"
+Svc_Admin -down-> Trc_OTel : "Create spans"
+Trc_OTel -down-> Trc_Collector : "OTLP export"
+Trc_Collector -down-> Trc_Jaeger : "Jaeger Thrift"
+Trc_Collector -down-> Trc_Tempo : "OTLP"
+
+' SLO monitoring
+Met_Prom -down-> SLO_ErrorBudget : "Burn rate metrics"
+SLO_ErrorBudget -down-> SLO_Alerts : "Trigger alerts"
+
+' Human consumers
+SRE -up-> Log_Kibana : "Search logs"
+SRE -up-> Met_Grafana : "View dashboards"
+SRE -up-> Trc_Jaeger : "Trace requests"
+Devs -up-> Log_Kibana : "Debug issues"
+Devs -up-> Met_Grafana : "Performance analysis"
+Devs -up-> Trc_Jaeger : "Trace debugging"
+Mgrs -up-> Met_Grafana : "Business dashboards"
+
+' ============================================================
+' CORRELATION
+' ============================================================
+note over Trc_OTel, Met_Grafana
+  **Three-Pillar Correlation:**
+  ============================
+  All three pillars are correlated via:
+  · **trace_id**: Links logs and spans to a single request
+  · **span_id**: Links logs to a specific span
+  · **request_id**: Cross-service correlation ID
+  
+  Each log entry includes: trace_id, span_id, request_id
+  
+  **Example workflow:**
+  1. Grafana alert fires (high latency) → copy trace_id
+  2. Jaeger: view full trace, find slow span
+  3. Kibana: filter logs by trace_id → see error details
+  4. Navigate from metric → trace → logs seamlessly
+endnote
+
+@enduml

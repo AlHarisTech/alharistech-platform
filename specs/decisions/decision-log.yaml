@@ -1,0 +1,121 @@
+# Decision Log
+# AlharisTech Platform — Architecture Decision Tracking
+# Links specifications to ADRs
+
+version: "1.0"
+updated: "2026-06-20"
+
+# Tracks every architecture decision and its downstream effects
+
+decisions:
+
+  - id: "DEC-001"
+    adr: "ADR-001"
+    title: "Next.js (App Router) for frontend"
+    status: "accepted"
+    date: "2026-06"
+    made_by: "architecture_board"
+    rationale: "SEO + SSR + App Router + Server Components + Vercel ecosystem"
+    affects:
+      specs: ["SPEC-DOM-003", "SPEC-DOM-006", "SPEC-FEAT-002", "SPEC-FEAT-003"]
+      domains: ["service", "content"]
+      channels: ["web", "admin"]
+    evidence: "docs/adr/adr-001-nextjs-frontend.md"
+    review_date: "2026-12"
+
+  - id: "DEC-002"
+    adr: "ADR-002"
+    title: "NestJS for backend services"
+    status: "accepted"
+    date: "2026-06"
+    made_by: "architecture_board"
+    rationale: "Enterprise architecture, DI, OpenAPI auto-generation, modularity"
+    affects:
+      specs: ["SPEC-DOM-001", "SPEC-DOM-009"]
+      domains: [all]
+      channels: ["api"]
+    evidence: "docs/adr/adr-002-nestjs-backend.md"
+    review_date: "2026-12"
+
+  - id: "DEC-012"
+    adr: "ADR-012"
+    title: "Monorepo with Turborepo"
+    status: "accepted"
+    date: "2026-06"
+    made_by: "architecture_board"
+    rationale: "Code sharing, parallel builds, caching, centralized dependency management"
+    affects:
+      specs: [all]
+      domains: [all]
+    evidence: "docs/adr/adr-012-monorepo-turborepo.md"
+    review_date: "2026-12"
+
+  - id: "DEC-ORM"
+    adr: null
+    title: "ORM Selection — Prisma vs Drizzle"
+    status: "unresolved"
+    priority: "P0"
+    needed_by: "2026-07-01"
+    options:
+      - name: "Prisma"
+        pros: ["Mature ecosystem", "Excellent DX", "Auto-generated types", "Studio GUI"]
+        cons: ["Heavier runtime", "Less flexible queries", "Migration lock-in"]
+      - name: "Drizzle"
+        pros: ["Lightweight", "SQL-like DX", "Better performance", "Flexible"]
+        cons: ["Smaller community", "Less tooling", "Newer"]
+    affects:
+      specs: ["SPEC-DOM-001", "SPEC-DOM-009"]
+      domains: [all]
+    recommendation: "Drizzle for performance and flexibility; Prisma if DX and tooling are prioritized"
+
+  - id: "DEC-MOBILE"
+    adr: null
+    title: "Mobile Framework — React Native vs Flutter"
+    status: "unresolved"
+    priority: "P2"
+    needed_by: "2027-06"
+    options:
+      - name: "React Native"
+        pros: ["Shared TypeScript codebase", "Shared packages (auth, sdk)", "Web-like DX"]
+        cons: ["Performance overhead", "Native module bridging"]
+      - name: "Flutter"
+        pros: ["Better performance", "Single codebase iOS+Android", "Rich widget library"]
+        cons: ["Dart (separate language)", "No code sharing with web", "Larger app size"]
+    affects:
+      channels: ["android", "ios"]
+    recommendation: "React Native for TypeScript/code sharing with monorepo"
+
+  - id: "DEC-DESKTOP"
+    adr: null
+    title: "Desktop Framework — Tauri vs Electron"
+    status: "unresolved"
+    priority: "P2"
+    needed_by: "2027-06"
+    options:
+      - name: "Tauri"
+        pros: ["Smaller binary", "Better performance", "Rust backend", "Better security"]
+        cons: ["Rust learning curve", "Smaller ecosystem"]
+      - name: "Electron"
+        pros: ["Mature ecosystem", "Full Node.js access", "Large community"]
+        cons: ["Large bundle size", "Higher memory usage", "Security concerns"]
+    affects:
+      channels: ["desktop"]
+    recommendation: "Tauri (preferred) with Electron as fallback"
+
+  - id: "DEC-GRAPHQL"
+    adr: "ADR-008"  # Indexed but unwritten
+    title: "GraphQL Implementation Strategy"
+    status: "unresolved"
+    priority: "P0"
+    needed_by: "2026-07-15"
+    options:
+      - name: "Apollo Federation"
+        pros: ["Industry standard", "Managed federation", "Schema composition"]
+      - name: "Mercurius (Fastify)"
+        pros: ["Better performance", "Lightweight"]
+      - name: "@nestjs/graphql (code-first)"
+        pros: ["Deep NestJS integration", "Auto-generates schema from decorators"]
+    affects:
+      specs: ["SPEC-DOM-003", "SPEC-DOM-004"]
+      domains: ["service", "commerce"]
+    recommendation: "@nestjs/graphql code-first approach for initial phases; evaluate Apollo Federation at Phase 5"

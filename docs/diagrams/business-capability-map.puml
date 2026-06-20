@@ -1,0 +1,104 @@
+@startuml business-capability-map
+' ============================================================
+' AlharisTech Platform — Business Capability Map
+' Maps 9 domains to business capabilities with strategic importance
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 11
+skinparam defaultTextAlignment center
+skinparam rectangle {
+  BackgroundColor<<core>> #1A5276
+  FontColor<<core>> #FFFFFF
+  BorderColor<<core>> #0E2F44
+  BackgroundColor<<supporting>> #2E86C1
+  FontColor<<supporting>> #FFFFFF
+  BorderColor<<supporting>> #1B4F72
+  BackgroundColor<<generic>> #85C1E9
+  FontColor<<generic>> #1A1A1A
+  BorderColor<<generic>> #5DADE2
+  RoundCorner 8
+  FontSize 10
+}
+
+skinparam package {
+  BackgroundColor #EBF5FB
+  BorderColor #2980B9
+  FontColor #1A5276
+  FontStyle bold
+  FontSize 12
+}
+
+skinparam legend {
+  BackgroundColor #F8F9FA
+  BorderColor #BDC3C7
+  FontSize 10
+}
+
+title **AlharisTech Platform — Business Capability Map**
+title **تصنيف القدرات الأعمال حسب الأهمية الاستراتيجية**
+
+legend right
+  |= Strategic Importance |= Classification |
+  |<#1A5276> </back>| **Core** — Differentiates the business |
+  |<#2E86C1> </back>| **Supporting** — Enables core operations |
+  |<#85C1E9> </back>| **Generic** — Non-differentiating (buy vs build) |
+endlegend
+
+' ============================================================
+' CORE CAPABILITIES
+' ============================================================
+package "Core Capabilities — القدرات الأساسية" as CorePkg #FDEBD0 {
+
+  rectangle "Identity & Access Management\nالمصادقة والصلاحيات\n\n· User Registration/Auth\n· JWT + Refresh Tokens\n· RBAC & Permissions\n· MFA (future)\n· Session Management" <<core>> as BIZ_Identity
+
+  rectangle "Service Management\nإدارة الخدمات\n\n· Service Catalog\n· Order Processing\n· Workflow Engine\n· Document Management\n· Quality Tracking" <<core>> as BIZ_Service
+
+  rectangle "Commerce & Orders\nالمتجر والطلبات\n\n· Product Catalog\n· Shopping Cart\n· Order Fulfillment\n· Inventory Management\n· Payment Processing" <<core>> as BIZ_Commerce
+
+  rectangle "Customer Relationship\nإدارة العملاء\n\n· CRM & Profiles\n· Customer History\n· Segmentation\n· Tags & Notes\n· Communication Log" <<core>> as BIZ_Customer
+}
+
+' ============================================================
+' SUPPORTING CAPABILITIES
+' ============================================================
+package "Supporting Capabilities — القدرات المساندة" as SuppPkg #D6EAF8 {
+
+  rectangle "Support & Help Desk\nالدعم الفني\n\n· Ticketing System\n· Knowledge Base\n· Live Chat\n· SLA Management\n· Customer Feedback" <<supporting>> as BIZ_Support
+
+  rectangle "Content Management\nإدارة المحتوى\n\n· CMS Pages & Blog\n· Media Library\n· SEO Management\n· Content Scheduling\n· Multi-language CMS" <<supporting>> as BIZ_Content
+
+  rectangle "Notifications\nالإشعارات\n\n· Email Templates\n· SMS Gateway\n· Push Notifications\n· In-App Messages\n· Notification Preferences" <<supporting>> as BIZ_Notification
+
+  rectangle "AI & Intelligence\nالذكاء الاصطناعي\n\n· AI Chat Agents\n· RAG Pipeline\n· Content Generation\n· Customer Insights\n· Automated Support" <<supporting>> as BIZ_AI
+}
+
+' ============================================================
+' GENERIC CAPABILITIES
+' ============================================================
+package "Generic Capabilities — القدرات العامة" as GenPkg #E8F8F5 {
+
+  rectangle "Analytics & Reporting\nالتحليلات والتقارير\n\n· Dashboards & KPIs\n· Business Reports\n· Data Export\n· Trend Analysis\n· Performance Metrics" <<generic>> as BIZ_Analytics
+}
+
+' ============================================================
+' Capability Dependencies
+' ============================================================
+BIZ_Identity -down-> BIZ_Customer : "Authenticates\ncustomers"
+BIZ_Identity -down-> BIZ_Service : "Authenticates\nstaff"
+BIZ_Customer -down-> BIZ_Service : "Requests\nservices"
+BIZ_Customer -down-> BIZ_Commerce : "Makes\npurchases"
+BIZ_Service -down-> BIZ_Commerce : "Generates\ninvoices"
+BIZ_Service -down-> BIZ_Support : "Creates\nsupport cases"
+BIZ_Commerce -down-> BIZ_Notification : "Triggers\norder notifications"
+BIZ_Service -down-> BIZ_Notification : "Triggers\nstatus updates"
+BIZ_Support -down-> BIZ_Notification : "Triggers\nticket alerts"
+BIZ_Content -down-> BIZ_Notification : "Publishing\nnotifications"
+BIZ_Customer -down-> BIZ_Analytics : "Feeds\ncustomer data"
+BIZ_Service -down-> BIZ_Analytics : "Feeds\nservice data"
+BIZ_Commerce -down-> BIZ_Analytics : "Feeds\nsales data"
+BIZ_AI -down-> BIZ_Support : "Powers\nsmart replies"
+BIZ_AI -down-> BIZ_Content : "Generates\ncontent"
+
+@enduml

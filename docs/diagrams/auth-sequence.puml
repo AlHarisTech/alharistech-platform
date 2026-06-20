@@ -1,0 +1,154 @@
+@startuml auth-sequence
+' ============================================================
+' AlharisTech Platform — Authentication Sequence Diagram
+' JWT + Refresh Token Flow: Login, Refresh, Logout, Expiry
+' ============================================================
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Segoe UI, Helvetica, Arial, sans-serif"
+skinparam defaultFontSize 10
+
+skinparam participant {
+  BackgroundColor #D4E6F1
+  BorderColor #2980B9
+  FontColor #1A1A1A
+}
+
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #E67E22
+  FontColor #1A1A1A
+}
+
+skinparam database {
+  BackgroundColor #D5F5E3
+  BorderColor #27AE60
+}
+
+skinparam note {
+  BackgroundColor #FEF9E7
+  BorderColor #F1C40F
+  FontSize 9
+}
+
+skinparam arrow {
+  FontSize 9
+}
+
+title **AlharisTech Platform — Authentication Sequence**
+title **JWT + Refresh Token Flow (Login, Refresh, Logout, Expiry)**
+
+actor "User\nالمستخدم" as User
+participant "Frontend\nNext.js" as Frontend
+participant "API Gateway\nNestJS" as Gateway
+participant "Auth Service\nNestJS Module" as AuthSvc
+database "PostgreSQL\nusers / sessions" as DB
+database "Redis\nsession cache" as Redis
+
+== LOGIN — تسجيل الدخول ==
+
+User -> Frontend : Enter email + password
+Frontend -> Gateway : POST /api/v1/auth/login\n{ email, password }
+Gateway -> Gateway : Validate input\n(ZodValidationPipe)
+Gateway -> AuthSvc : login(dto)
+AuthSvc -> DB : Find user by email\nSELECT * FROM users WHERE email = ?
+DB --> AuthSvc : User record (with password_hash)
+
+alt User not found
+  AuthSvc --> Gateway : 401 Unauthorized
+  Gateway --> Frontend : 401 { error: "Invalid credentials" }
+  Frontend --> User : Show error message
+else User found
+  AuthSvc -> AuthSvc : bcrypt.compare(password, hash)
+
+  alt Password incorrect
+    AuthSvc -> DB : Log failed attempt\n(rate limit counter)
+    AuthSvc --> Gateway : 401 Unauthorized
+    Gateway --> Frontend : 401 { error: "Invalid credentials" }
+    Frontend --> User : Show error message
+  else Password correct
+    AuthSvc -> AuthSvc : Generate JWT Access Token\n{ sub, email, role, permissions }\nExpires: 15 minutes
+    AuthSvc -> AuthSvc : Generate Refresh Token\nOpaque 256-bit random string
+    AuthSvc -> DB : Store refresh token hash\n(userId, hash, expiresAt, familyId)
+    AuthSvc -> Redis : Cache session\n(userId, accessToken, ttl: 15m)
+    AuthSvc --> Gateway : { accessToken, refreshToken }
+
+    Gateway -> Gateway : Set refresh token cookie\nhttpOnly, Secure, SameSite=Strict, path=/api/v1/auth
+
+    Gateway --> Frontend : 200 { accessToken, user }
+    Frontend -> Frontend : Store accessToken in memory\n(NOT localStorage)
+    Frontend --> User : Redirect to dashboard
+  end
+end
+
+== AUTHENTICATED REQUEST — طلب مصادق ==
+
+User -> Frontend : Perform action
+Frontend -> Gateway : GET /api/v1/orders\nAuthorization: Bearer <accessToken>
+Gateway -> Gateway : JwtAuthGuard\nVerify JWT signature
+Gateway -> AuthSvc : validateToken(token)
+AuthSvc -> Redis : Check session exists\n(userId, token)
+Redis --> AuthSvc : Session valid
+AuthSvc --> Gateway : { userId, email, role, permissions }
+Gateway -> Gateway : Attach user to request\n(req.user)
+Gateway --> Frontend : 200 { data: [...] }
+Frontend --> User : Render data
+
+== TOKEN REFRESH — تجديد الرمز ==
+
+User -> Frontend : Access token expired (401)
+Frontend -> Gateway : POST /api/v1/auth/refresh\n(cookie: refreshToken)
+Gateway -> AuthSvc : refreshToken(cookie.refreshToken)
+
+AuthSvc -> DB : Find refresh token hash\nWHERE hash = SHA256(token) AND revoked = false
+DB --> AuthSvc : Refresh token record
+
+alt Token valid
+  AuthSvc -> AuthSvc : **Token Rotation (mandatory)**:\n1. Invalidate old refresh token\n2. Issue NEW refresh token\n3. Issue NEW access token
+
+  AuthSvc -> DB : UPDATE refresh_tokens\nSET revoked = true, replacedBy = <newTokenId>\nWHERE id = <oldTokenId>
+  AuthSvc -> DB : INSERT INTO refresh_tokens\n(userId, hash, familyId, expiresAt)
+  AuthSvc -> Redis : Update session cache\n(new accessToken, ttl: 15m)
+
+  AuthSvc --> Gateway : { accessToken (NEW), refreshToken (NEW) }
+  Gateway -> Gateway : Set new refresh token cookie
+  Gateway --> Frontend : 200 { accessToken: <new> }
+  Frontend -> Frontend : Replace in-memory accessToken
+else Token reused (potential theft detected)
+  AuthSvc -> AuthSvc : **REUSE DETECTION!**\nRevoke ALL tokens for this user
+  AuthSvc -> DB : UPDATE refresh_tokens\nSET revoked = true\nWHERE userId = ? AND familyId = ?
+  AuthSvc -> Redis : DELETE session cache
+  AuthSvc --> Gateway : 401 { error: "Token reuse detected. All sessions revoked." }
+  Gateway --> Frontend : 401
+  Frontend --> User : Redirect to login
+end
+
+== LOGOUT — تسجيل الخروج ==
+
+User -> Frontend : Click Logout
+Frontend -> Gateway : POST /api/v1/auth/logout\n(cookie: refreshToken)
+Gateway -> AuthSvc : logout(userId, refreshToken)
+
+AuthSvc -> DB : Revoke refresh token\nUPDATE SET revoked = true
+AuthSvc -> Redis : DELETE session cache
+AuthSvc --> Gateway : 200 { message: "Logged out" }
+Gateway -> Gateway : Clear refresh token cookie
+Gateway --> Frontend : 200
+Frontend -> Frontend : Clear in-memory accessToken
+Frontend --> User : Redirect to login page
+
+== SESSION EXPIRY (SLIDING) — انتهاء الجلسة ==
+
+note over AuthSvc, DB
+  **Refresh Token Lifetime (Sliding Window):**
+  · Absolute max: 7 days
+  · Sliding extension: each refresh extends by 7 days
+  · Maximum total: 30 days from initial login
+  · After 30 days: must re-authenticate with password
+  · Inactivity timeout: 15 min (access token)
+endnote
+
+AuthSvc -> DB : Cron job: DELETE expired refresh tokens\nWHERE expiresAt < NOW()
+AuthSvc -> Redis : Auto-expire session keys (TTL)
+
+@enduml

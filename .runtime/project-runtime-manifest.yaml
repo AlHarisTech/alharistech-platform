@@ -1,0 +1,225 @@
+# Project Runtime Manifest
+# AlharisTech Platform — Engineering Operating System
+# Generated: 2026-06-20
+
+project:
+  id: "alharistech-platform"
+  name: "AlharisTech Platform"
+  name_ar: "منصة الحارس تك"
+  type: "digital-business-operating-system"
+  repository: "/home/asem/workspace/projects/Alharistech"
+
+lifecycle:
+  current_phase: "sprint-0"
+  current_gate: "G2" # Architecture gate
+  phases:
+    - id: "sprint-0"
+      name: "Architecture Foundation"
+      status: "in-progress"
+      progress: 0.52
+      gates: ["G0", "G1", "G2"]
+      deliverables:
+        - "Vision & Strategy"
+        - "PRD & Requirements"
+        - "Architecture & ADRs"
+        - "C4 & Diagrams"
+        - "Governance & Tooling"
+        - "Development Environment"
+
+    - id: "phase-1"
+      name: "Digital Presence — Official Website"
+      status: "pending"
+      depends_on: ["sprint-0"]
+      gates: ["G3", "G4", "G5", "G6"]
+      estimated_duration: "4 months"
+      deliverables:
+        - "Monorepo Setup"
+        - "Authentication System"
+        - "Public Website"
+        - "CMS"
+        - "Services & Orders System"
+
+    - id: "phase-2"
+      name: "Internal Management"
+      status: "pending"
+      depends_on: ["phase-1"]
+      estimated_duration: "6 months"
+
+    - id: "phase-3"
+      name: "E-Commerce"
+      status: "pending"
+      depends_on: ["phase-2"]
+      estimated_duration: "6 months"
+
+    - id: "phase-4"
+      name: "Desktop & Mobile"
+      status: "pending"
+      depends_on: ["phase-3"]
+      estimated_duration: "8 months"
+
+    - id: "phase-5"
+      name: "SaaS, Marketplace & AI"
+      status: "pending"
+      depends_on: ["phase-4"]
+      estimated_duration: "12 months"
+
+principles:
+  perp:
+    - name: "Security First"
+      id: "PERP-SEC"
+      enforcement: "security-review-gate"
+    - name: "Scalability First"
+      id: "PERP-SCA"
+      enforcement: "load-test-gate"
+    - name: "Maintainability First"
+      id: "PERP-MNT"
+      enforcement: "code-review + lint-gate"
+    - name: "Minimal Complexity"
+      id: "PERP-MIN"
+      enforcement: "architecture-review"
+    - name: "Evidence First"
+      id: "PERP-EVI"
+      enforcement: "decision-record-required"
+    - name: "Modular First"
+      id: "PERP-MOD"
+      enforcement: "dependency-analysis"
+    - name: "API First"
+      id: "PERP-API"
+      enforcement: "openapi-validation"
+    - name: "Fail Closed"
+      id: "PERP-FCL"
+      enforcement: "security-audit"
+
+domains:
+  - id: "identity"
+    name: "الهوية — Identity"
+    bounded_context: "Authentication, Users, Roles, Permissions"
+    phase: "phase-1"
+
+  - id: "customer"
+    name: "العملاء — Customer"
+    bounded_context: "CRM, Profiles, Tags, Communication"
+    phase: "phase-2"
+
+  - id: "service"
+    name: "الخدمات — Service"
+    bounded_context: "Services Catalog, Orders, Workflow, Documents"
+    phase: "phase-1"
+
+  - id: "commerce"
+    name: "التجارة — Commerce"
+    bounded_context: "Products, Cart, Checkout, Inventory, Shipping"
+    phase: "phase-3"
+
+  - id: "support"
+    name: "الدعم — Support"
+    bounded_context: "Tickets, Knowledge Base, Live Chat"
+    phase: "phase-2"
+
+  - id: "content"
+    name: "المحتوى — Content"
+    bounded_context: "CMS, Pages, Blog, Media, SEO"
+    phase: "phase-1"
+
+  - id: "notification"
+    name: "الإشعارات — Notification"
+    bounded_context: "Email, SMS, Push, Templates"
+    phase: "phase-2"
+
+  - id: "analytics"
+    name: "التحليلات — Analytics"
+    bounded_context: "Reports, Dashboards, KPIs"
+    phase: "phase-2"
+
+  - id: "ai"
+    name: "الذكاء الاصطناعي — AI"
+    bounded_context: "Agents, RAG, Embeddings, Automation"
+    phase: "phase-5"
+
+channels:
+  - id: "web"
+    name: "Web Platform"
+    technology: "Next.js"
+    phase: "phase-1"
+
+  - id: "admin"
+    name: "Admin Dashboard"
+    technology: "Next.js"
+    phase: "phase-2"
+
+  - id: "desktop"
+    name: "Desktop Application"
+    technology: "Tauri/Electron"
+    phase: "phase-4"
+
+  - id: "android"
+    name: "Android Application"
+    technology: "React Native"
+    phase: "phase-4"
+
+  - id: "ios"
+    name: "iOS Application"
+    technology: "React Native"
+    phase: "phase-4"
+
+  - id: "api"
+    name: "API Platform"
+    technology: "NestJS"
+    phase: "phase-1"
+
+quality_gates:
+  - id: "G0"
+    name: "Vision Gate"
+    criteria: ["vision_document_approved"]
+
+  - id: "G1"
+    name: "Requirements Gate"
+    criteria: ["prd_approved", "system_requirements_approved"]
+
+  - id: "G2"
+    name: "Architecture Gate"
+    criteria: ["architecture_approved", "all_adrs_complete", "c4_diagrams_complete"]
+
+  - id: "G3"
+    name: "Design Gate"
+    criteria: ["domain_specs_complete", "api_spec_complete", "data_model_complete"]
+
+  - id: "G4"
+    name: "Implementation Gate"
+    criteria: ["code_complete", "unit_tests_pass", "integration_tests_pass"]
+
+  - id: "G5"
+    name: "Validation Gate"
+    criteria: ["e2e_tests_pass", "security_audit_pass", "performance_benchmark_pass"]
+
+  - id: "G6"
+    name: "Release Gate"
+    criteria: ["deployed_to_production", "monitoring_active", "rollback_plan_ready"]
+
+  - id: "G7"
+    name: "Operations Gate"
+    criteria: ["kpis_met", "incidents_resolved", "feedback_collected"]
+
+tools:
+  ai_workstation_core:
+    repository: "https://github.com/anomalyco/ai-workstation-core"
+    location: "tools/ai-workstation-core"
+    status: "not-installed"
+
+  spec_kit:
+    repository: "https://github.com/github/spec-kit"
+    location: "tools/spec-kit"
+    status: "not-installed"
+
+  diagram_tools:
+    - "PlantUML"
+    - "Mermaid"
+    - "D2"
+    - "Draw.io"
+
+  ci_cd: "GitHub Actions"
+  package_manager: "pnpm"
+  monorepo_tool: "Turborepo"
+  container_runtime: "Docker"
+  orchestration: "Kubernetes (Phase 5)"
+  iac: "Terraform (Phase 5)"

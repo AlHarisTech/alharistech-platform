@@ -1,0 +1,212 @@
+# Specification Registry
+# AlharisTech Platform — Central register of all specifications
+
+version: "1.0"
+updated: "2026-06-20"
+
+# Registry tracks every specification in the project
+# Each entry maps to: document location, pipeline stage, owner, status
+
+specifications:
+
+  # ─── Platform Core ───
+  - id: "SPEC-PLATFORM-001"
+    title: "منصة الحارس تك — المواصفات الأساسية"
+    title_en: "AlharisTech Platform — Core Platform Specification"
+    domain: "platform"
+    location: "docs/requirements/prd.md"
+    type: "product_requirements"
+    stage: "approved"
+    owner: "product_owner"
+    adr_refs: []
+    fr_refs: ["FR-101", "FR-906"]
+
+  - id: "SPEC-PLATFORM-002"
+    title: "متطلبات النظام"
+    title_en: "System Requirements"
+    domain: "platform"
+    location: "docs/requirements/system-requirements.md"
+    type: "system_requirements"
+    stage: "approved"
+    owner: "product_owner"
+    adr_refs: []
+    fr_refs: ["FR-101", "FR-906", "NFR-101", "NFR-605"]
+
+  # ─── Architecture ───
+  - id: "SPEC-ARCH-001"
+    title: "المعمارية المؤسسية"
+    title_en: "Enterprise Architecture"
+    domain: "architecture"
+    location: "docs/architecture/enterprise-architecture.md"
+    type: "architecture"
+    stage: "approved"
+    owner: "tech_lead"
+    adr_refs: ["ADR-001", "ADR-016"]
+
+  # ─── Domain Specifications ───
+  - id: "SPEC-DOM-001"
+    title: "نطاق الهوية والمصادقة"
+    title_en: "Identity Domain Specification"
+    domain: "identity"
+    location: "specs/domains/identity/"
+    type: "domain_spec"
+    stage: "draft"  # Needs to be written
+    owner: "tech_lead"
+    adr_refs: ["ADR-007"]
+    fr_refs: ["FR-101", "FR-109"]
+
+  - id: "SPEC-DOM-002"
+    title: "نطاق العملاء — CRM"
+    title_en: "Customer Domain Specification"
+    domain: "customer"
+    location: "specs/domains/customer/"
+    type: "domain_spec"
+    stage: "draft"
+    owner: "domain_lead"
+    adr_refs: []
+    fr_refs: ["FR-201", "FR-208"]
+
+  - id: "SPEC-DOM-003"
+    title: "نطاق الخدمات والطلبات"
+    title_en: "Service Domain Specification"
+    domain: "service"
+    location: "specs/domains/service/"
+    type: "domain_spec"
+    stage: "draft"
+    owner: "domain_lead"
+    adr_refs: []
+    fr_refs: ["FR-301", "FR-308"]
+
+  - id: "SPEC-DOM-004"
+    title: "نطاق التجارة الإلكترونية"
+    title_en: "Commerce Domain Specification"
+    domain: "commerce"
+    location: "specs/domains/commerce/"
+    type: "domain_spec"
+    stage: "draft"
+    owner: "domain_lead"
+    adr_refs: []
+    fr_refs: ["FR-701", "FR-710"]
+
+  - id: "SPEC-DOM-005"
+    title: "نطاق الدعم الفني"
+    title_en: "Support Domain Specification"
+    domain: "support"
+    location: "specs/domains/support/"
+    type: "domain_spec"
+    stage: "draft"
+    owner: "domain_lead"
+    adr_refs: []
+    fr_refs: ["FR-601", "FR-608"]
+
+  - id: "SPEC-DOM-006"
+    title: "نطاق إدارة المحتوى"
+    title_en: "Content Domain Specification"
+    domain: "content"
+    location: "specs/domains/content/"
+    type: "domain_spec"
+    stage: "draft"
+    owner: "domain_lead"
+    adr_refs: []
+    fr_refs: ["FR-401", "FR-408"]
+
+  - id: "SPEC-DOM-007"
+    title: "نطاق الإشعارات"
+    title_en: "Notification Domain Specification"
+    domain: "notification"
+    location: "specs/domains/notification/"
+    type: "domain_spec"
+    stage: "draft"
+    owner: "domain_lead"
+    adr_refs: []
+    fr_refs: ["FR-801", "FR-806"]
+
+  - id: "SPEC-DOM-008"
+    title: "نطاق التحليلات والتقارير"
+    title_en: "Analytics Domain Specification"
+    domain: "analytics"
+    location: "specs/domains/analytics/"
+    type: "domain_spec"
+    stage: "draft"
+    owner: "domain_lead"
+    adr_refs: []
+    fr_refs: ["FR-901", "FR-906"]
+
+  - id: "SPEC-DOM-009"
+    title: "نطاق الذكاء الاصطناعي"
+    title_en: "AI Domain Specification"
+    domain: "ai"
+    location: "specs/domains/ai/"
+    type: "domain_spec"
+    stage: "draft"
+    owner: "domain_lead"
+    adr_refs: []
+    fr_refs: []
+
+  # ─── Feature Specifications (Phase 1) ───
+  - id: "SPEC-FEAT-001"
+    title: "نظام المصادقة — تسجيل ودخول"
+    title_en: "Authentication System — Register & Login"
+    domain: "identity"
+    location: "specs/features/auth-system.md"
+    type: "feature_spec"
+    stage: "draft"
+    owner: "tech_lead"
+    phase: "phase-1"
+    sprint: "sprint-1.2"
+    adr_refs: ["ADR-007"]
+    fr_refs: ["FR-101", "FR-102", "FR-103"]
+    epic: "EPIC-1"
+
+  - id: "SPEC-FEAT-002"
+    title: "الموقع الرسمي — الصفحات الرئيسية"
+    title_en: "Public Website — Core Pages"
+    domain: "content"
+    location: "specs/features/website-core.md"
+    type: "feature_spec"
+    stage: "draft"
+    owner: "tech_lead"
+    phase: "phase-1"
+    sprint: "sprint-1.3"
+
+  - id: "SPEC-FEAT-003"
+    title: "نظام إدارة المحتوى"
+    title_en: "Content Management System"
+    domain: "content"
+    location: "specs/features/cms.md"
+    type: "feature_spec"
+    stage: "draft"
+    owner: "tech_lead"
+    phase: "phase-1"
+    sprint: "sprint-1.4"
+    fr_refs: ["FR-401", "FR-408"]
+
+  - id: "SPEC-FEAT-004"
+    title: "نظام الخدمات والطلبات"
+    title_en: "Services & Orders System"
+    domain: "service"
+    location: "specs/features/services-orders.md"
+    type: "feature_spec"
+    stage: "draft"
+    owner: "tech_lead"
+    phase: "phase-1"
+    sprint: "sprint-1.5"
+    fr_refs: ["FR-301", "FR-308"]
+
+# Pipeline Stages:
+#   draft        — Initial creation
+#   clarified    — Ambiguities resolved
+#   planned      — Implementation plan created
+#   implemented  — Code complete
+#   verified     — QA passed
+#   released     — In production
+#   superseded   — Replaced by newer spec
+
+# Spec Types:
+#   product_requirements — PRD, vision
+#   system_requirements  — FRs, NFRs
+#   architecture         — Architecture documents
+#   domain_spec          — Domain-level specification
+#   feature_spec         — Feature-level specification
+#   api_spec             — API contract
+#   adr                  — Architecture Decision Record
