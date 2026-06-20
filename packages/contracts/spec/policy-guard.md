@@ -387,7 +387,7 @@ Policies can be reloaded without restart:
 |:---|:---|
 | `should evaluate all 162 policies without errors` | Compile and validate all policies |
 | `should load policy file from YAML` | Parse access-control.yaml correctly |
-| `should map all 184 routes to policy resources` | Route-to-resource mapping covers all endpoints |
+| `should map all 149 routes to policy resources` | Route-to-resource mapping covers all endpoints |
 | `should not exceed 1ms for typical evaluation` | Benchmark with realistic policies |
 
 ### 10.3 E2E Tests

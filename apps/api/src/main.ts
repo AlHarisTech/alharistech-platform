@@ -1,4 +1,4 @@
-import { NestFactory } from "@nestjs/core";
+import { NestFactory, Reflector } from "@nestjs/core";
 import { FastifyAdapter, NestFastifyApplication } from "@nestjs/platform-fastify";
 import { AppModule } from "./app.module";
 import { ContractGuard } from "./common/guards/contract.guard";
@@ -14,10 +14,11 @@ async function bootstrap(): Promise<void> {
   );
 
   const schemaRegistry = app.get(SchemaRegistry);
+  const reflector = app.get(Reflector);
 
   app.useGlobalGuards(
-    new ContractGuard(app.get("Reflector")),
-    new PolicyGuard(app.get("Reflector")),
+    new ContractGuard(reflector),
+    new PolicyGuard(reflector),
   );
   app.useGlobalInterceptors(new ContractInterceptor(schemaRegistry));
   app.useGlobalPipes(new ContractPipe(schemaRegistry));

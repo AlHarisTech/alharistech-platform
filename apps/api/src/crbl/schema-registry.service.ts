@@ -471,8 +471,8 @@ export class SchemaRegistry implements OnModuleInit {
 
   private compileSchema(schema: Record<string, unknown>): ValidateFunction | undefined {
     try {
-      const sanitized = this.sanitizeSchemaForAjv(schema);
-      return this.ajv.compile(sanitized);
+      const sanitized = this.sanitizeSchemaForAjv(structuredClone(schema));
+      return this.ajv.compile(sanitized as Record<string, unknown>);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`AJV compilation failed: ${message}`);
@@ -480,27 +480,28 @@ export class SchemaRegistry implements OnModuleInit {
     }
   }
 
-  private sanitizeSchemaForAjv(schema: unknown): unknown {
-    if (schema === null || schema === undefined) return schema;
-    if (typeof schema !== 'object') return schema;
+  private sanitizeSchemaForAjv(schema: unknown): Record<string, unknown> {
+    if (schema === null || schema === undefined) return {};
+    if (typeof schema !== 'object') return {};
 
     if (Array.isArray(schema)) {
-      return schema.map((item) => this.sanitizeSchemaForAjv(item));
+      const result: Record<string, unknown> = {};
+      for (let i = 0; i < schema.length; i++) {
+        result[String(i)] = this.sanitizeSchemaForAjv(schema[i]);
+      }
+      return result;
     }
 
     const sanitized: Record<string, unknown> = {};
+    const skipKeys = new Set(['nullable', 'discriminator', 'xml', 'example', 'externalDocs', 'deprecated']);
+
     for (const [key, value] of Object.entries(schema as Record<string, unknown>)) {
-      if (key === 'nullable') continue;
-      if (key === 'discriminator') continue;
-      if (key === 'xml') continue;
-      if (key === 'example') continue;
-      if (key === 'externalDocs') continue;
-      if (key === 'deprecated') continue;
-      if (key === 'description') {
+      if (skipKeys.has(key)) continue;
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        sanitized[key] = this.sanitizeSchemaForAjv(value);
+      } else {
         sanitized[key] = value;
-        continue;
       }
-      sanitized[key] = this.sanitizeSchemaForAjv(value);
     }
     return sanitized;
   }

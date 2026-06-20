@@ -43,7 +43,7 @@ principle and has defined failure modes, remediation steps, and phase-dependent 
 | 1.10 | Policy effects valid | `access-control.yaml` | All `effect` values are `"allow"` or `"deny"`. |
 | 1.11 | Policy roles valid | `access-control.yaml` | All role values are from the allowed set: `admin`, `manager`, `employee`, `customer`, `partner`, `*`. |
 | 1.12 | Policy actions valid | `access-control.yaml` | All action values are from the allowed set: `create`, `read`, `update`, `delete`, `issue`, `refresh`, `revoke`, `publish`, `unpublish`, `activate`, `execute`, `export`, `import`, `merge`, `grant`, `revoke_permission`. |
-| 1.13 | Service catalog parseable | `specs/contracts/service-catalog.yaml` | YAML parses, `services` is an array with 184 entries. |
+| 1.13 | Service catalog parseable | `specs/contracts/service-catalog.yaml` | YAML parses, `services` is an array with 149 entries. |
 | 1.14 | Service catalog entries valid | `service-catalog.yaml` | Each entry has `path`, `method`, `domain`, `service`, `description`, `auth`, `roles`, `errors`, `fr_ref`, `phase`. |
 | 1.15 | Service catalog domains valid | `service-catalog.yaml` | All `domain` values are from the 9 allowed domains. |
 | 1.16 | Service catalog no duplicates | `service-catalog.yaml` | No duplicate `path` + `method` combinations. |
@@ -213,7 +213,7 @@ npx turbo coverage:contracts
 Contract Coverage Report — 2026-06-20T12:00:00Z
 =================================================
 
-Endpoints:  184/184 tested (100.0%) ✓
+Endpoints:  149/149 tested (100.0%) ✓
 Events:      94/94  tested (100.0%) ✓
 Policies:   162/162 tested (100.0%) ✓
 Specs:        9/9   tested (100.0%) ✓

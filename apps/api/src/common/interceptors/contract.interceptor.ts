@@ -43,11 +43,14 @@ export class ContractInterceptor implements NestInterceptor {
         }
 
         const start = Date.now();
-        const result = validator(data);
+        const valid = validator(data);
 
-        if (!result.valid) {
+        if (!valid) {
+          const ajvErrors = (validator.errors ?? []).map((e) =>
+            e.message ?? "validation failed"
+          );
           const mode = process.env.CONTRACT_RESPONSE_MODE || "lenient";
-          this.logValidationErrors(path, method, statusCode, result.errors || []);
+          this.logValidationErrors(path, method, statusCode, ajvErrors);
 
           if (mode === "strict") {
             throw new HttpException(
@@ -57,9 +60,10 @@ export class ContractInterceptor implements NestInterceptor {
                   message: "انتهاك العقد - الاستجابة لا تتطابق مع المواصفات",
                   message_en: "Contract violation - response does not match specification",
                   statusCode: 500,
-                  details: result.errors?.map((e) => ({
-                    field: e,
+                  details: ajvErrors.map((msg) => ({
+                    field: "response",
                     code: "MISMATCH",
+                    message: msg,
                   })),
                 },
                 meta: {
@@ -73,11 +77,6 @@ export class ContractInterceptor implements NestInterceptor {
           }
         }
 
-        const stripped = this.schemaRegistry.stripExtraFields(
-          data,
-          (validator as any).schema,
-        );
-
         const elapsed = Date.now() - start;
         if (elapsed > 5) {
           this.logger.debug(
@@ -85,7 +84,7 @@ export class ContractInterceptor implements NestInterceptor {
           );
         }
 
-        return stripped;
+        return data;
       }),
     );
   }

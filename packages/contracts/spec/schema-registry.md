@@ -387,7 +387,7 @@ Response:
   },
   "eventSchemasCount": 94,
   "policyRulesCount": 162,
-  "endpointsCount": 184,
+  "endpointsCount": 149,
   "errors": []
 }
 ```
@@ -675,7 +675,7 @@ SchemaRegistry MUST be a true singleton — only one instance per process. NestJ
 | 9 OpenAPI specs (parsed + resolved) | 5-8 MB |
 | 94 event schemas | 1-2 MB |
 | 162 compiled policies | 0.5 MB |
-| Route index (184 entries) | 1 MB |
+| Route index (149 entries) | 1 MB |
 | Event name index (94 entries) | 0.2 MB |
 | Policy-by-role index | 0.2 MB |
 | **Total** | **~10 MB** |

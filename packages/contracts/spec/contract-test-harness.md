@@ -316,7 +316,7 @@ Test Suite: Schema Compilation > Service Catalog
 | Test ID | Check | Assertion |
 |---|---|---|
 | `compile-catalog-yaml` | Service catalog YAML parseable | `yaml.parse(file)` succeeds. |
-| `compile-catalog-count` | Catalog has 149 endpoints | `services.length === 184`. |
+| `compile-catalog-count` | Catalog has 149 endpoints | `services.length === 149`. |
 | `compile-catalog-unique` | No duplicate path+method combinations | `Set(path + method).size === services.length`. |
 | `compile-catalog-domains` | All domains are valid | Each `domain` is one of: `identity`, `customer`, `service`, `commerce`, `support`, `content`, `notification`, `analytics`, `ai`. |
 | `compile-catalog-auth` | Auth field is valid | Each `auth` is `"public"` or `"required"`. |
@@ -550,8 +550,8 @@ The coverage report (`turbo coverage:contracts`) produces:
 {
   "timestamp": "2026-06-20T12:00:00Z",
   "endpoints": {
-    "total": 184,
-    "tested": 184,
+    "total": 149,
+    "tested": 149,
     "untested": 0,
     "coverage": 100.0
   },
@@ -765,8 +765,8 @@ npx tsx packages/contracts/src/scripts/verify-test-generation.ts
 
 | Category | Items | Tests Per Item | Estimated Total |
 |---|---|---|---|
-| API endpoints (happy path) | 184 | 2 (status + schema) | 368 |
-| API endpoints (validation) | 184 | ~5 per endpoint (avg required fields) | ~920 |
+| API endpoints (happy path) | 149 | 2 (status + schema) | 368 |
+| API endpoints (validation) | 149 | ~5 per endpoint (avg required fields) | ~920 |
 | API endpoints (auth) | ~140 (non-public) | 3 (no token, expired, malformed) | 420 |
 | API endpoints (authorization) | ~120 (role-restricted) | ~2 per endpoint | ~240 |
 | Event schemas | 94 | 5 per event | 470 |

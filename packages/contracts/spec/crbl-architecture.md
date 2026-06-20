@@ -1183,7 +1183,7 @@ export class SchemaRegistry implements OnApplicationShutdown {
 
 | Contract File | CRBL Component | Description |
 |:---|:---|:---|
-| `specs/contracts/openapi/identity-api.yaml` | ContractGuard, ContractInterceptor, ValidationPipe | 184 CRUD operations across 9 OpenAPI specs |
+| `specs/contracts/openapi/identity-api.yaml` | ContractGuard, ContractInterceptor, ValidationPipe | 149 CRUD operations across 9 OpenAPI specs |
 | `specs/contracts/events/event-schemas.yaml` | EventValidator | 94 domain events with JSON Schema definitions |
 | `specs/contracts/policy/access-control.yaml` | PolicyGuard | 162 RBAC policy rules with priority-based evaluation |
 | `specs/contracts/execution-boundaries.yaml` | (Reference) | Defines where CRBL runs (NestJS API Gateway layer) |

@@ -2,10 +2,11 @@
 ## AlharisTech Platform — v0.6.1-audit-clean
 
 ### Audit Limitations
-- **Endpoint Count Discrepancy (RESOLVED):** Service catalog initially reported 184. OpenAPI path+method verification confirmed 149. Fixed in v0.6.1.
+- **Endpoint Count Discrepancy (RESOLVED):** Service catalog initially reported 184. OpenAPI path+method verification confirmed 149. Fixed in v0.6.1 across all files including contract specs.
 - **Monorepo Bootstrap Gap (RESOLVED):** Root package.json, pnpm-workspace.yaml, and turbo.json were missing. Created in v0.6.1.
 - **Docker References in Docs (RESOLVED):** Multiple operational docs referenced Docker despite explicit decision not to use Docker in development. Cleaned in v0.6.1.
 - **ADR Depth (RESOLVED):** ADR-001, 002, 012 were concise. Expanded to full format in v0.6.1.
+- **TypeScript Build Errors (RESOLVED):** ContractInterceptor and ContractPipe treated AJV ValidateFunction return as `{valid, errors}` instead of `boolean`. SchemaRegistry.sanitizeSchemaForAjv had `unknown` return type. stripExtraFields method referenced but not defined. Fixed in v0.6.1 — all 18 errors resolved.
 
 ### Runtime Assumptions
 - PostgreSQL 16 is installed and running locally on the developer's machine (not via Docker)

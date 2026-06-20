@@ -289,8 +289,8 @@ When the performance budget is exceeded:
     "total": 0.025
   },
   "caches": {
-    "requestValidators": { "total": 184, "cached": 184, "hitRate": 1.0 },
-    "responseValidators": { "total": 184, "cached": 184, "hitRate": 1.0 },
+    "requestValidators": { "total": 149, "cached": 149, "hitRate": 1.0 },
+    "responseValidators": { "total": 149, "cached": 149, "hitRate": 1.0 },
     "eventValidators": { "total": 94, "cached": 94, "hitRate": 1.0 }
   },
   "metrics": {

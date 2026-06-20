@@ -44,19 +44,14 @@ export class ContractPipe implements PipeTransform {
       return value;
     }
 
-    const result = validator(value);
+    const valid = validator(value);
 
-    if (!result.valid) {
-      const details = (result.errors || []).map((err) => {
-        const parts = err.split(":");
-        const field = parts[0]?.trim() || "root";
-        const message = parts.slice(1).join(":").trim() || err;
-        return {
-          field,
-          code: "INVALID",
-          message,
-        };
-      });
+    if (!valid) {
+      const details = (validator.errors || []).map((err) => ({
+        field: err.instancePath || "root",
+        code: "INVALID",
+        message: err.message || "validation failed",
+      }));
 
       throw new BadRequestException({
         error: {
