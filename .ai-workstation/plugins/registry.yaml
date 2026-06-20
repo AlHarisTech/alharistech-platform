@@ -64,13 +64,12 @@ plugins:
       - "post_commit.update-context"
       - "pre_merge.architecture-compliance"
 
-  docker_runtime:
-    name: "Docker Runtime"
-    description: "Manages Docker-based development environment"
+  local_runtime:
+    name: "Local Runtime"
+    description: "Manages local bare-metal development environment (PostgreSQL, Redis)"
     commands:
       - "ops_deploy"
-    config: "infrastructure/docker/"
-    status: "pending"  # Requires docker-compose.yml creation
+    status: "pending"  # Requires local service installation
 
   ci_cd:
     name: "CI/CD Pipeline"

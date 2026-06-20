@@ -24,7 +24,7 @@ implementation drifts from spec, tests fail.
 | `specs/contracts/openapi/*.yaml` | 9 APIs | API Contract Tests |
 | `specs/contracts/events/event-schemas.yaml` | 94 events | Event Contract Tests |
 | `specs/contracts/policy/access-control.yaml` | 162 rules | Policy Contract Tests |
-| `specs/contracts/service-catalog.yaml` | 184 endpoints | Coverage + Drift Detection |
+| `specs/contracts/service-catalog.yaml` | 149 endpoints | Coverage + Drift Detection |
 
 ---
 
@@ -316,7 +316,7 @@ Test Suite: Schema Compilation > Service Catalog
 | Test ID | Check | Assertion |
 |---|---|---|
 | `compile-catalog-yaml` | Service catalog YAML parseable | `yaml.parse(file)` succeeds. |
-| `compile-catalog-count` | Catalog has 184 endpoints | `services.length === 184`. |
+| `compile-catalog-count` | Catalog has 149 endpoints | `services.length === 184`. |
 | `compile-catalog-unique` | No duplicate path+method combinations | `Set(path + method).size === services.length`. |
 | `compile-catalog-domains` | All domains are valid | Each `domain` is one of: `identity`, `customer`, `service`, `commerce`, `support`, `content`, `notification`, `analytics`, `ai`. |
 | `compile-catalog-auth` | Auth field is valid | Each `auth` is `"public"` or `"required"`. |
@@ -703,7 +703,7 @@ packages/contracts/src/__tests__/
 # Generate all contract tests from specs
 npx tsx packages/contracts/src/scripts/generate-contract-tests.ts
 
-# Output: "Generated 1,847 contract tests from 184 endpoints, 94 events, 162 policies."
+# Output: "Generated 1,847 contract tests from 149 endpoints, 94 events, 162 policies."
 ```
 
 Generated tests are committed to the repository. CI validates that generated tests match specs (test generation is reproducible and deterministic).

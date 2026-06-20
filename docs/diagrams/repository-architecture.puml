@@ -108,8 +108,7 @@ package "**packages/** — Foundation (Layer 1)\nحزم الأساس — لا ت
 ' ============================================================
 ' INFRASTRUCTURE & TOOLS
 ' ============================================================
-package "**infrastructure/** — Deployment\nالبنية التحتية — Docker, K8s, Terraform" {
-  component "**docker**\nCompose\nDockerfiles" <<infra>> as Infra_Docker
+package "**infrastructure/** — Deployment\nالبنية التحتية — K8s, Terraform" {
   component "**k8s**\nKubernetes\nManifests" <<infra>> as Infra_K8s
   component "**terraform**\nIaC\nTerraform" <<infra>> as Infra_TF
 }
@@ -213,7 +212,7 @@ Pkg_SDK --> Pkg_Types : "depends"
 Pkg_SDK --> Pkg_Utils : "depends"
 
 ' Infrastructure
-Infra_Docker --> App_API : "runs"
+
 Infra_K8s --> App_API : "deploys"
 Infra_TF --> Infra_K8s : "provisions"
 

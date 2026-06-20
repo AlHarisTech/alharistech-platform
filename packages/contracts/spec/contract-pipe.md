@@ -248,7 +248,7 @@ Fields with `format: password` or `x-sensitive: true` have their `received` valu
 | Zod parse (small) | < 1ms | Schema with 5 fields |
 | Zod parse (medium) | < 2ms | Schema with 15 fields |
 | Zod parse (large) | < 5ms | Schema with 50+ fields, deep nesting |
-| Schema generation (build time) | < 2s | Generate all 184 endpoint schemas |
+| Schema generation (build time) | < 2s | Generate all 149 endpoint schemas |
 
 **Note:** ContractPipe is typically ~2x faster than ContractGuard for DTO validation because Zod's validation engine is optimized for TypeScript and avoids JSON Schema's pointer resolution overhead. For endpoints that use ContractPipe with Zod schemas, ContractGuard may be disabled via `@SkipContractValidation()`.
 

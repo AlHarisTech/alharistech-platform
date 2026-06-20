@@ -1079,7 +1079,6 @@ Alharistech/
 │   └── utils/                @alharistech/utils — Utility functions
 ├── domains/                  9 domain modules (DDD)
 ├── infrastructure/
-│   ├── docker/               Dockerfiles & compose
 │   ├── k8s/                  Kubernetes manifests
 │   └── terraform/            Infrastructure as Code
 ├── docs/                     All documentation

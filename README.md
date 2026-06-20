@@ -35,7 +35,7 @@
 | Database | PostgreSQL, Redis |
 | Storage | S3 Compatible |
 | Auth | JWT, Refresh Tokens, RBAC |
-| DevOps | Docker, GitHub Actions, Turborepo |
+| DevOps | GitHub Actions, Turborepo |
 
 ---
 
@@ -46,7 +46,7 @@ Alharistech/
 ├── apps/            ← التطبيقات (web, admin, desktop, mobile, api)
 ├── packages/        ← الحزم المشتركة (ui, auth, database, sdk, types...)
 ├── domains/         ← نطاقات الأعمال (identity, customer, service...)
-├── infrastructure/  ← البنية التحتية (docker, k8s, terraform)
+├── infrastructure/  ← البنية التحتية (k8s, terraform)
 ├── docs/            ← التوثيق الكامل (الرؤية، المتطلبات، المعمارية...)
 ├── specs/           ← المواصفات التفصيلية
 ├── tasks/           ← خطط التنفيذ
@@ -73,7 +73,6 @@ Alharistech/
 ### المتطلبات
 - Node.js 20+
 - pnpm 9+
-- Docker + Docker Compose
 - PostgreSQL 16
 - Redis 7
 
@@ -83,10 +82,8 @@ Alharistech/
 # تثبيت التبعيات
 pnpm install
 
-# تشغيل الخدمات المساعدة
-docker compose up -d
-
-# تشغيل التطوير
+# تأكد من تشغيل PostgreSQL و Redis محلياً
+# ثم:
 pnpm dev
 ```
 

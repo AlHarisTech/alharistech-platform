@@ -70,7 +70,7 @@ The AlharisTech Platform is built over **5 phases** spanning approximately **2.5
 | Milestone | Date | Phase | Criteria |
 |:---|:---|:---|:---|
 | **M0** — Docs Complete | Jul 2026 | 0 | All Sprint 0 docs reviewed & approved |
-| **M1** — Dev Environment Ready | Jul 2026 | 0→1 | Monorepo builds, CI/CD green, Docker stack running |
+| **M1** — Dev Environment Ready | Jul 2026 | 0→1 | Monorepo builds, CI/CD green, PostgreSQL + Redis running locally |
 | **M2** — Public Site Live (v0.1.0) | Oct 2026 | 1 | Website, auth, CMS, service orders deployed to production |
 | **M3** — Internal Ops Live (v0.2.0) | Apr 2027 | 2 | Dashboard, CRM, invoicing, ticketing deployed |
 | **M4** — Store Live (v0.3.0) | Oct 2027 | 3 | E-commerce platform deployed |
@@ -105,7 +105,7 @@ Phase 0 ──► Phase 1 ──► Phase 2 ──► Phase 3 ──► Phase 4 
 |:---|:---|
 | **Duration** | 4 weeks (Jun 8 – Jul 3, 2026) |
 | **PI Objectives** | Establish documentation baseline, architectural decisions, governance framework, and development environment |
-| **Key Results** | KR0.1: All Phase 0 documents reviewed and approved (vision, PRD, SRD, ADRs, C4, architecture, governance, roadmap)<br>KR0.2: Monorepo initialized with Turborepo + pnpm<br>KR0.3: Docker Compose stack running (PostgreSQL, Redis)<br>KR0.4: NestJS + Next.js scaffold projects building<br>KR0.5: CI/CD pipeline (GitHub Actions) green on main<br>KR0.6: Linting, formatting, and TypeScript strict mode enforced |
+| **Key Results** | KR0.1: All Phase 0 documents reviewed and approved (vision, PRD, SRD, ADRs, C4, architecture, governance, roadmap)<br>KR0.2: Monorepo initialized with Turborepo + pnpm<br>KR0.3: PostgreSQL + Redis installed and running locally<br>KR0.4: NestJS + Next.js scaffold projects building<br>KR0.5: CI/CD pipeline (GitHub Actions) green on main<br>KR0.6: Linting, formatting, and TypeScript strict mode enforced |
 | **Teams** | 1 Lead Architect + 1 Senior Engineer |
 | **Staffing** | Architecture & DevOps focus; no dedicated frontend/backend yet |
 
@@ -367,7 +367,7 @@ Tenant isolation must be validated after rollback; run tenant data integrity che
 | **FR Mappings** | FR-101 (Registration), FR-102 (Login with JWT), FR-103 (Password Reset), FR-104 (Profile Management), FR-105 (RBAC), FR-106 (Granular Permissions), FR-107 (MFA — deferred), FR-108 (Social Login — deferred), FR-109 (Session Management) |
 | **Story Point Estimate** | 34 SP |
 | **Priority** | P0 — BLOCKER for all other epics |
-| **Dependencies** | EPIC-5 (Infrastructure & DevOps) must deliver monorepo, database, Docker, and CI/CD before auth implementation can begin. |
+| **Dependencies** | EPIC-5 (Infrastructure & DevOps) must deliver monorepo, database, local environment, and CI/CD before auth implementation can begin. |
 | **Assigned Sprint** | Sprint 1.2 |
 
 ### EPIC-2: Public Website
@@ -415,7 +415,7 @@ Tenant isolation must be validated after rollback; run tenant data integrity che
 |:---|:---|
 | **Epic ID** | EPIC-5 |
 | **Name** | Infrastructure, DevOps & Platform Foundation |
-| **Description** | Set up the monorepo with Turborepo + pnpm, NestJS API scaffold, Next.js App Router scaffold, PostgreSQL + Redis Docker services, Prisma/Drizzle ORM with migrations, shared packages (@aht/types, @aht/ui, @aht/config), CI/CD pipeline (GitHub Actions), linting/formatting (ESLint, Prettier), TypeScript strict mode, and deployment to staging environment. |
+| **Description** | Set up the monorepo with Turborepo + pnpm, NestJS API scaffold, Next.js App Router scaffold, PostgreSQL + Redis (local), Prisma/Drizzle ORM with migrations, shared packages (@aht/types, @aht/ui, @aht/config), CI/CD pipeline (GitHub Actions), linting/formatting (ESLint, Prettier), TypeScript strict mode, and deployment to staging environment. |
 | **FR Mappings** | NFR-601 (Test Coverage), NFR-602 (OpenAPI Docs), NFR-604 (Coding Standards), NFR-605 (CI/CD Pipeline), NFR-301 (TLS), NFR-303 (OWASP), NFR-401 (Scalability), NFR-404 (Horizontal Scaling) |
 | **Story Point Estimate** | 26 SP |
 | **Priority** | P0 — BLOCKER for all other epics |
@@ -782,26 +782,24 @@ Tenant isolation must be validated after rollback; run tenant data integrity che
 | **Name** | Database Setup with Prisma ORM |
 | **User Story** | As a **developer**, I want a **PostgreSQL database with Prisma ORM and migration system** so that data persistence is reliable and version-controlled. |
 | **FRs** | — (infrastructure) |
-| **Acceptance Criteria** | AC-001: PostgreSQL 16 running in Docker Compose.<br>AC-002: Prisma schema in `packages/database/prisma/schema.prisma`.<br>AC-003: Initial migration creates first tables.<br>AC-004: `prisma generate` and `prisma migrate` scripts work.<br>AC-005: Database connection string from environment variable (never committed).<br>AC-006: Seed script for development data. |
-| **Technical Notes** | Prisma ORM. Docker Compose: `postgres:16-alpine` with persistent volume. `DATABASE_URL` in `.env`. Shared `@aht/database` package exports PrismaClient singleton. |
+| **Acceptance Criteria** | AC-001: PostgreSQL 16 running locally.<br>AC-002: Prisma schema in `packages/database/prisma/schema.prisma`.<br>AC-003: Initial migration creates first tables.<br>AC-004: `prisma generate` and `prisma migrate` scripts work.<br>AC-005: Database connection string from environment variable (never committed).<br>AC-006: Seed script for development data. |
+| **Technical Notes** | Prisma ORM. PostgreSQL installed locally. `DATABASE_URL` in `.env`. Shared `@aht/database` package exports PrismaClient singleton. |
 | **Dependencies** | F-INF-001 |
 | **Story Points** | 3 SP |
 
 ---
 
-#### F-INF-005: Docker Environment
+#### F-INF-005: Local Development Setup
 
 | Feature ID | F-INF-005 |
 |:---|:---|
-| **Name** | Docker Compose Development Environment |
-| **User Story** | As a **developer**, I want a **one-command local environment** so that I can start developing immediately with all services running. |
+| **Name** | Local Development Environment |
+| **User Story** | As a **developer**, I want a **local development environment** with PostgreSQL and Redis running directly on my machine so that I can develop without container overhead. |
 | **FRs** | — (infrastructure) |
-| **Acceptance Criteria** | AC-001: `docker-compose.yml` defines PostgreSQL, Redis, MinIO, Mailhog services.<br>AC-002: `docker compose up -d` starts all services.<br>AC-003: Health checks on all containers.<br>AC-004: Persistent volumes for PostgreSQL and MinIO data.<br>AC-005: Port mappings: PostgreSQL (5432), Redis (6379), MinIO (9000/9001), Mailhog (1025/8025). |
-| **Technical Notes** | Use named volumes. Add `depends_on` with `condition: service_healthy`. MinIO for local S3-compatible storage. Mailhog for email capture in dev. |
+| **Acceptance Criteria** | AC-001: PostgreSQL 16 installed and running locally on port 5432.<br>AC-002: Redis 7 installed and running locally on port 6379.<br>AC-003: Connection verified from NestJS and Next.js apps.<br>AC-004: Setup documented in README (installation steps per OS). |
+| **Technical Notes** | PostgreSQL and Redis installed directly on the host via package manager or official installers. No Docker required. Environment variables in `.env` point to `localhost` for all services. |
 | **Dependencies** | F-INF-001 |
-| **Story Points** | 3 SP |
-
----
+| **Story Points** | 2 SP |
 
 #### F-INF-006: CI/CD Pipeline
 
@@ -1005,7 +1003,7 @@ Tenant isolation must be validated after rollback; run tenant data integrity che
 | Field | Value |
 |:---|:---|
 | **Duration** | 2 weeks (Jul 6 – Jul 17, 2026) |
-| **Sprint Goal** | Establish the monorepo, backend scaffold, frontend scaffold, database, Docker environment, shared packages, and CI/CD pipeline. All services run locally with `docker compose up` and `pnpm dev`. |
+| **Sprint Goal** | Establish the monorepo, backend scaffold, frontend scaffold, database, local environment, shared packages, and CI/CD pipeline. All services run locally with `pnpm dev` (PostgreSQL + Redis installed directly on host). |
 | **Capacity** | 26 SP (3 engineers × 2 weeks) |
 
 #### Stories
@@ -1014,7 +1012,7 @@ Tenant isolation must be validated after rollback; run tenant data integrity che
 |:---|:---|:---|:---|:---|
 | INF-001 | Monorepo Initialization with Turborepo | 5 | Full-Stack | None |
 | INF-004 | Database Setup with Prisma ORM | 3 | Backend | INF-001 |
-| INF-005 | Docker Compose Development Environment | 3 | Backend | INF-001 |
+| INF-005 | Local Development Environment (PostgreSQL + Redis) | 2 | Backend | INF-001 |
 | INF-002 | NestJS API Scaffold (health check, Swagger, pipes) | 3 | Backend | INF-001, INF-004 |
 | INF-003 | Next.js Frontend Scaffold (Tailwind, shadcn/ui, RTL, fonts) | 3 | Frontend | INF-001 |
 | INF-006 | CI/CD Pipeline (GitHub Actions) | 8 | Full-Stack | INF-001—005 |
@@ -1178,7 +1176,7 @@ Tenant isolation must be validated after rollback; run tenant data integrity che
 ```
                         ┌─────────────────────────────────────┐
                         │         EPIC-5: Infrastructure       │
-                        │  (Monorepo, DB, Docker, CI/CD)       │
+                        │  (Monorepo, DB, Local Env, CI/CD)       │
                         └──────────────┬──────────────────────┘
                                        │ BLOCKS all below
                                        ▼
@@ -1249,8 +1247,8 @@ This is the **exact order** in which tasks must be executed. Each step is justif
 | **2** | Install Turborepo, configure `turbo.json` with pipeline definitions (build, dev, lint, test, typecheck) | Full-Stack | 0.5d | Orchestration layer needed before apps |
 | **3** | Create `packages/config` with shared ESLint, Prettier, TypeScript base config | Full-Stack | 0.5d | Linting must be in place before code is written |
 | **4** | Create `packages/types` with shared TypeScript interfaces | Full-Stack | 0.5d | Shared types needed by all packages |
-| **5** | Create `docker-compose.yml` with PostgreSQL 16, Redis 7, MinIO, Mailhog | Full-Stack | 0.5d | Infrastructure must run before apps connect |
-| **6** | Verify `docker compose up -d` starts all services healthy | Full-Stack | 0.25d | Validate infrastructure |
+| **5** | Install and configure PostgreSQL 16 and Redis 7 locally | Full-Stack | 0.5d | Infrastructure must run before apps connect |
+| **6** | Verify PostgreSQL and Redis are running and accessible | Full-Stack | 0.25d | Validate infrastructure |
 | **7** | Scaffold `apps/api` (NestJS) with `nest new` or manual setup | Backend | 1d | API scaffold must exist before database integration |
 | **8** | Scaffold `apps/web` (Next.js 14+ App Router) with TailwindCSS | Frontend | 1d | Frontend scaffold must exist before pages |
 | **9** | Create `packages/ui` with shadcn/ui init | Frontend | 0.5d | Shared components needed by web |
@@ -1273,7 +1271,7 @@ This is the **exact order** in which tasks must be executed. Each step is justif
 
 ### Why This Order
 
-1. **Infrastructure before application**: Docker services must run before any app attempts to connect to PostgreSQL or Redis. A failing `docker compose up` blocks everything.
+1. **Infrastructure before application**: PostgreSQL and Redis must be running before any app attempts to connect. Verify both are accessible before starting API development.
 
 2. **Shared config before app code**: ESLint, Prettier, and TypeScript configs must exist before any source file is written — otherwise code will not conform to standards and must be retroactively fixed.
 
@@ -1312,7 +1310,7 @@ Each sprint must pass ALL gates before being considered complete. The sprint dem
 | Swagger Docs | Browser | `/api/docs` loads with schema | ☐ |
 | Frontend Build | `next build` | Builds without errors | ☐ |
 | API Build | `nest build` | Builds without errors | ☐ |
-| Docker Services | `docker compose ps` | All healthy | ☐ |
+| Local Services | Check PostgreSQL + Redis | Both running and accessible | ☐ |
 | CI Pipeline | GitHub Actions | Green on `develop` branch | ☐ |
 
 **Manual Checks:**
@@ -1322,7 +1320,7 @@ Each sprint must pass ALL gates before being considered complete. The sprint dem
 | Code Review | Lead Architect | Monorepo structure follows ADR-012, folder conventions correct |
 | RTL Smoke Test | Frontend Lead | Root layout renders with `dir="rtl"`, Arabic font loaded |
 | Security Review | Lead Architect | No secrets committed, `.env.example` exists, `.gitignore` covers `.env` |
-| Dev Onboarding | New Engineer | Can run `docker compose up && pnpm dev` and see API + Web on first try |
+| Dev Onboarding | New Engineer | Can run `pnpm dev` and see API + Web on first try (PostgreSQL + Redis pre-installed) |
 
 **Go/No-Go Criteria:**
 
@@ -1537,7 +1535,7 @@ Each sprint must pass ALL gates before being considered complete. The sprint dem
 | **Lead Architect** | Architecture decisions, ADRs, code review, security, CI/CD strategy |
 | **Backend Engineer** | NestJS API, database, Prisma, Redis, BullMQ, auth, services/orders API |
 | **Frontend Engineer** | Next.js, TailwindCSS, shadcn/ui, TipTap, pages, CMS UI, public website |
-| **Full-Stack Engineer** | Bridges back and front, owns end-to-end features, CI/CD, Docker, DevOps |
+| **Full-Stack Engineer** | Bridges back and front, owns end-to-end features, CI/CD, DevOps |
 | **QA Engineer** | Test plans, E2E tests (Playwright), manual testing, performance testing |
 
 ## Appendix C: Risk Register

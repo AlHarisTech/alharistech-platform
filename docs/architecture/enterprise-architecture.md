@@ -1147,26 +1147,25 @@ Reference: [docs/architecture/README.md](../architecture/README.md) Caching Stra
 
 | Component | Technology | Purpose |
 |:---|:---|:---|
-| Container Runtime | Docker + Docker Compose | Local environment parity |
+| Runtime | Node.js (bare metal/VM) | Direct host execution |
 | API Server | NestJS dev server (`nest start --watch`) | Hot reload on code changes |
 | Frontend | Next.js dev server (`next dev`) | HMR (Hot Module Replacement) |
-| Database | PostgreSQL 16 (Docker) | Local development database |
-| Cache | Redis 7 (Docker) | Local cache + queue |
-| Storage | MinIO (Docker) | S3-compatible local storage |
-| Mail Testing | Mailpit (Docker) | SMTP capture for development |
-| Reverse Proxy | Traefik (Docker) | Local HTTPS + routing |
+| Database | PostgreSQL 16 (local) | Local development database |
+| Cache | Redis 7 (local) | Local cache + queue |
+| Storage | Local filesystem / S3 | Local or direct S3 for development |
+| Mail Testing | Mailpit (local) or direct SMTP | SMTP capture for development |
+| Reverse Proxy | Traefik/Caddy (local) | Local HTTPS + routing |
 | Process Manager | Turborepo (`turbo dev`) | Parallel dev server orchestration |
 | Code Quality | ESLint + Prettier + commitlint | Pre-commit and CI enforcement |
 
-**Docker Compose Services:**
+**Local Development Services:**
 
-```yaml
-services:
-  postgres:    # PostgreSQL 16, port 5432
-  redis:       # Redis 7, port 6379
-  minio:       # MinIO, ports 9000/9001
-  mailpit:     # Mailpit, ports 1025/8025
-```
+The following services run directly on the development machine (bare metal/VM), not in containers:
+
+- PostgreSQL 16 — installed locally, port 5432
+- Redis 7 — installed locally, port 6379
+- MinIO (optional) — for local S3-compatible storage, or use direct S3
+- Mailpit (optional) — local SMTP capture, or configure a real SMTP provider
 
 ### 5.2 Testing Infrastructure
 
@@ -1188,7 +1187,7 @@ services:
 | Aspect | Configuration |
 |:---|:---|
 | Hosting | VPS / cloud VM (2 vCPU, 4GB RAM minimum) |
-| Deployment | GitHub Actions → Docker Compose on VM |
+| Deployment | GitHub Actions → direct deployment on VM |
 | Database | Separate PostgreSQL instance with sanitized production data |
 | Data Strategy | Anonymized subset of production (no real PII) |
 | SSL | Let's Encrypt via Traefik |
@@ -1304,7 +1303,7 @@ services:
 
 | Phase | Technology | Capabilities |
 |:---|:---|:---|
-| Phase 1–2 | Docker logging driver + local log files | Basic log persistence |
+| Phase 1–2 | Local log files + structured logging (Pino/Winston) | Basic log persistence |
 | Phase 3+ | Loki + Promtail (or ELK stack) | Centralized aggregation, search, alerting |
 | Long-term | S3 archive | Compliance retention |
 

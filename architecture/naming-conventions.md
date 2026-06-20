@@ -37,8 +37,6 @@ This document defines the complete naming conventions for every artifact in the 
 | Type definition files | `camelCase.ts` | `user.ts`, `order.ts` |
 | Barrel exports | `index.ts` | `packages/ui/src/index.ts` |
 | Environment files | `.env.{environment}` | `.env.development`, `.env.production` |
-| Docker files | `Dockerfile.{service}` | `Dockerfile.api`, `Dockerfile.web` |
-| Docker Compose | `docker-compose.{env}.yml` | `docker-compose.dev.yml` |
 | Migration files | `YYYYMMDDHHMMSS_description.sql` | `20260601143000_add_user_table.sql` |
 | ADR files | `adr-NNN-slug.md` | `adr-001-nextjs-frontend.md` |
 | Domain directories | `lowercase` | `identity/`, `commerce/` |
@@ -374,7 +372,7 @@ Branch names must be lowercase, use hyphens, and be descriptive. Maximum 50 char
 | `notification` | Notification domain |
 | `analytics` | Analytics domain |
 | `ai` | AI domain |
-| `infra` | Infrastructure (Docker, k8s, Terraform) |
+| `infra` | Infrastructure (k8s, Terraform) |
 | `deps` | Dependencies |
 | `security` | Security fixes/improvements |
 

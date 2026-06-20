@@ -336,14 +336,6 @@ Alharistech/                                    # Root monorepo
 │   └── ai/                                     # @alharistech/domain-ai
 │
 ├── infrastructure/                             # ─── DEPLOYMENT ───
-│   ├── docker/
-│   │   ├── Dockerfile.api                      # Multi-stage NestJS build
-│   │   ├── Dockerfile.web                      # Multi-stage Next.js build
-│   │   ├── Dockerfile.admin                    # Multi-stage Next.js build
-│   │   ├── docker-compose.yml                  # Development services
-│   │   ├── docker-compose.prod.yml             # Production-like local test
-│   │   └── postgres/
-│   │       └── init.sql                        # Initial database setup
 │   ├── k8s/                                    # Kubernetes manifests
 │   │   ├── base/
 │   │   │   ├── namespace.yaml
@@ -617,14 +609,10 @@ APP DEPENDENCIES:
 │  ┌──────────────────────────────────────────────────────────────┐    │
 │  │                  DEPLOY STAGING                                │    │
 │  │                                                               │    │
-│  │  Step 1: Build Docker Images                                  │    │
-│  │    docker build -f Dockerfile.api -t api:staging .            │    │
-│  │    docker build -f Dockerfile.web -t web:staging .            │    │
+│  │  Step 1: Build Application                                    │    │
+│  │    pnpm build                                                 │    │
 │  │                                                               │    │
-│  │  Step 2: Push to Registry                                     │    │
-│  │    docker push registry.alharistech.com/api:staging           │    │
-│  │                                                               │    │
-│  │  Step 3: Run Migrations                                       │    │
+│  │  Step 2: Run Migrations                                       │    │
 │  │    pnpm db:migrate:prod (against staging DB)                  │    │
 │  │                                                               │    │
 │  │  Step 4: Deploy to Staging (Kubernetes)                       │    │
@@ -826,8 +814,7 @@ ENFORCEMENT:
 │                                                             │
 │  DEVELOPMENT (Local)                                        │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │ docker compose up (PostgreSQL + Redis + MinIO +      │  │
-│  │ MailHog)                                             │  │
+│  │ PostgreSQL + Redis (local, installed directly)       │  │
 │  │ pnpm dev (all apps in parallel via Turbo)            │  │
 │  │ Hot reload on all apps                               │  │
 │  │ Localhost: web:3000, admin:3001, api:4000            │  │

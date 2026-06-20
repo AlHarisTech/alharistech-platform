@@ -91,9 +91,9 @@ Identity → Customer → Service → Commerce → Support → Content → Notif
 ## Deployment Architecture
 
 ```
-Development → Docker Compose (local)
-Staging → Docker + GitHub Actions
-Production → Docker + Kubernetes (Phase 5)
+Development → Direct Node.js + PostgreSQL + Redis (local)
+Staging → GitHub Actions + VM
+Production → Kubernetes (Phase 5)
 ```
 
 ## Unresolved Architecture Questions

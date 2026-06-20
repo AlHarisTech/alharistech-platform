@@ -146,15 +146,6 @@ Alharistech/
 │   └── ai/
 │
 ├── infrastructure/
-│   ├── docker/
-│   │   ├── Dockerfile.api
-│   │   ├── Dockerfile.web
-│   │   ├── Dockerfile.admin
-│   │   ├── docker-compose.yml       # Development
-│   │   ├── docker-compose.prod.yml  # Production
-│   │   └── postgres/
-│   │       └── init.sql
-│   │
 │   ├── k8s/                         # Kubernetes (للمراحل المتقدمة)
 │   │   ├── base/
 │   │   ├── overlays/

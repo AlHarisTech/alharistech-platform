@@ -10,7 +10,7 @@
 | المهمة | المخرجات | الحالة |
 |:---|:---|:---|
 | إعداد هيكل المشروع | هيكل monorepo فارغ | ⬜ |
-| إعداد بيئة التطوير | Docker, Dev Containers | ⬜ |
+| إعداد بيئة التطوير | Node.js, pnpm, PostgreSQL, Redis (محلي) | ⬜ |
 | كتابة الرؤية والاستراتيجية | docs/vision/, docs/business/ | ✅ |
 | كتابة PRD | docs/requirements/prd.md | ✅ |
 | كتابة متطلبات النظام | docs/requirements/system-requirements.md | ✅ |
@@ -32,7 +32,7 @@
 - تهيئة Monorepo مع Turborepo
 - إعداد NestJS API مع المصادقة الأساسية
 - إعداد Next.js مع TailwindCSS + shadcn/ui
-- إعداد PostgreSQL + Redis مع Docker
+- إعداد PostgreSQL + Redis (محلي)
 - CI/CD أساسي (GitHub Actions)
 
 ### Sprint 1.2: نظام المصادقة (1 أسبوع)

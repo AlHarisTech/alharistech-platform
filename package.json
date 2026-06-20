@@ -1,0 +1,27 @@
+{
+  "name": "alharistech-platform",
+  "version": "0.6.1",
+  "private": true,
+  "description": "منصة الحارس تك — Digital Business Operating System",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "test:contracts": "turbo test:contracts",
+    "db:generate": "turbo db:generate",
+    "db:migrate": "turbo db:migrate",
+    "clean": "turbo clean"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0",
+    "typescript": "^5.5.0",
+    "@types/node": "^22.0.0"
+  }
+}

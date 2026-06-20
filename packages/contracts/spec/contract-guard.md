@@ -12,7 +12,7 @@
 
 **Fail-closed:** If the contract or schema cannot be loaded, the request MUST be rejected (500) — never passed through unvalidated.
 
-**Source of truth:** `specs/contracts/openapi/*.yaml` (9 domain API specs, 184 endpoints in `service-catalog.yaml`)
+**Source of truth:** `specs/contracts/openapi/*.yaml` (9 domain API specs, 149 endpoints in `service-catalog.yaml`)
 
 ---
 
@@ -380,7 +380,7 @@ ContractGuard MUST run AFTER authentication guards (JWT extraction) but BEFORE P
 | Test | Description |
 |:---|:---|
 | `should validate full request against identity-api.yaml` | POST /api/v1/auth/register with valid/invalid data |
-| `should validate all 184 endpoints load correctly` | Smoke test: compile validators for all service-catalog endpoints |
+| `should validate all 149 endpoints load correctly` | Smoke test: compile validators for all service-catalog endpoints |
 | `should not exceed 5ms p95 overhead` | Benchmark: 10,000 requests, measure guard duration |
 | `should handle concurrent requests correctly` | Concurrent requests → no race conditions in cache |
 
@@ -445,7 +445,7 @@ Some OpenAPI schemas may contain circular `$ref` references (e.g., User → Orde
 
 ### 12.4 Memory Considerations
 
-- Compiled AJV validators for 184 endpoints ≈ 5-10 MB memory
+- Compiled AJV validators for 149 endpoints ≈ 5-10 MB memory
 - L1 LRU cache of 1000 entries ≈ 2-5 MB
 - Monitor memory usage via `process.memoryUsage()` in development
 
@@ -458,7 +458,7 @@ Some OpenAPI schemas may contain circular `$ref` references (e.g., User → Orde
 
 ### 12.6 Future Considerations
 
-- **Schema pre-compilation at startup:** Compile all 184 endpoint validators during `onModuleInit` to avoid cold-start latency
+- **Schema pre-compilation at startup:** Compile all 149 endpoint validators during `onModuleInit` to avoid cold-start latency
 - **Schema differential updates:** Instead of full reload on schema change, apply patch updates
 - **WebSocket validation:** Extend ContractGuard to validate WebSocket message payloads against schemas
 - **gRPC validation:** Support protobuf schema validation alongside JSON Schema

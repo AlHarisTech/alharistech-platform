@@ -148,7 +148,6 @@ Alharistech/
 │   └── ai/           ← الذكاء الاصطناعي
 │
 ├── infrastructure/
-│   ├── docker/       ← Docker compose للتطوير والنشر
 │   ├── k8s/          ← Kubernetes manifests (لاحقاً)
 │   └── terraform/    ← Infrastructure as Code (لاحقاً)
 │

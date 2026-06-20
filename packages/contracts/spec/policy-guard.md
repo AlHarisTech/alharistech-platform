@@ -172,7 +172,7 @@ const routeResourceMap = {
   "PATCH:/api/v1/users/:id/role":  { resource: "identity:roles",     action: "update" },
   "POST:/api/v1/orders":           { resource: "service:service_orders", action: "create" },
   "GET:/api/v1/orders":            { resource: "service:service_orders", action: "read" },
-  // ... all 184 endpoints
+  // ... all 149 endpoints
 };
 ```
 

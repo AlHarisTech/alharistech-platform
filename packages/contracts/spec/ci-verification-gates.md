@@ -9,7 +9,7 @@
 
 ## Purpose
 
-Define the CI/CD gates that enforce contract compliance across all 9 domains, 184 endpoints,
+Define the CI/CD gates that enforce contract compliance across all 9 domains, 149 endpoints,
 94 events, and 162 policy rules. Each gate maps to a specific `.governance/enforcement.yaml`
 principle and has defined failure modes, remediation steps, and phase-dependent behavior.
 
@@ -195,7 +195,7 @@ The generator reads `x-skip-reason` from OpenAPI extensions and emits `test.skip
 
 | # | Check | Source | Assertion |
 |---|---|---|---|
-| 3.1 | Endpoint coverage | `service-catalog.yaml` (184 endpoints) | Every endpoint has ≥ 1 valid-request test AND ≥ 1 invalid-request test. Coverage ≥ 95%. |
+| 3.1 | Endpoint coverage | `service-catalog.yaml` (149 endpoints) | Every endpoint has ≥ 1 valid-request test AND ≥ 1 invalid-request test. Coverage ≥ 95%. |
 | 3.2 | Event coverage | `event-catalog.yaml` (94 events) | Every event has ≥ 1 valid-payload test AND ≥ 1 invalid-payload test. Coverage ≥ 95%. |
 | 3.3 | Policy coverage | `access-control.yaml` (162 rules) | Every allow rule has ≥ 1 allow test AND ≥ 1 deny test. Every deny rule has ≥ 1 deny test. Coverage ≥ 95%. |
 | 3.4 | Domain coverage | All 9 domains | Each domain has contract tests. No domain with 0 tests. |

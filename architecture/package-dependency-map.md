@@ -271,8 +271,8 @@ Enforced via `@next/bundle-analyzer` (web/admin) and custom tooling for other ap
 |:---|:---|:---|
 | p95 latency | < 200ms | OpenTelemetry / k6 |
 | p99 latency | < 500ms | OpenTelemetry / k6 |
-| Memory usage | < 512 MB | Docker metrics |
-| CPU usage | < 70% | Docker metrics |
+| Memory usage | < 512 MB | Process metrics |
+| CPU usage | < 70% | Process metrics |
 
 ### Shared Package Bundle Impact
 

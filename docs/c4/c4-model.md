@@ -535,7 +535,7 @@ graph TB
 - **apps/**: التطبيقات الخمسة (web، admin، desktop، mobile، api)
 - **packages/**: 8 مكتبات مشتركة (ui، auth، database، sdk، config، logger، types، utils)
 - **domains/**: 9 نطاقات أعمال (identity، customer، service، commerce، support، content، notification، analytics، ai)
-- **infrastructure/**: docker، k8s، terraform
+- **infrastructure/**: k8s، terraform (أنماط حاويات بدون Docker في التطوير)
 - **أدلة داعمة**: docs/، specs/، tasks/، tools/
 
 ### PlantUML
@@ -584,7 +584,6 @@ System_Boundary(domains_boundary, "domains/ — نطاقات الأعمال (DDD
 
 ' === Infrastructure ===
 System_Boundary(infrastructure_boundary, "infrastructure/ — البنية التحتية") {
-    Container(infra_docker, "docker", "Docker Compose", "بيئة التطوير المحلية — PostgreSQL، Redis، MinIO، Mailhog")
     Container(infra_k8s, "k8s", "Kubernetes", "ملفات النشر — Deployments، Services، ConfigMaps، Secrets")
     Container(infra_terraform, "terraform", "Terraform/HCL", "IaC — VPC، RDS، ElastiCache، S3، EKS")
 }
@@ -674,8 +673,6 @@ Rel(dom_ai, dom_support, "دعم ذكي", "NestJS DI")
 Rel(dom_ai, dom_content, "توليد محتوى", "NestJS DI")
 
 ' === Infrastructure Dependencies ===
-Rel(infra_docker, app_api, "يشغل", "docker-compose")
-Rel(infra_docker, pkg_database, "يهيئ", "init scripts")
 Rel(infra_k8s, app_api, "ينشر", "kubectl apply")
 Rel(infra_terraform, infra_k8s, "ينشئ الكتلة", "terraform apply")
 
@@ -725,7 +722,6 @@ graph TB
     end
 
     subgraph Infrastructure["🏗️ infrastructure/ — البنية التحتية"]
-        Docker["🐳 docker<br/>Docker Compose<br/>بيئة تطوير محلية"]:::infra
         K8s["☸️ k8s<br/>Kubernetes<br/>ملفات النشر"]:::infra
         Terraform["🏗️ terraform<br/>Terraform/HCL<br/>Infrastructure as Code"]:::infra
     end
@@ -803,8 +799,6 @@ graph TB
     AIDom --> Content
 
     %% Infrastructure
-    Docker --> API
-    Docker --> DB
     K8s --> API
     Terraform --> K8s
 ```
@@ -859,7 +853,7 @@ domains/{name}/
 | **Performance First** | الأداء أساس وليس ميزة | Redis Caching، CDN، Query Optimization |
 | **Modular First** | كل مكون مستقل وقابل للاستبدال | Monorepo مع نطاقات DDD مستقلة |
 | **Mobile Ready** | كل واجهة متجاوبة مع الجوال | React Native + Responsive Web Design |
-| **Cloud Ready** | جاهزة للنشر السحابي | Docker، Kubernetes، Terraform |
+| **Cloud Ready** | جاهزة للنشر السحابي | Container patterns، Kubernetes، Terraform |
 | **AI Ready** | جاهزة لدمج الذكاء الاصطناعي | AI Module مع Agents، Embeddings، RAG |
 | **Offline Ready** | التطبيقات تعمل بدون إنترنت | Tauri + React Native مع تخزين محلي |
 

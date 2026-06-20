@@ -37,7 +37,6 @@
 
 ### Sprint 0.5: إعداد بيئة التطوير (قادم)
 - [ ] تهيئة Monorepo (Turborepo + pnpm)
-- [ ] إعداد Docker Compose
 - [ ] إعداد PostgreSQL + Redis
 - [ ] إعداد NestJS (مشروع فارغ)
 - [ ] إعداد Next.js (مشروع فارغ)
@@ -60,8 +59,8 @@
 | 1.1.1 | إعداد Monorepo مع Turborepo | هيكل المشروع يعمل |
 | 1.1.2 | إعداد NestJS مع Hello World | API يعمل على port 4000 |
 | 1.1.3 | إعداد Next.js مع TailwindCSS | Web يعمل على port 3000 |
-| 1.1.4 | إعداد PostgreSQL مع Docker | قاعدة بيانات متاحة |
-| 1.1.5 | إعداد Redis مع Docker | Redis متاح |
+| 1.1.4 | إعداد PostgreSQL | قاعدة بيانات متاحة |
+| 1.1.5 | إعداد Redis | Redis متاح |
 | 1.1.6 | إعداد Prisma/Drizzle ORM | اتصال قاعدة البيانات |
 | 1.1.7 | إعداد Shared Packages | @aht/ui, @aht/types, @aht/config |
 | 1.1.8 | إعداد CI/CD Pipeline | GitHub Actions |

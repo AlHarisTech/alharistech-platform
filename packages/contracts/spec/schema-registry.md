@@ -16,7 +16,7 @@
 - `specs/contracts/openapi/*.yaml` — 9 domain API specs
 - `specs/contracts/events/event-schemas.yaml` — 94 event schemas
 - `specs/contracts/policy/access-control.yaml` — 162 policy rules
-- `specs/contracts/service-catalog.yaml` — 184 endpoints
+- `specs/contracts/service-catalog.yaml` — 149 endpoints
 - `specs/contracts/event-catalog.yaml` — event catalog
 - `specs/contracts/permission-matrix.yaml` — permission matrix reference
 - `specs/contracts/execution-boundaries.yaml` — execution boundaries
@@ -137,7 +137,7 @@ Application Bootstrap
   ├─ Phase 2: onModuleInit()
   │     1. Determine schema source (local files vs Redis)
   │     2. Load and parse all schema files:
-  │        a. service-catalog.yaml → 184 endpoints
+  │        a. service-catalog.yaml → 149 endpoints
   │        b. All openapi/*.yaml files → 9 domain specs
   │        c. event-schemas.yaml → 94 event schemas
   │        d. access-control.yaml → 162 policy rules
@@ -482,7 +482,7 @@ class SchemaRegistry {
   private policyRules: CompiledPolicy[];             // 162 compiled policies
   private routeIndex: Map<string, RouteSchema>;      // "GET:/api/v1/users" → route schema
   private resourceMapping: Map<string, ResourceMapping>; // domain:resource → API path
-  private serviceCatalog: ServiceCatalogEntry[];     // 184 endpoints
+  private serviceCatalog: ServiceCatalogEntry[];     // 149 endpoints
 
   // Derived caches (computed from primary stores)
   private policyByRole: Map<string, CompiledPolicy[]>;  // role → policies index
@@ -610,7 +610,7 @@ export class SchemaRegistryModule {}
 | `should load all 162 policy rules` | Policy rules compiled and indexed |
 | `should resolve $ref pointers recursively` | Nested $ref → fully resolved schema |
 | `should detect circular $ref and handle gracefully` | Entity → Entity circular ref → not infinite loop |
-| `should build route index for all 184 endpoints` | Every endpoint has a route schema entry |
+| `should build route index for all 149 endpoints` | Every endpoint has a route schema entry |
 | `should build event name index for all events` | Every event name → schema lookup |
 | `should build policy-by-role index` | Policies indexed by role for fast lookup |
 | `should return undefined for unknown schema` | Unknown domain/event → undefined |

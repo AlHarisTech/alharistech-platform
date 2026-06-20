@@ -52,7 +52,7 @@ Alharistech/
 │   │   ├── analytics/spec.md
 │   │   └── ai/spec.md
 │   ├── contracts/                     ← Contract Layer
-│   │   ├── openapi/                   ← 9 OpenAPI 3.1 specs (184 endpoints, 195 schemas)
+│   │   ├── openapi/                   ← 9 OpenAPI 3.1 specs (149 endpoints, 195 schemas)
 │   │   ├── events/                    ← 94 event schemas (JSON Schema)
 │   │   ├── policy/                    ← 162 RBAC policy rules
 │   │   ├── event-catalog.yaml         ← Complete event registry
