@@ -1,6 +1,11 @@
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, NestFastifyApplication } from "@nestjs/platform-fastify";
 import { AppModule } from "./app.module";
+import { ContractGuard } from "./common/guards/contract.guard";
+import { PolicyGuard } from "./common/guards/policy.guard";
+import { ContractInterceptor } from "./common/interceptors/contract.interceptor";
+import { ContractPipe } from "./common/pipes/contract.pipe";
+import { SchemaRegistry } from "./crbl/schema-registry.service";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -8,11 +13,18 @@ async function bootstrap(): Promise<void> {
     new FastifyAdapter({ logger: true }),
   );
 
-  // CRBL: Global guards registered here (pass-through until Sprint 0.5.1)
-  // CRBL: Global interceptors registered here
-  // CRBL: Global pipes registered here
+  const schemaRegistry = app.get(SchemaRegistry);
 
-  app.enableCors({ origin: process.env.CORS_ORIGIN?.split(",") || ["http://localhost:3000"] });
+  app.useGlobalGuards(
+    new ContractGuard(app.get("Reflector")),
+    new PolicyGuard(app.get("Reflector")),
+  );
+  app.useGlobalInterceptors(new ContractInterceptor(schemaRegistry));
+  app.useGlobalPipes(new ContractPipe(schemaRegistry));
+
+  app.enableCors({
+    origin: process.env.CORS_ORIGIN?.split(",") || ["http://localhost:3000"],
+  });
 
   const port = process.env.PORT || 4000;
   await app.listen(port, "0.0.0.0");

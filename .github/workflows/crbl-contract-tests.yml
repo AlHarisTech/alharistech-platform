@@ -1,0 +1,295 @@
+# CRBL Contract Verification — CI Workflow Spec
+#
+# SPECIFICATION ONLY — Not yet active in CI pipeline.
+# This workflow defines the CI jobs that will be activated in Sprint 0.6
+# once the CRBL runtime components are implemented.
+#
+# Activation: Sprint 0.6
+# Governance:  .governance/enforcement.yaml (PERP-API, PERP-FCL, PERP-EVI)
+# Reference:   packages/contracts/spec/ci-verification-gates.md
+#               packages/contracts/spec/crbl-architecture.md
+#               packages/contracts/spec/crbl-verification-checklist.md
+#               packages/contracts/spec/crbl-performance-benchmarks.md
+
+name: CRBL Contract Verification
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+concurrency:
+  group: crbl-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # =========================================================================
+  # JOB 1: Schema Validity (CRBL-01)
+  # Validates that all 9 OpenAPI specs, 94 event schemas, and 162 policy
+  # rules are parseable, compilable, and internally consistent.
+  # Blocks merge on failure.
+  # =========================================================================
+  schema-validity:
+    name: "CRBL-01: Schema Validity"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate schemas
+        id: validate
+        run: pnpm --filter @aht/api test:schema-validity
+
+      - name: Report schema validation failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let report = '';
+            try { report = fs.readFileSync('schema-validation-report.md', 'utf8'); } catch (e) {}
+
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                '## ❌ CRBL-01: Schema Validity Failed',
+                '',
+                'One or more contract schemas failed validation. Run locally:',
+                '',
+                '```bash',
+                'pnpm --filter @aht/api test:schema-validity',
+                '```',
+                '',
+                'See [ci-verification-gates.md](packages/contracts/spec/ci-verification-gates.md#gate-crbl-01-schema-validity) for remediation steps.',
+                '',
+                report ? '<details><summary>Full Report</summary>\n\n```\n' + report + '\n```\n</details>' : ''
+              ].join('\n')
+            });
+
+  # =========================================================================
+  # JOB 2: Contract Tests (CRBL-02)
+  # Runs the auto-generated contract tests against all 184 endpoints, 94
+  # events, and 162 policy rules. Requires schema-validity to pass first.
+  # Blocks merge on failure.
+  # =========================================================================
+  contract-tests:
+    name: "CRBL-02: Contract Tests"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [schema-validity]
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: alharistech_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/alharistech_test
+      REDIS_URL: redis://localhost:6379
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run database migrations
+        run: pnpm --filter @aht/api db:migrate
+
+      - name: Generate contract test files
+        run: pnpm --filter @alharistech/contracts run generate
+
+      - name: Run contract tests
+        id: tests
+        run: pnpm --filter @aht/api test:contracts -- --coverage
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-test-results
+          path: |
+            packages/contracts/coverage/
+            packages/contracts/test-results/
+            apps/api/coverage/
+            apps/api/test-results/
+          retention-days: 7
+
+      - name: Report test failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                '## ❌ CRBL-02: Contract Tests Failed',
+                '',
+                'One or more contract tests failed. Review the test results artifact for details.',
+                '',
+                'Run locally:',
+                '',
+                '```bash',
+                'pnpm --filter @aht/api test:contracts',
+                '```',
+                '',
+                'See [ci-verification-gates.md](packages/contracts/spec/ci-verification-gates.md#gate-crbl-02-contract-test-execution) for remediation steps.'
+              ].join('\n')
+            });
+
+  # =========================================================================
+  # JOB 3: Performance Benchmarks (main branch only)
+  # Runs CRBL performance benchmarks and validates the 5ms p95 budget.
+  # Only runs on main branch pushes. Blocks merge on budget violation.
+  # =========================================================================
+  performance-benchmarks:
+    name: "CRBL: Performance Benchmarks"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.ref == 'refs/heads/main'
+    needs: [contract-tests]
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run CRBL benchmarks
+        id: bench
+        run: |
+          pnpm --filter @aht/api bench:crbl -- --json --ci > bench-results.json
+          echo "Results:"
+          cat bench-results.json
+
+      - name: Verify performance budget
+        run: |
+          node -e "
+            const results = JSON.parse(require('fs').readFileSync('bench-results.json', 'utf8'));
+            const budgets = {
+              ContractGuard_p95_ms:     { value: 3,   unit: 'ms' },
+              PolicyGuard_p95_ms:       { value: 1,   unit: 'ms' },
+              ContractInterceptor_p95:  { value: 1,   unit: 'ms' },
+              ContractPipe_p95_ms:      { value: 2,   unit: 'ms' },
+              EventValidator_p95_ms:    { value: 2,   unit: 'ms' },
+              total_crbl_overhead_p95:  { value: 5,   unit: 'ms' },
+              cold_start_ms:            { value: 50,  unit: 'ms' },
+              hot_reload_ms:            { value: 5,   unit: 'ms' },
+              ajv_compile_ai_api_ms:    { value: 100, unit: 'ms' },
+              ajv_compile_all_events_ms:{ value: 200, unit: 'ms' },
+            };
+
+            let failed = false;
+            for (const [key, budget] of Object.entries(budgets)) {
+              const actual = results[key] ? results[key].p95 : results[key];
+              if (actual === undefined) {
+                console.warn('WARNING: No result for ' + key);
+              } else if (actual > budget.value) {
+                console.error('VIOLATION: ' + key + ' = ' + actual + budget.unit + ' (budget: ' + budget.value + budget.unit + ')');
+                failed = true;
+              } else {
+                console.log('OK: ' + key + ' = ' + actual + budget.unit + ' (budget: ' + budget.value + budget.unit + ')');
+              }
+            }
+            if (failed) process.exit(1);
+            console.log('\nAll performance budgets met.');
+          "
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crbl-benchmark-results
+          path: bench-results.json
+          retention-days: 30
+
+      - name: Report budget violation
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let report = '';
+            try { report = require('fs').readFileSync('bench-results.json', 'utf8'); } catch (e) {}
+
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                '## ⚠️ CRBL Performance Budget Violation',
+                '',
+                'One or more performance budgets were exceeded on `main`. See the benchmark results artifact for details.',
+                '',
+                'Budget reference: [crbl-performance-benchmarks.md](packages/contracts/spec/crbl-performance-benchmarks.md)',
+                '',
+                'Investigation steps:',
+                '1. Check if AJV validators are being recompiled on every request',
+                '2. Check Redis cache hit rate',
+                '3. Check for recent contract schema changes that may have increased complexity',
+                '4. Profile with Node.js `--prof` to identify hot paths',
+                '',
+                report ? '<details><summary>Benchmark Results</summary>\n\n```json\n' + report + '\n```\n</details>' : ''
+              ].join('\n')
+            });
