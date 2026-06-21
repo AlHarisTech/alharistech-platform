@@ -4,8 +4,9 @@ import { hash, verify } from 'argon2';
 import { sign, verify as jwtVerify } from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 import { db, users, refreshTokens } from '@aht/database';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
+import { assertValidated } from '../../crbl/contract-assertion';
+import type { RegisterDto } from './dto/register.dto';
+import type { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
@@ -19,6 +20,7 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
+    assertValidated(dto);
     const existing = await db
       .select({ id: users.id })
       .from(users)
@@ -61,6 +63,7 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
+    assertValidated(dto);
     const [user] = await db
       .select()
       .from(users)
