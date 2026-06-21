@@ -7,6 +7,7 @@ import { REDIS_CLIENT_TOKEN } from '../infrastructure/queue.constants';
 import type { RetryConfig } from './retry-config';
 import { calculateBackoffDelay } from './retry-config';
 import { EventExecutionException } from '../exceptions/event-execution.exception';
+import { DlqRouter } from '../dlq/dlq-router';
 
 export interface ActiveWorker {
   queueName: string;
@@ -22,6 +23,7 @@ export class WorkerFactory implements OnApplicationShutdown {
   constructor(
     @Inject(REDIS_CLIENT_TOKEN) private readonly redis: Redis | null,
     private readonly registry: WorkerRegistry,
+    private readonly dlqRouter: DlqRouter,
   ) {}
 
   createWorker(queueName: string, retryConfig: RetryConfig): BullWorker {
@@ -64,6 +66,27 @@ export class WorkerFactory implements OnApplicationShutdown {
 
           if (attempt >= retryConfig.maxAttempts) {
             await handler.onFailure?.(execError);
+
+            try {
+              await this.dlqRouter.route({
+                eventId: eventId ?? 'unknown',
+                eventType,
+                version: (job.data.version as number) ?? 0,
+                queueName,
+                payload: job.data.payload as Record<string, unknown>,
+                jobId: job.id ?? 'unknown',
+                failedAt: new Date().toISOString(),
+                failureReason: execError.message,
+                attempt,
+                maxAttempts: retryConfig.maxAttempts,
+              });
+            } catch (dlqError) {
+              this.logger.error(
+                `DLQ routing failed for ${eventType} (job ${job.id}): ` +
+                  `${dlqError instanceof Error ? dlqError.message : String(dlqError)}`,
+              );
+            }
+
             throw new EventExecutionException(
               eventId ?? 'unknown',
               eventType,

@@ -13,6 +13,9 @@ import { EventBus } from './bus/event-bus';
 import { WorkerRegistry } from './workers/worker-registry';
 import { WorkerFactory } from './workers/worker-factory';
 import { WorkerOrchestrator } from './workers/worker-orchestrator';
+import { DlqRegistry } from './dlq/dlq-registry';
+import { DlqRouter } from './dlq/dlq-router';
+import { DlqService } from './dlq/dlq-service';
 
 @Global()
 @Module({
@@ -38,6 +41,9 @@ import { WorkerOrchestrator } from './workers/worker-orchestrator';
     WorkerRegistry,
     WorkerFactory,
     WorkerOrchestrator,
+    DlqRegistry,
+    DlqRouter,
+    DlqService,
   ],
   exports: [
     RedisManager,
@@ -51,6 +57,9 @@ import { WorkerOrchestrator } from './workers/worker-orchestrator';
     WorkerRegistry,
     WorkerFactory,
     WorkerOrchestrator,
+    DlqRegistry,
+    DlqRouter,
+    DlqService,
     ...QUEUE_PROVIDERS.map((p) => p.provide),
   ],
 })
