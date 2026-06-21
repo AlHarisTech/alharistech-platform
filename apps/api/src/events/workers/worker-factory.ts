@@ -9,6 +9,8 @@ import { calculateBackoffDelay } from './retry-config';
 import { EventExecutionException } from '../exceptions/event-execution.exception';
 import { DlqRouter } from '../dlq/dlq-router';
 import { IdempotencyService } from '../idempotency/idempotency-service';
+import { EventMetricsService } from '../observability/event-metrics.service';
+import { EventTracerService } from '../observability/event-tracer.service';
 
 export interface ActiveWorker {
   queueName: string;
@@ -26,6 +28,8 @@ export class WorkerFactory implements OnApplicationShutdown {
     private readonly registry: WorkerRegistry,
     private readonly dlqRouter: DlqRouter,
     private readonly idempotency: IdempotencyService,
+    private readonly metrics?: EventMetricsService,
+    private readonly tracer?: EventTracerService,
   ) {}
 
   createWorker(queueName: string, retryConfig: RetryConfig): BullWorker {
@@ -60,13 +64,22 @@ export class WorkerFactory implements OnApplicationShutdown {
         const canProceed = await this.idempotency.checkAndLock(eventType, eventId ?? 'unknown');
         if (!canProceed) {
           this.logger.debug(`Idempotency skip: ${eventType} (id=${eventId}) — already processed`);
+          this.metrics?.incrementIdempotencySkipped();
+          this.tracer?.traceIdempotencySkip(eventId ?? 'unknown', eventType);
           return;
         }
 
+        this.metrics?.incrementExecutionStarted();
+        this.tracer?.traceExecutionStarted(eventId ?? 'unknown', eventType);
+
         try {
+          const start = Date.now();
           await handler.execute(payload);
           await handler.onSuccess?.();
+          const duration = Date.now() - start;
           await this.idempotency.markCompleted(eventType, eventId ?? 'unknown', (job.data.version as number) ?? 0, (job.attemptsMade || 0) + 1);
+          this.metrics?.incrementExecutionCompleted();
+          this.tracer?.traceExecutionCompleted(eventId ?? 'unknown', eventType, duration);
         } catch (error) {
           const execError = error instanceof Error ? error : new Error(String(error));
           const attempt = (job.attemptsMade || 0) + 1;
@@ -76,6 +89,8 @@ export class WorkerFactory implements OnApplicationShutdown {
           if (attempt >= retryConfig.maxAttempts) {
             await handler.onFailure?.(execError);
             await this.idempotency.markFailed(eventType, eventId ?? 'unknown', (job.data.version as number) ?? 0, attempt, execError.message);
+            this.metrics?.incrementExecutionFailed();
+            this.tracer?.traceExecutionFailed(eventId ?? 'unknown', eventType, execError.message);
 
             try {
               await this.dlqRouter.route({
@@ -90,6 +105,8 @@ export class WorkerFactory implements OnApplicationShutdown {
                 attempt,
                 maxAttempts: retryConfig.maxAttempts,
               });
+              this.metrics?.incrementDlqRouted();
+              this.tracer?.traceDlqRouted(eventId ?? 'unknown', eventType);
             } catch (dlqError) {
               this.logger.error(
                 `DLQ routing failed for ${eventType} (job ${job.id}): ` +
@@ -111,6 +128,8 @@ export class WorkerFactory implements OnApplicationShutdown {
             `Retrying ${eventType} (job ${job.id}): attempt ${attempt}/${retryConfig.maxAttempts}, ` +
               `delay ${delay}ms`,
           );
+          this.metrics?.incrementRetryAttempt();
+          this.tracer?.traceRetry(eventId ?? 'unknown', eventType);
           throw execError;
         }
       },

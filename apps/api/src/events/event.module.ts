@@ -19,9 +19,11 @@ import { DlqService } from './dlq/dlq-service';
 import { ExecutionStore } from './idempotency/execution-store';
 import { ExecutionLock } from './idempotency/execution-lock';
 import { IdempotencyService } from './idempotency/idempotency-service';
+import { ObservabilityModule } from './observability/observability.module';
 
 @Global()
 @Module({
+  imports: [ObservabilityModule],
   providers: [
     {
       provide: 'EVENT_RUNTIME_CONFIG',

@@ -3,6 +3,8 @@ import { DlqRouter } from './dlq-router';
 import { EventBus } from '../bus/event-bus';
 import type { DomainEvent } from '../contracts/domain-event';
 import type { DlqEntry } from './dlq-event';
+import { EventMetricsService } from '../observability/event-metrics.service';
+import { EventTracerService } from '../observability/event-tracer.service';
 
 export interface ReplayResult {
   success: boolean;
@@ -18,6 +20,8 @@ export class DlqService {
   constructor(
     private readonly router: DlqRouter,
     private readonly eventBus: EventBus,
+    private readonly metrics?: EventMetricsService,
+    private readonly tracer?: EventTracerService,
   ) {}
 
   async inspect(queueName: string, limit = 50): Promise<DlqEntry[]> {
@@ -48,6 +52,8 @@ export class DlqService {
 
       await this.eventBus.publish(event);
 
+      this.metrics?.incrementReplay();
+      this.tracer?.traceReplay(entry.eventId, entry.eventType);
       this.logger.log(`Replayed: ${entry.eventType} (id=${entry.eventId})`);
       return { success: true, eventId: entry.eventId, eventType: entry.eventType };
     } catch (error) {

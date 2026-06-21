@@ -7,6 +7,9 @@ import { QueueResolver } from './queue-resolver';
 import { QueueRegistry } from '../infrastructure/queue-registry';
 import { EventPublishException } from '../exceptions/event-publish.exception';
 import { EventScheduleException } from '../exceptions/event-schedule.exception';
+import { EventMetricsService } from '../observability/event-metrics.service';
+import { EventTracerService } from '../observability/event-tracer.service';
+import { TraceAction } from '../observability/trace.types';
 
 @Injectable()
 export class EventBus {
@@ -16,6 +19,8 @@ export class EventBus {
     private readonly validator: EventValidator,
     private readonly resolver: QueueResolver,
     private readonly registry: QueueRegistry,
+    private readonly metrics?: EventMetricsService,
+    private readonly tracer?: EventTracerService,
   ) {}
 
   async publish<T>(event: DomainEvent<T>, options?: PublishOptions): Promise<EventReceipt> {
@@ -35,6 +40,9 @@ export class EventBus {
       }
 
       this.logger.debug(`Published: ${event.type}:v${event.version} (job=${job.id})`);
+
+      this.metrics?.incrementPublished(event.type);
+      this.tracer?.tracePublish(event.id, event.type);
 
       return this.buildReceipt(event, job.id, queue.name, false);
     } catch (error) {
@@ -109,6 +117,9 @@ export class EventBus {
 
       const scheduledFor = new Date(Date.now() + options.delayMs).toISOString();
       this.logger.debug(`Scheduled: ${event.type}:v${event.version} (job=${job.id}, +${options.delayMs}ms)`);
+
+      this.metrics?.incrementPublished(event.type);
+      this.tracer?.trace(event.id, event.type, TraceAction.SCHEDULE);
 
       return this.buildReceipt(event, job.id, queue.name, true, scheduledFor);
     } catch (error) {
