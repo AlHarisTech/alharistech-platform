@@ -17,7 +17,7 @@
 - This applies to development only. Production deployment strategy is not yet determined.
 
 ### Known Architectural Risks
-1. **CRBL-001 — ContractPipe DTO Validation (RESOLVED in v0.6.8):** ContractPipe is now request-scoped, injects Fastify request via REQUEST token, extracts real path/method from request, and calls SchemaRegistry.getRequestValidator(). Registered as APP_PIPE in CRBLModule. DTO contract validation is now active — HTTP enforcement reaches 95%.
+1. **CRBL-001 — ContractPipe DTO Validation (RESOLVED in v0.6.10):** ContractPipe is request-scoped, injects Fastify request via REQUEST token, extracts route pattern from `request.routeOptions.url`, converts Fastify `:param` → OpenAPI `{param}`, and calls SchemaRegistry.getRequestValidator(). Matching fixed for parameterized routes. ContractInterceptor also updated with same route pattern resolution. HTTP enforcement reaches ~95%.
 2. **CRBL Centralization:** ContractGuard, PolicyGuard, ContractPipe, ContractInterceptor, EventValidator, and SchemaRegistry all live in the same NestJS process. If CRBL grows further, it may need extraction into a dedicated enforcement service.
 3. **EventValidator Runtime Gap:** EventValidator is implemented but BullMQ worker infrastructure is not yet deployed. Event enforcement exists in code but cannot be tested end-to-end without a running worker.
 4. **Single Database Instance:** Current design assumes a single PostgreSQL instance. Read replicas for analytics and horizontal scaling are designed but not implemented.

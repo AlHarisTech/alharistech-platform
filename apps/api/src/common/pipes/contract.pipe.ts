@@ -73,9 +73,22 @@ export class ContractPipe implements PipeTransform {
   }
 
   private extractPath(): string {
+    // Priority 1: Fastify route pattern (e.g. /customers/:id) — convert :param → {param}
+    const routeOpts = (this.request as Record<string, unknown>).routeOptions as
+      | { url?: string }
+      | undefined;
+    if (routeOpts?.url) {
+      return this.fastifyToOpenApiPath(routeOpts.url);
+    }
+
+    // Fallback: literal URL (works only for static routes without params)
     const url = this.request.url || this.request.raw?.url || "/";
     const parsed = url.split("?")[0];
     return parsed.replace(/\/+$/, "") || "/";
+  }
+
+  private fastifyToOpenApiPath(fastifyPath: string): string {
+    return fastifyPath.replace(/:([^/]+)/g, "{$1}");
   }
 
   private extractMethod(): string {

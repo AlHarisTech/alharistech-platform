@@ -20,7 +20,7 @@ export class ContractInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
     const response = context.switchToHttp().getResponse();
-    const path = this.normalizePath(request.url || request.raw?.url || "");
+    const path = this.extractRoutePattern(request);
     const method = (request.method || "GET").toUpperCase();
 
     return next.handle().pipe(
@@ -108,7 +108,14 @@ export class ContractInterceptor implements NestInterceptor {
     return false;
   }
 
-  private normalizePath(url: string): string {
+  private extractRoutePattern(request: any): string {
+    // Priority 1: Fastify route pattern — convert :param → {param}
+    const routeOpts = request.routeOptions as { url?: string } | undefined;
+    if (routeOpts?.url) {
+      return routeOpts.url.replace(/:([^/]+)/g, "{$1}");
+    }
+    // Fallback: literal URL
+    const url = request.url || request.raw?.url || "";
     const parsed = url.split("?")[0];
     return parsed.replace(/\/+$/, "") || "/";
   }
