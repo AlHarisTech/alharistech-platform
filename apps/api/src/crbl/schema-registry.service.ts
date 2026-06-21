@@ -369,6 +369,8 @@ export class SchemaRegistry implements OnModuleInit {
     const spec = rawSpec as ParsedYaml;
     this.openapiSpecs.set(domain, spec);
 
+    this.registerComponentSchemas(spec);
+
     const paths = (spec.paths ?? {}) as Record<string, Record<string, unknown>>;
     let endpointCount = 0;
 
@@ -401,6 +403,24 @@ export class SchemaRegistry implements OnModuleInit {
 
     if (endpointCount === 0) {
       this.logger.warn(`OpenAPI spec ${filePath} has no paths with HTTP methods`);
+    }
+  }
+
+  private registerComponentSchemas(spec: ParsedYaml): void {
+    const components = spec.components as Record<string, unknown> | undefined;
+    if (!components) return;
+
+    const schemas = components.schemas as Record<string, Record<string, unknown>> | undefined;
+    if (!schemas) return;
+
+    for (const [name, schema] of Object.entries(schemas)) {
+      const refPath = `#/components/schemas/${name}`;
+      try {
+        this.ajv.addSchema(schema, refPath);
+        this.logger.debug(`Registered component schema: ${refPath}`);
+      } catch (error) {
+        this.logger.error(`Failed to register component schema ${refPath}: ${error}`);
+      }
     }
   }
 
@@ -521,14 +541,17 @@ export class SchemaRegistry implements OnModuleInit {
     return this.compileSchema(compositeSchema);
   }
 
-  private compileSchema(schema: Record<string, unknown>): ValidateFunction | undefined {
+  private compileSchema(schema: Record<string, unknown>): ValidateFunction {
     try {
       const sanitized = this.sanitizeSchemaForAjv(structuredClone(schema));
-      return this.ajv.compile(sanitized as Record<string, unknown>);
+      const validator = this.ajv.compile(sanitized as Record<string, unknown>);
+      if (typeof validator !== 'function') {
+        throw new Error('AJV compile returned non-function');
+      }
+      return validator;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`AJV compilation failed: ${message}`);
-      return undefined;
+      throw new Error(`Schema compilation failed: ${message}`);
     }
   }
 
@@ -600,8 +623,8 @@ export class SchemaRegistry implements OnModuleInit {
     if ('$ref' in record && typeof record.$ref === 'string') {
       const ref = record.$ref;
       if (visitedRefs.has(ref)) {
-        this.logger.warn(`Circular $ref detected: ${ref}`);
-        return { $ref: ref };
+        this.logger.debug(`Circular $ref resolved via open schema: ${ref}`);
+        return true;
       }
       visitedRefs.add(ref);
       const resolved = this.resolveRef(ref, rootSpec, visitedRefs);
