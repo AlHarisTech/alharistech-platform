@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { HealthModule } from "./health/health.module";
 import { CRBLModule } from "./crbl/crbl.module";
 import { AuthModule } from "./modules/auth/auth.module";
+import { EventModule } from "./events/event.module";
 
 @Module({
   imports: [
@@ -10,6 +11,7 @@ import { AuthModule } from "./modules/auth/auth.module";
     CRBLModule,
     HealthModule,
     AuthModule,
+    EventModule,
   ],
 })
 export class AppModule {}
