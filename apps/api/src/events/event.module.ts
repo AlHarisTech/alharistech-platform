@@ -16,6 +16,9 @@ import { WorkerOrchestrator } from './workers/worker-orchestrator';
 import { DlqRegistry } from './dlq/dlq-registry';
 import { DlqRouter } from './dlq/dlq-router';
 import { DlqService } from './dlq/dlq-service';
+import { ExecutionStore } from './idempotency/execution-store';
+import { ExecutionLock } from './idempotency/execution-lock';
+import { IdempotencyService } from './idempotency/idempotency-service';
 
 @Global()
 @Module({
@@ -44,6 +47,9 @@ import { DlqService } from './dlq/dlq-service';
     DlqRegistry,
     DlqRouter,
     DlqService,
+    ExecutionStore,
+    ExecutionLock,
+    IdempotencyService,
   ],
   exports: [
     RedisManager,
@@ -60,6 +66,9 @@ import { DlqService } from './dlq/dlq-service';
     DlqRegistry,
     DlqRouter,
     DlqService,
+    ExecutionStore,
+    ExecutionLock,
+    IdempotencyService,
     ...QUEUE_PROVIDERS.map((p) => p.provide),
   ],
 })

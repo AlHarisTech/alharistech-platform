@@ -8,6 +8,7 @@ import type { RetryConfig } from './retry-config';
 import { calculateBackoffDelay } from './retry-config';
 import { EventExecutionException } from '../exceptions/event-execution.exception';
 import { DlqRouter } from '../dlq/dlq-router';
+import { IdempotencyService } from '../idempotency/idempotency-service';
 
 export interface ActiveWorker {
   queueName: string;
@@ -24,6 +25,7 @@ export class WorkerFactory implements OnApplicationShutdown {
     @Inject(REDIS_CLIENT_TOKEN) private readonly redis: Redis | null,
     private readonly registry: WorkerRegistry,
     private readonly dlqRouter: DlqRouter,
+    private readonly idempotency: IdempotencyService,
   ) {}
 
   createWorker(queueName: string, retryConfig: RetryConfig): BullWorker {
@@ -55,9 +57,16 @@ export class WorkerFactory implements OnApplicationShutdown {
 
         const payload = job.data.payload as Record<string, unknown>;
 
+        const canProceed = await this.idempotency.checkAndLock(eventType, eventId ?? 'unknown');
+        if (!canProceed) {
+          this.logger.debug(`Idempotency skip: ${eventType} (id=${eventId}) — already processed`);
+          return;
+        }
+
         try {
           await handler.execute(payload);
           await handler.onSuccess?.();
+          await this.idempotency.markCompleted(eventType, eventId ?? 'unknown', (job.data.version as number) ?? 0, (job.attemptsMade || 0) + 1);
         } catch (error) {
           const execError = error instanceof Error ? error : new Error(String(error));
           const attempt = (job.attemptsMade || 0) + 1;
@@ -66,6 +75,7 @@ export class WorkerFactory implements OnApplicationShutdown {
 
           if (attempt >= retryConfig.maxAttempts) {
             await handler.onFailure?.(execError);
+            await this.idempotency.markFailed(eventType, eventId ?? 'unknown', (job.data.version as number) ?? 0, attempt, execError.message);
 
             try {
               await this.dlqRouter.route({
