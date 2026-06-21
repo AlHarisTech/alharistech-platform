@@ -558,7 +558,7 @@ export class SchemaRegistry implements OnModuleInit {
     return sanitized;
   }
 
-  private resolveRef(ref: string, rootSpec: ParsedYaml): Record<string, unknown> {
+  private resolveRef(ref: string, rootSpec: ParsedYaml, visitedRefs = new Set<string>()): Record<string, unknown> {
     if (!ref.startsWith('#/')) {
       this.logger.warn(`External $ref not supported: ${ref}`);
       return {};
@@ -580,7 +580,7 @@ export class SchemaRegistry implements OnModuleInit {
     }
 
     const clone = structuredClone(current as Record<string, unknown>);
-    return this.resolveRefsRecursive(clone, rootSpec) as Record<string, unknown>;
+    return this.resolveRefsRecursive(clone, rootSpec, visitedRefs) as Record<string, unknown>;
   }
 
   private resolveRefsRecursive(
@@ -604,7 +604,7 @@ export class SchemaRegistry implements OnModuleInit {
         return { $ref: ref };
       }
       visitedRefs.add(ref);
-      const resolved = this.resolveRef(ref, rootSpec);
+      const resolved = this.resolveRef(ref, rootSpec, visitedRefs);
       visitedRefs.delete(ref);
       return resolved;
     }
