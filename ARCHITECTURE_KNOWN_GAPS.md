@@ -18,12 +18,14 @@
 
 ### Known Architectural Risks
 1. **CRBL-001 — ContractPipe DTO Validation (RESOLVED in v0.6.10):** ContractPipe is request-scoped, injects Fastify request via REQUEST token, extracts route pattern from `request.routeOptions.url`, converts Fastify `:param` → OpenAPI `{param}`, and calls SchemaRegistry.getRequestValidator(). Matching fixed for parameterized routes. ContractInterceptor also updated with same route pattern resolution. HTTP enforcement reaches ~95%.
-2. **CRBL Centralization:** ContractGuard, PolicyGuard, ContractPipe, ContractInterceptor, EventValidator, and SchemaRegistry all live in the same NestJS process. If CRBL grows further, it may need extraction into a dedicated enforcement service.
-3. **EventValidator Runtime Gap:** EventValidator is implemented but BullMQ worker infrastructure is not yet deployed. Event enforcement exists in code but cannot be tested end-to-end without a running worker.
-4. **Single Database Instance:** Current design assumes a single PostgreSQL instance. Read replicas for analytics and horizontal scaling are designed but not implemented.
-5. **No Observability Stack:** Prometheus, Grafana, OpenTelemetry are specified but not configured. Development relies on console logging.
-6. **No CI/CD Pipeline:** GitHub Actions workflows are specified but not active. Token scope limitation prevents workflow file deployment.
-7. **JWT Dev Defaults:** JWT secrets use `dev-*-change-in-production` placeholders. These must be rotated before any production deployment.
+
+2. **CRBL-002 — Circular $ref AJV compilation (KNOWN, scope: 2 schemas):** Self-referencing schemas (`Category` → children → $ref Category, `MenuItem` → children → $ref MenuItem) return `{ $ref }` placeholder when circularity detected. AJV cannot compile these because the referenced schema ID isn't registered via `addSchema()`. Result: validators for Category/MenuItem endpoints are `undefined` → requests pass through silently. Scope: ~2 of 149 endpoints. Fix: register all `components/schemas/*` as AJV schemas with `$id` matching their ref path, then AJV resolves natively.
+3. **CRBL Centralization:** ContractGuard, PolicyGuard, ContractPipe, ContractInterceptor, EventValidator, and SchemaRegistry all live in the same NestJS process. If CRBL grows further, it may need extraction into a dedicated enforcement service.
+4. **EventValidator Runtime Gap:** EventValidator is implemented but BullMQ worker infrastructure is not yet deployed. Event enforcement exists in code but cannot be tested end-to-end without a running worker.
+5. **Single Database Instance:** Current design assumes a single PostgreSQL instance. Read replicas for analytics and horizontal scaling are designed but not implemented.
+6. **No Observability Stack:** Prometheus, Grafana, OpenTelemetry are specified but not configured. Development relies on console logging.
+7. **No CI/CD Pipeline:** GitHub Actions workflows are specified but not active. Token scope limitation prevents workflow file deployment.
+8. **JWT Dev Defaults:** JWT secrets use `dev-*-change-in-production` placeholders. These must be rotated before any production deployment.
 
 ### Deferred Decisions
 1. **Kubernetes Migration (Phase 5):** Current architecture uses direct process execution. Kubernetes is deferred to Phase 5.
