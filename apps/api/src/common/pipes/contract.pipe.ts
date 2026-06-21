@@ -74,7 +74,7 @@ export class ContractPipe implements PipeTransform {
 
   private extractPath(): string {
     // Priority 1: Fastify route pattern (e.g. /customers/:id) — convert :param → {param}
-    const routeOpts = (this.request as Record<string, unknown>).routeOptions as
+    const routeOpts = (this.request as unknown as Record<string, unknown>).routeOptions as
       | { url?: string }
       | undefined;
     if (routeOpts?.url) {

@@ -342,7 +342,7 @@ const EMBEDDED_SCHEMAS: RouteSchemaEntry[] = [
   // --- Auth ---
   {
     method: "POST",
-    path: "/api/v1/auth/register",
+    path: "/auth/register",
     bodySchema: {
       type: "object",
       required: ["email", "password", "first_name_ar", "last_name_ar"],
@@ -367,7 +367,7 @@ const EMBEDDED_SCHEMAS: RouteSchemaEntry[] = [
   },
   {
     method: "POST",
-    path: "/api/v1/auth/verify-email",
+    path: "/auth/verify-email",
     bodySchema: {
       type: "object",
       required: ["token"],
@@ -379,7 +379,7 @@ const EMBEDDED_SCHEMAS: RouteSchemaEntry[] = [
   },
   {
     method: "POST",
-    path: "/api/v1/auth/login",
+    path: "/auth/login",
     bodySchema: {
       type: "object",
       required: ["email", "password"],
@@ -394,7 +394,7 @@ const EMBEDDED_SCHEMAS: RouteSchemaEntry[] = [
   },
   {
     method: "POST",
-    path: "/api/v1/auth/refresh",
+    path: "/auth/refresh",
     bodySchema: {
       type: "object",
       required: ["refresh_token"],
@@ -406,7 +406,7 @@ const EMBEDDED_SCHEMAS: RouteSchemaEntry[] = [
   },
   {
     method: "POST",
-    path: "/api/v1/auth/logout",
+    path: "/auth/logout",
     bodySchema: {
       type: "object",
       additionalProperties: false,
@@ -417,7 +417,7 @@ const EMBEDDED_SCHEMAS: RouteSchemaEntry[] = [
   },
   {
     method: "POST",
-    path: "/api/v1/auth/forgot-password",
+    path: "/auth/forgot-password",
     bodySchema: {
       type: "object",
       required: ["email"],
@@ -429,7 +429,7 @@ const EMBEDDED_SCHEMAS: RouteSchemaEntry[] = [
   },
   {
     method: "POST",
-    path: "/api/v1/auth/reset-password",
+    path: "/auth/reset-password",
     bodySchema: {
       type: "object",
       required: ["token", "new_password"],
@@ -445,14 +445,14 @@ const EMBEDDED_SCHEMAS: RouteSchemaEntry[] = [
   // --- Users ---
   {
     method: "GET",
-    path: "/api/v1/users/me",
+    path: "/users/me",
     bodySchema: null,
     querySchema: null,
     paramsSchema: null,
   },
   {
     method: "PATCH",
-    path: "/api/v1/users/me",
+    path: "/users/me",
     bodySchema: {
       type: "object",
       additionalProperties: false,
@@ -469,7 +469,7 @@ const EMBEDDED_SCHEMAS: RouteSchemaEntry[] = [
   },
   {
     method: "GET",
-    path: "/api/v1/users",
+    path: "/users",
     bodySchema: null,
     querySchema: {
       type: "object",
@@ -484,7 +484,7 @@ const EMBEDDED_SCHEMAS: RouteSchemaEntry[] = [
   },
   {
     method: "PATCH",
-    path: "/api/v1/users/:id/role",
+    path: "/users/:id/role",
     bodySchema: {
       type: "object",
       required: ["role"],
