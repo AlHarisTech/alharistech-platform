@@ -8,6 +8,8 @@ import { QUEUE_PROVIDERS } from './providers/queue.provider';
 import { loadEventRuntimeConfig } from './infrastructure/queue.constants';
 import { EventRegistry } from './validation/event-registry';
 import { EventValidator } from './validation/event-validator';
+import { QueueResolver } from './bus/queue-resolver';
+import { EventBus } from './bus/event-bus';
 
 @Global()
 @Module({
@@ -28,6 +30,8 @@ import { EventValidator } from './validation/event-validator';
     EventRuntimeHealthService,
     EventRegistry,
     EventValidator,
+    QueueResolver,
+    EventBus,
   ],
   exports: [
     RedisManager,
@@ -36,6 +40,8 @@ import { EventValidator } from './validation/event-validator';
     EventRuntimeHealthService,
     EventRegistry,
     EventValidator,
+    QueueResolver,
+    EventBus,
     ...QUEUE_PROVIDERS.map((p) => p.provide),
   ],
 })
