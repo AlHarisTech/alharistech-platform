@@ -1,4 +1,4 @@
-import { Injectable, Logger, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { hash, verify } from 'argon2';
 import { sign, verify as jwtVerify } from 'jsonwebtoken';

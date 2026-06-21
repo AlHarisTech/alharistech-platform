@@ -10,6 +10,7 @@ import {
 import { REQUEST } from "@nestjs/core";
 import { FastifyRequest } from "fastify";
 import { SchemaRegistry } from "../../crbl/schema-registry.service";
+import { markValidated } from "../../crbl/contract-assertion";
 
 @Injectable({ scope: Scope.REQUEST })
 export class ContractPipe implements PipeTransform {
@@ -65,7 +66,7 @@ export class ContractPipe implements PipeTransform {
     }
 
     this.logger.debug(`Validation passed for ${method} ${path}`);
-    return value;
+    return markValidated(value);
   }
 
   private hasSchemaRegistryReady(): boolean {

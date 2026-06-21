@@ -15,6 +15,8 @@ export interface ApiResponse<T> {
   meta: ResponseMeta;
 }
 
+export type { Validated } from './validated';
+
 export interface ApiError {
   error: {
     code: string;
