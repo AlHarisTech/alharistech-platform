@@ -643,7 +643,7 @@ export class ContractGuard implements CanActivate {
   }
 
   private lookupSchema(method: string, routePath: string): RouteSchemaEntry | null {
-    // Normalize path: remove /api/v1 prefix from routePath if present, then match
+    // Normalize path: ensure consistent format for matching against embedded schemas
     const normalized = this.normalizePath(routePath);
     return (
       EMBEDDED_SCHEMAS.find(
@@ -655,7 +655,7 @@ export class ContractGuard implements CanActivate {
   private normalizePath(routePath: string): string {
     let p = routePath;
     if (!p.startsWith("/")) p = `/${p}`;
-    // Fastify may pass template paths like /api/v1/users/:id
+    // Route may contain template segments like /users/:id
     // Embedded schemas use :id notation; ensure match
     return p;
   }

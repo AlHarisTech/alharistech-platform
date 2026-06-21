@@ -36,7 +36,8 @@
 - [x] All ADRs written and accepted (24/24)
 - [x] All domain specs complete (9/9)
 - [x] All OpenAPI specs complete (9/9, 149 endpoints)
-- [x] CRBL components: 4/6 runtime-active (ContractGuard, PolicyGuard, ContractInterceptor, ContractPipe), 1 structural (SchemaRegistry — precompilation added in v0.6.9), 1 spec (EventValidator)
+- [x] CRBL consistency: 5/5 layers unified canonical routes (ContractGuard, PolicyGuard, ContractPipe, ContractInterceptor, SchemaRegistry) — v0.6.12
+- [x] CRBL components: 4/6 runtime-active, 1 structural (SchemaRegistry), 1 spec (EventValidator)
 - [x] Endpoint count corrected
 - [x] Monorepo config present
 - [x] Docker references cleaned
