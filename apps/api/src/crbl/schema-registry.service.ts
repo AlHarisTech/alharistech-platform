@@ -330,8 +330,12 @@ export class SchemaRegistry implements OnModuleInit {
     );
   }
 
+  private resolveRepoPath(relativePath: string): string {
+    return path.resolve(__dirname, '../../../..', relativePath);
+  }
+
   private async loadOpenApiSpecs(): Promise<void> {
-    const schemaDir = path.resolve(process.cwd(), this.config.schemaDir);
+    const schemaDir = this.resolveRepoPath(this.config.schemaDir);
 
     if (!fs.existsSync(schemaDir)) {
       throw new Error(`OpenAPI schema directory not found: ${schemaDir}`);
@@ -624,7 +628,7 @@ export class SchemaRegistry implements OnModuleInit {
   }
 
   private async loadEventSchemas(): Promise<void> {
-    const eventsPath = path.resolve(process.cwd(), this.config.eventsSchemaPath);
+    const eventsPath = this.resolveRepoPath(this.config.eventsSchemaPath);
 
     if (!fs.existsSync(eventsPath)) {
       throw new Error(`Event schemas file not found: ${eventsPath}`);
@@ -680,7 +684,7 @@ export class SchemaRegistry implements OnModuleInit {
   }
 
   private async loadPolicyRules(): Promise<void> {
-    const policyPath = path.resolve(process.cwd(), this.config.policySchemaPath);
+    const policyPath = this.resolveRepoPath(this.config.policySchemaPath);
 
     if (!fs.existsSync(policyPath)) {
       throw new Error(`Policy schema file not found: ${policyPath}`);
@@ -704,9 +708,9 @@ export class SchemaRegistry implements OnModuleInit {
 
   private enableHotReload(): void {
     const watchPaths = [
-      path.resolve(process.cwd(), this.config.schemaDir),
-      path.resolve(process.cwd(), this.config.eventsSchemaPath),
-      path.resolve(process.cwd(), this.config.policySchemaPath),
+      this.resolveRepoPath(this.config.schemaDir),
+      this.resolveRepoPath(this.config.eventsSchemaPath),
+      this.resolveRepoPath(this.config.policySchemaPath),
     ];
 
     for (const watchPath of watchPaths) {

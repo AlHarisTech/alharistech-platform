@@ -23,7 +23,6 @@ import { ContractPipe } from '../common/pipes/contract.pipe';
     ContractGuard,
     PolicyGuard,
     ContractInterceptor,
-    ContractPipe,
   ],
 })
 export class CRBLModule {}
