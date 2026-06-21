@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+// Type-only — runtime validation by CRBL (ContractPipe via SchemaRegistry/AJV)
 export const registerSchema = z.object({
   email: z.string().email().max(255),
   password: z
