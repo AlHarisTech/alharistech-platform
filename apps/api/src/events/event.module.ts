@@ -10,6 +10,9 @@ import { EventRegistry } from './validation/event-registry';
 import { EventValidator } from './validation/event-validator';
 import { QueueResolver } from './bus/queue-resolver';
 import { EventBus } from './bus/event-bus';
+import { WorkerRegistry } from './workers/worker-registry';
+import { WorkerFactory } from './workers/worker-factory';
+import { WorkerOrchestrator } from './workers/worker-orchestrator';
 
 @Global()
 @Module({
@@ -32,6 +35,9 @@ import { EventBus } from './bus/event-bus';
     EventValidator,
     QueueResolver,
     EventBus,
+    WorkerRegistry,
+    WorkerFactory,
+    WorkerOrchestrator,
   ],
   exports: [
     RedisManager,
@@ -42,6 +48,9 @@ import { EventBus } from './bus/event-bus';
     EventValidator,
     QueueResolver,
     EventBus,
+    WorkerRegistry,
+    WorkerFactory,
+    WorkerOrchestrator,
     ...QUEUE_PROVIDERS.map((p) => p.provide),
   ],
 })
