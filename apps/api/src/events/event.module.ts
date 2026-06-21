@@ -6,6 +6,8 @@ import { EventRuntimeHealthService } from './health/event-runtime.health';
 import { redisClientProvider } from './providers/redis.provider';
 import { QUEUE_PROVIDERS } from './providers/queue.provider';
 import { loadEventRuntimeConfig } from './infrastructure/queue.constants';
+import { EventRegistry } from './validation/event-registry';
+import { EventValidator } from './validation/event-validator';
 
 @Global()
 @Module({
@@ -24,12 +26,16 @@ import { loadEventRuntimeConfig } from './infrastructure/queue.constants';
     QueueFactory,
     ...QUEUE_PROVIDERS,
     EventRuntimeHealthService,
+    EventRegistry,
+    EventValidator,
   ],
   exports: [
     RedisManager,
     QueueRegistry,
     QueueFactory,
     EventRuntimeHealthService,
+    EventRegistry,
+    EventValidator,
     ...QUEUE_PROVIDERS.map((p) => p.provide),
   ],
 })
