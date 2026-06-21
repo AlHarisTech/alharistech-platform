@@ -269,7 +269,7 @@ export class AuthService {
     await db.insert(refreshTokens).values({
       userId,
       tokenHash: jti,
-      expiresAt: expiresAt.toISOString(),
+      expiresAt,
       replacedBy: replacedBy ?? null,
     });
 

@@ -17,7 +17,7 @@ async function bootstrap(): Promise<void> {
   const reflector = app.get(Reflector);
 
   app.useGlobalGuards(
-    new ContractGuard(reflector),
+    new ContractGuard(reflector, schemaRegistry),
     new PolicyGuard(reflector),
   );
   app.useGlobalInterceptors(new ContractInterceptor(schemaRegistry));
