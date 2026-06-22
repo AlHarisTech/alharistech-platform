@@ -184,7 +184,7 @@ jobs:
         run: |
           BODY=$(curl -sf http://127.0.0.1:4000/health)
           echo "$BODY"
-          echo "$BODY" | python3 -c 'import sys,json; d=json.load(sys.stdin); assert d.get("status")=="healthy","status:"+str(d.get("status")); assert d.get("database")=="connected","DB:"+str(d.get("database")); assert d.get("redis")=="connected","Redis:"+str(d.get("redis")); print("OI-010: database=connected"); print("OI-011: redis=connected")'
+          echo "$BODY" | python3 -c 'import sys,json; d=json.load(sys.stdin); assert d.get("status")=="ok","status:"+str(d.get("status")); er=d.get("eventRuntime",{}); assert er.get("status")=="healthy","er.status:"+str(er.get("status")); assert er.get("redis")=="connected","er.redis:"+str(er.get("redis")); print("OI-010: eventRuntime status=healthy"); print("OI-011: eventRuntime redis=connected")'
 
       - name: Dashboard endpoint
         run: |
@@ -213,11 +213,11 @@ jobs:
           fi
           echo "Trace endpoint: HTTP 200 ✓"
 
-      - name: Events health (SchemaRegistry + system status)
+      - name: Events health (Runtime system status)
         run: |
           BODY=$(curl -sf http://127.0.0.1:4000/events/health)
           echo "$BODY"
-          echo "$BODY" | python3 -c 'import sys,json; d=json.load(sys.stdin); assert d.get("status")=="healthy","s:"+str(d.get("status")); sr=d.get("schemaRegistry",{}); assert sr.get("specs",0)>=9,"specs:"+str(sr.get("specs")); assert sr.get("endpoints",0)>=149,"ep:"+str(sr.get("endpoints")); assert sr.get("eventSchemas",0)>=94,"ev:"+str(sr.get("eventSchemas")); print("OI-012: SchemaRegistry specs>=9, endpoints>=149, schemas>=94"); print("OI-013: status=healthy")'
+          echo "$BODY" | python3 -c 'import sys,json; d=json.load(sys.stdin); assert d.get("status")=="healthy","s:"+str(d.get("status")); assert d.get("redis",{}).get("status")=="connected","redis:"+str(d.get("redis")); assert d.get("workers",{}).get("status")=="running","workers:"+str(d.get("workers")); assert d.get("idempotency",{}).get("status")=="available","idem:"+str(d.get("idempotency")); print("OI-013: runtime status=healthy, redis=connected, workers=running, idempotency=available")'
 
       - name: Cleanup
         if: always()

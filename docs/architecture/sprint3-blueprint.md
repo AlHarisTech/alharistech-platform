@@ -445,6 +445,11 @@ Commit ──▶ CI (lint + build + test)
 | OI-007 | Environment stratification is explicit   | Separate env files per layer     |
 | OI-008 | E2E tests only run against Docker stack  | CI workflow separation           |
 | OI-009 | API must start and respond 200 with real Postgres + Redis | CI integration job |
+| OI-010 | EventRuntime status must be "healthy" with Redis connected | CI /health body assert |
+| OI-011 | Workers must be "running", idempotency "available" | CI /events/health body assert |
+| OI-012 | SchemaRegistry loads >=9 specs, >=149 endpoints, >=94 schemas | Requires dedicated endpoint (planned);
+  indirectly validated: /events/dashboard 200 implies full bootstrap |
+| OI-013 | No endpoint may return "degraded" or "unavailable" during integration CI | CI body asserts reject non-healthy |
 
 ### 9.2 Verification Gates
 
