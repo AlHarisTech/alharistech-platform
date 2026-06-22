@@ -140,7 +140,23 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Start API with real dependencies
+      - name: Wait for Postgres
+        run: |
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for Postgres..."
+            sleep 1
+          done
+          echo "Postgres ready"
+
+      - name: Wait for Redis
+        run: |
+          until redis-cli -h localhost ping; do
+            echo "Waiting for Redis..."
+            sleep 1
+          done
+          echo "Redis ready"
+
+      - name: Start API
         run: |
           NODE_ENV=test \
           DB_HOST=localhost \
@@ -156,22 +172,19 @@ jobs:
 
       - name: Wait for API
         run: |
-          for i in $(seq 1 15); do
+          for i in $(seq 1 30); do
             if curl -sf http://127.0.0.1:4000/health > /dev/null 2>&1; then
               echo "API ready (attempt $i)"
               break
             fi
-            sleep 1
+            sleep 2
           done
 
       - name: Health endpoint
         run: |
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4000/health)
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "Integration health check failed: HTTP $HTTP_CODE"
-            exit 1
-          fi
-          echo "Integration health check passed: HTTP 200"
+          BODY=$(curl -sf http://127.0.0.1:4000/health)
+          echo "$BODY"
+          echo "$BODY" | python3 -c 'import sys,json; d=json.load(sys.stdin); assert d.get("status")=="healthy","status:"+str(d.get("status")); assert d.get("database")=="connected","DB:"+str(d.get("database")); assert d.get("redis")=="connected","Redis:"+str(d.get("redis")); print("OI-010: database=connected"); print("OI-011: redis=connected")'
 
       - name: Dashboard endpoint
         run: |
@@ -180,7 +193,7 @@ jobs:
             echo "Integration dashboard check failed: HTTP $HTTP_CODE"
             exit 1
           fi
-          echo "Integration dashboard check passed: HTTP 200"
+          echo "Dashboard endpoint: HTTP 200 ✓"
 
       - name: Metrics endpoint
         run: |
@@ -189,7 +202,7 @@ jobs:
             echo "Integration metrics check failed: HTTP $HTTP_CODE"
             exit 1
           fi
-          echo "Integration metrics check passed: HTTP 200"
+          echo "Metrics endpoint: HTTP 200 ✓"
 
       - name: Trace endpoint
         run: |
@@ -198,13 +211,13 @@ jobs:
             echo "Integration trace check failed: HTTP $HTTP_CODE"
             exit 1
           fi
-          echo "Integration trace check passed: HTTP 200"
+          echo "Trace endpoint: HTTP 200 ✓"
 
-      - name: SchemaRegistry health
+      - name: Events health (SchemaRegistry + system status)
         run: |
           BODY=$(curl -sf http://127.0.0.1:4000/events/health)
-          echo "$BODY" | head -10
-          echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status') in ('healthy','degraded'), f'bad status: {d}'"
+          echo "$BODY"
+          echo "$BODY" | python3 -c 'import sys,json; d=json.load(sys.stdin); assert d.get("status")=="healthy","s:"+str(d.get("status")); sr=d.get("schemaRegistry",{}); assert sr.get("specs",0)>=9,"specs:"+str(sr.get("specs")); assert sr.get("endpoints",0)>=149,"ep:"+str(sr.get("endpoints")); assert sr.get("eventSchemas",0)>=94,"ev:"+str(sr.get("eventSchemas")); print("OI-012: SchemaRegistry specs>=9, endpoints>=149, schemas>=94"); print("OI-013: status=healthy")'
 
       - name: Cleanup
         if: always()
