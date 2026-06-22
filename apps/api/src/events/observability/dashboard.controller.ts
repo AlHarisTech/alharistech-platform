@@ -1,9 +1,11 @@
 import { Controller, Get, Post, HttpCode } from '@nestjs/common';
+import { Public } from '../../common/decorators/public.decorator';
 import { EventMetricsService } from './event-metrics.service';
 import { EventTracerService } from './event-tracer.service';
 import { RuntimeHealthService } from './runtime-health.service';
 import type { DashboardData } from './dashboard.dto';
 
+@Public()
 @Controller('events')
 export class DashboardController {
   constructor(

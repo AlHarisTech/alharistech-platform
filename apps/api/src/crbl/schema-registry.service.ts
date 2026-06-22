@@ -331,7 +331,7 @@ export class SchemaRegistry implements OnModuleInit {
   }
 
   private resolveRepoPath(relativePath: string): string {
-    return path.resolve(__dirname, '../../../..', relativePath);
+    return path.resolve(__dirname, '../../../../../../..', relativePath);
   }
 
   private async loadOpenApiSpecs(): Promise<void> {
