@@ -1,4 +1,4 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Inject, Optional, Logger } from '@nestjs/common';
 import type { Redis } from 'ioredis';
 import { REDIS_CLIENT_TOKEN, EVENT_QUEUES } from '../infrastructure/queue.constants';
 import type { EventQueueName } from '../infrastructure/queue.constants';
@@ -15,7 +15,7 @@ export class RuntimeHealthService {
   private readonly logger = new Logger(RuntimeHealthService.name);
 
   constructor(
-    @Inject(REDIS_CLIENT_TOKEN) private readonly redis: Redis | null,
+    @Optional() @Inject(REDIS_CLIENT_TOKEN) private readonly redis: Redis | null,
     private readonly queueRegistry: QueueRegistry,
     private readonly workerRegistry: WorkerRegistry,
     private readonly dlqRouter: DlqRouter,

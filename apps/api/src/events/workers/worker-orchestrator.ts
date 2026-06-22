@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { EventQueueName } from '../infrastructure/queue.constants';
 import { EVENT_QUEUES } from '../infrastructure/queue.constants';
 import { WorkerFactory, type ActiveWorker } from './worker-factory';
@@ -21,7 +21,7 @@ export class WorkerOrchestrator {
   private readonly defaultRetryConfig: RetryConfig;
   private started = false;
 
-  constructor(private readonly factory: WorkerFactory, retryConfig?: Partial<RetryConfig>) {
+  constructor(private readonly factory: WorkerFactory, @Optional() retryConfig?: Partial<RetryConfig>) {
     this.defaultRetryConfig = { ...DEFAULT_RETRY_CONFIG, ...retryConfig };
   }
 

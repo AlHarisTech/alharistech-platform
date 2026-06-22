@@ -2,16 +2,12 @@ import { Injectable } from '@nestjs/common';
 import type { TraceEntry, TraceSnapshot } from './trace.types';
 import { TraceAction } from './trace.types';
 
-const DEFAULT_CAPACITY = 1000;
+const BUFFER_CAPACITY = 1000;
 
 @Injectable()
 export class EventTracerService {
   private readonly buffer: TraceEntry[] = [];
-  private readonly capacity: number;
-
-  constructor(capacity = DEFAULT_CAPACITY) {
-    this.capacity = capacity;
-  }
+  private readonly capacity = BUFFER_CAPACITY;
 
   trace(
     eventId: string,
