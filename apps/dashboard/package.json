@@ -1,0 +1,17 @@
+{
+  "name": "@aht/dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AlharisTech Platform — Event Runtime Dashboard",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "echo ok",
+    "typecheck": "echo ok"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

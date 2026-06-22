@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AlharisTech — Runtime Dashboard</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%2300e676'/></svg>" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0e17;
+      --surface: #111827;
+      --surface-2: #1a1f2e;
+      --border: #1e293b;
+      --text: #e2e8f0;
+      --text-dim: #64748b;
+      --green: #00e676;
+      --yellow: #ffd54f;
+      --red: #ff5252;
+      --blue: #448aff;
+      --orange: #ff9100;
+      --radius: 8px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container { max-width: 1400px; margin: 0 auto; }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 24px; padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 { font-size: 18px; font-weight: 600; letter-spacing: 0.5px; }
+    header h1 span { color: var(--green); }
+    .status-bar { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+    .live-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .live-dot.paused { background: var(--yellow); animation: none; }
+    .live-dot.error { background: var(--red); animation: none; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .grid { display: grid; gap: 16px; }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px;
+    }
+    .card h2 {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+      color: var(--text-dim); margin-bottom: 12px;
+    }
+    .card .value {
+      font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums;
+    }
+    .stat-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid var(--surface-2); }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-label { color: var(--text-dim); }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+    }
+    .badge-green { background: rgba(0,230,118,0.15); color: var(--green); }
+    .badge-yellow { background: rgba(255,213,79,0.15); color: var(--yellow); }
+    .badge-red { background: rgba(255,82,82,0.15); color: var(--red); }
+    .badge-blue { background: rgba(68,138,255,0.15); color: var(--blue); }
+    .trace-list { max-height: 400px; overflow-y: auto; }
+    .trace-entry {
+      display: flex; gap: 12px; padding: 6px 0; font-size: 12px;
+      font-family: monospace; border-bottom: 1px solid var(--surface-2);
+      align-items: center;
+    }
+    .trace-entry .time { color: var(--text-dim); white-space: nowrap; min-width: 80px; }
+    .trace-entry .action {
+      white-space: nowrap; padding: 1px 6px; border-radius: 3px;
+      font-weight: 600; min-width: 120px; text-align: center;
+    }
+    .trace-entry .id { color: var(--orange); min-width: 180px; }
+    .trace-entry .type { color: var(--blue); min-width: 120px; }
+    .trace-entry .duration { color: var(--text-dim); min-width: 60px; text-align: right; }
+    .trace-entry .error { color: var(--red); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    @media (max-width: 900px) {
+      .grid-4 { grid-template-columns: repeat(2, 1fr); }
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      .grid-4 { grid-template-columns: 1fr; }
+      header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    }
+    .empty { color: var(--text-dim); font-size: 13px; text-align: center; padding: 20px; }
+    .timestamp { font-size: 12px; color: var(--text-dim); }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: var(--surface); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>⚡ <span>AlharisTech</span> Runtime Dashboard</h1>
+      <div class="status-bar">
+        <span class="live-dot" id="liveDot"></span>
+        <span id="liveLabel">LIVE</span>
+        <span class="timestamp" id="lastUpdated">—</span>
+        <span class="timestamp" id="errorCount" style="display:none"></span>
+      </div>
+    </header>
+
+    <div class="grid grid-4" id="healthCards"></div>
+
+    <div class="grid grid-4" style="margin-top:16px" id="metricCards"></div>
+
+    <div class="grid grid-2" style="margin-top:16px">
+      <div class="card" id="queueCard">
+        <h2>Queue Depth</h2>
+        <div id="queueList"></div>
+      </div>
+      <div class="card" id="dlqCard">
+        <h2>DLQ & Poison Events</h2>
+        <div id="dlqContent"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h2>Event Trace <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:12px" id="traceCount"></span></h2>
+      <div class="trace-list" id="traceList"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    const API_ENDPOINTS = {
+      dashboard: '/events/dashboard',
+      health: '/events/health',
+      metrics: '/events/metrics',
+      trace: '/events/trace',
+    };
+
+    const POLL_INTERVAL = 3000;
+
+    const state = {
+      health: null,
+      metrics: null,
+      trace: null,
+      errorCounts: { consecutive: 0 },
+      lastUpdate: null,
+    };
+
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => document.querySelectorAll(sel);
+
+    function badge(status) {
+      if (status === 'healthy' || status === 'connected' || status === 'available' || status === 'running')
+        return '<span class="badge badge-green">✓</span>';
+      if (status === 'degraded')
+        return '<span class="badge badge-yellow">⚠</span>';
+      return '<span class="badge badge-red">✗</span>';
+    }
+
+    function shortId(id) {
+      if (!id || id === 'unknown') return '—';
+      return id.length > 16 ? id.slice(0, 16) + '…' : id;
+    }
+
+    function formatTime(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return d.toLocaleTimeString('en-US', { hour12: false });
+    }
+
+    function renderHealth(health) {
+      if (!health) return;
+      const cards = [
+        { label: 'Runtime', value: health.status, cls: health.status === 'healthy' ? 'badge-green' : health.status === 'degraded' ? 'badge-yellow' : 'badge-red' },
+        { label: 'Redis', value: health.redis.status, cls: health.redis.status === 'connected' ? 'badge-green' : 'badge-red', sub: health.redis.latencyMs != null ? `${health.redis.latencyMs}ms` : '' },
+        { label: 'Workers', value: `${health.workers.activeCount} active`, sub: `${health.workers.registeredHandlers} handlers` },
+        { label: 'DLQ', value: `${health.dlq.totalEntries} entries`, sub: health.dlq.queueNames.length > 0 ? `${health.dlq.queueNames.length} queues` : '' },
+      ];
+
+      $('#healthCards').innerHTML = cards.map(c => `
+        <div class="card">
+          <h2>${c.label}</h2>
+          <div class="value"><span class="badge ${c.cls}">${c.value}</span></div>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-dim)">${c.sub || ''}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderMetrics(metrics) {
+      if (!metrics) return;
+      const cards = [
+        { label: 'Published', value: metrics.publishedTotal.toLocaleString() },
+        { label: 'Executions', value: metrics.executionCompletedTotal.toLocaleString(), sub: `${metrics.executionStartedTotal} started` },
+        { label: 'Failed', value: metrics.executionFailedTotal.toLocaleString(), sub: `${metrics.dlqRoutedTotal} DLQ routed` },
+        { label: 'Skipped', value: metrics.idempotencySkippedTotal.toLocaleString(), sub: `${metrics.retryAttemptsTotal} retries` },
+      ];
+
+      $('#metricCards').innerHTML = cards.map(c => `
+        <div class="card">
+          <h2>${c.label}</h2>
+          <div class="value">${c.value}</div>
+          <div style="margin-top:4px;font-size:12px;color:var(--text-dim)">${c.sub || ''}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderQueues(health) {
+      if (!health || !health.queues) {
+        $('#queueList').innerHTML = '<div class="empty">No queue data</div>';
+        return;
+      }
+      $('#queueList').innerHTML = health.queues.map(q => `
+        <div class="stat-row">
+          <span class="stat-label">${q.name}</span>
+          <span>${badge(q.status)} ${q.waiting != null ? `waiting: ${q.waiting}` : ''} ${q.active != null ? `active: ${q.active}` : ''} ${q.failed ? `failed: ${q.failed}` : ''}</span>
+        </div>
+      `).join('');
+    }
+
+    function renderDlq(health) {
+      if (!health) {
+        $('#dlqContent').innerHTML = '<div class="empty">No data</div>';
+        return;
+      }
+      $('#dlqContent').innerHTML = `
+        <div class="stat-row">
+          <span class="stat-label">Total Entries</span>
+          <span style="font-weight:700">${health.dlq.totalEntries}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Queues</span>
+          <span>${health.dlq.queueNames.join(', ') || '—'}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Idempotency</span>
+          <span>${badge(health.idempotency.status)} ${health.idempotency.status}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Uptime</span>
+          <span style="font-family:monospace">${msToDuration(health.uptimeMs)}</span>
+        </div>
+      `;
+    }
+
+    function msToDuration(ms) {
+      const s = Math.floor(ms / 1000);
+      if (s < 60) return `${s}s`;
+      const m = Math.floor(s / 60);
+      if (m < 60) return `${m}m ${s % 60}s`;
+      const h = Math.floor(m / 60);
+      return `${h}h ${m % 60}m`;
+    }
+
+    function renderTrace(trace) {
+      const entries = trace?.entries || [];
+      $('#traceCount').textContent = `(${entries.length} entries)`;
+      if (entries.length === 0) {
+        $('#traceList').innerHTML = '<div class="empty">No trace entries yet</div>';
+        return;
+      }
+      const recent = entries.slice(-100).reverse();
+      $('#traceList').innerHTML = recent.map(e => {
+        const actionClass = {
+          publish: 'badge-green', schedule: 'badge-blue', execution_started: 'badge-blue',
+          execution_completed: 'badge-green', execution_failed: 'badge-red',
+          retry: 'badge-yellow', dlq_routed: 'badge-red', replay: 'badge-blue',
+          idempotency_skip: 'badge-yellow',
+        }[e.action] || 'badge-blue';
+        return `<div class="trace-entry">
+          <span class="time">${formatTime(e.timestamp)}</span>
+          <span class="action" style="background:rgba(0,0,0,0.2);border-radius:3px"><span class="badge ${actionClass}">${e.action.replace(/_/g,' ')}</span></span>
+          <span class="id">${shortId(e.eventId)}</span>
+          <span class="type">${e.eventType}</span>
+          <span class="duration">${e.durationMs != null ? e.durationMs + 'ms' : ''}</span>
+          <span class="error">${e.error ? '✗ ' + e.error.slice(0, 60) : ''}</span>
+        </div>`;
+      }).join('');
+    }
+
+    async function fetchAll() {
+      try {
+        const [dashboardRes, healthRes, metricsRes, traceRes] = await Promise.all([
+          fetch(API_ENDPOINTS.dashboard).then(r => r.ok ? r.json() : null),
+          fetch(API_ENDPOINTS.health).then(r => r.ok ? r.json() : null),
+          fetch(API_ENDPOINTS.metrics).then(r => r.ok ? r.json() : null),
+          fetch(API_ENDPOINTS.trace).then(r => r.ok ? r.json() : null),
+        ]);
+
+        const health = healthRes || dashboardRes?.health;
+        const metrics = metricsRes || dashboardRes?.metrics;
+        const trace = traceRes || dashboardRes?.trace;
+
+        if (health) state.health = health;
+        if (metrics) state.metrics = metrics;
+        if (trace) state.trace = trace;
+
+        state.errorCounts.consecutive = 0;
+        state.lastUpdate = new Date();
+
+        renderHealth(health);
+        renderMetrics(metrics);
+        renderQueues(health);
+        renderDlq(health);
+        renderTrace(trace);
+
+        $('#liveDot').className = 'live-dot';
+        $('#liveLabel').textContent = 'LIVE';
+        $('#lastUpdated').textContent = state.lastUpdate.toLocaleTimeString('en-US', { hour12: false });
+        $('#errorCount').style.display = 'none';
+      } catch (err) {
+        state.errorCounts.consecutive++;
+        $('#liveDot').className = 'live-dot error';
+        $('#liveLabel').textContent = `ERROR (${state.errorCounts.consecutive})`;
+        $('#errorCount').textContent = `⚠ ${err.message}`;
+        $('#errorCount').style.display = 'inline';
+      }
+    }
+
+    fetchAll();
+    setInterval(fetchAll, POLL_INTERVAL);
+  </script>
+</body>
+</html>
