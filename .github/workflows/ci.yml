@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: [v*]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  PNPM_VERSION: "9.15.0"
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test
+
+      - name: Bootstrap verification
+        run: |
+          echo "Starting API server..."
+          node apps/api/dist/apps/api/src/main.js &
+          SERVER_PID=$!
+
+          echo "Waiting for server..."
+          for i in $(seq 1 15); do
+            if curl -sf http://127.0.0.1:4000/health > /dev/null 2>&1; then
+              echo "Server is ready (attempt $i)"
+              break
+            fi
+            sleep 1
+          done
+
+          echo "Checking health endpoint..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4000/health)
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Health check failed: HTTP $HTTP_CODE"
+            kill $SERVER_PID 2>/dev/null || true
+            exit 1
+          fi
+          echo "Health check passed: HTTP 200"
+
+          echo "Checking dashboard endpoint..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:4000/events/dashboard)
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Dashboard endpoint check failed: HTTP $HTTP_CODE"
+            kill $SERVER_PID 2>/dev/null || true
+            exit 1
+          fi
+          echo "Dashboard endpoint passed: HTTP 200"
+
+          echo "Checking SchemaRegistry status..."
+          HEALTH_BODY=$(curl -sf http://127.0.0.1:4000/events/health)
+          echo "$HEALTH_BODY" | head -5
+
+          kill $SERVER_PID 2>/dev/null || true
+          echo "Bootstrap verification passed"
