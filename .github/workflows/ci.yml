@@ -198,6 +198,7 @@ jobs:
             fi
             sleep 1
           done
+          curl -sf http://127.0.0.1:5173 > /dev/null 2>&1 || (echo "::error::Dashboard not ready after 15s" && exit 1)
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install chromium
