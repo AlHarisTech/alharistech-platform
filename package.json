@@ -17,11 +17,16 @@
     "test:contracts": "turbo test:contracts",
     "db:generate": "turbo db:generate",
     "db:migrate": "turbo db:migrate",
-    "clean": "turbo clean"
+    "clean": "turbo clean",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.0",
+    "@types/node": "^22.0.0",
     "turbo": "^2.4.0",
-    "typescript": "^5.5.0",
-    "@types/node": "^22.0.0"
+    "typescript": "^5.5.0"
   }
 }

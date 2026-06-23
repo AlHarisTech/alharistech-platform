@@ -450,6 +450,13 @@ Commit ──▶ CI (lint + build + test)
 | OI-012 | SchemaRegistry loads >=9 specs, >=149 endpoints, >=94 schemas | Requires dedicated endpoint (planned);
   indirectly validated: /events/dashboard 200 implies full bootstrap |
 | OI-013 | No endpoint may return "degraded" or "unavailable" during integration CI | CI body asserts reject non-healthy |
+| OI-014 | Dashboard loads with correct title | Playwright E2E-01 |
+| OI-015 | Dashboard can communicate with API (composite endpoints return 200) | Playwright E2E-06, E2E-08 |
+| OI-016 | Health indicator shows LIVE status | Playwright E2E-02 |
+| OI-017 | Observability cards render (health, metrics, trace) | Playwright E2E-03, E2E-04, E2E-05 |
+| OI-018 | Events health endpoint returns healthy with proper status | Playwright E2E-07 |
+| OI-019 | Responsive layout passes at mobile viewport | Playwright E2E-10 |
+| OI-020 | Playwright suite passes in CI (no flaky failures) | CI e2e job |
 
 ### 9.2 Verification Gates
 
