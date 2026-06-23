@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import { IS_CI } from "./config";
+import { API_URL, IS_CI, TIMEOUTS } from "./config";
 
 function findRedisContainerId(): string | null {
   try {
@@ -34,4 +34,20 @@ export function startRedis(): void {
   } else {
     execSync("sudo systemctl start redis-server", { timeout: 10000 });
   }
+}
+
+export async function waitUntilRedisHealthy(request: { get: (url: string) => Promise<{ status: () => number; json: () => Promise<Record<string, unknown>> }> }, timeout = TIMEOUTS.REDIS_RECOVER): Promise<void> {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    try {
+      const res = await request.get(`${API_URL}/health`);
+      if (res.status() !== 200) continue;
+      const body = await res.json() as { eventRuntime?: { redis?: string; status?: string } };
+      if (body.eventRuntime?.redis === "connected" && body.eventRuntime?.status === "healthy") return;
+    } catch {
+      // API not ready, retry
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`Redis did not become healthy within ${timeout}ms`);
 }

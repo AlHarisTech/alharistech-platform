@@ -2,6 +2,16 @@ import { test, expect } from "@playwright/test";
 import { API_URL, EVENTS, makeEventPayload, TIMEOUTS } from "./helpers/config";
 import { waitForCondition } from "./helpers/wait-until";
 
+test.afterEach(async ({ request }) => {
+  const res = await request.get(`${API_URL}/events/health`);
+  expect(res.status()).toBe(200);
+  const health = await res.json();
+  expect(health.status).toBe("healthy");
+  expect(health.redis.status).toBe("connected");
+  expect(health.workers.status).toBe("running");
+  expect(health.idempotency.status).toBe("available");
+});
+
 test.describe("RTE-04: Idempotency (OI-024)", () => {
   test("duplicate event ID is skipped by idempotency mechanism", async ({ request }) => {
     await request.post(`${API_URL}/events/metrics/reset`);

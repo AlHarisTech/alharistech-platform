@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Body, HttpCode, NotFoundException } from '@nestjs/common';
 import { Public } from '../../common/decorators/public.decorator';
 import { EventMetricsService } from './event-metrics.service';
 import { EventTracerService } from './event-tracer.service';
@@ -65,6 +65,9 @@ export class DashboardController {
 
   @Post('test/publish')
   async testPublish(@Body() dto: TestPublishDto): Promise<EventReceipt> {
+    if (process.env.RUNTIME_TEST_MODE !== 'true') {
+      throw new NotFoundException();
+    }
     const event: DomainEvent<unknown> = {
       id: dto.id ?? crypto.randomUUID(),
       type: dto.type,

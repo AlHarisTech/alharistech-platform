@@ -1,7 +1,17 @@
 import { test, expect } from "@playwright/test";
 import { API_URL, IS_CI, TIMEOUTS } from "./helpers/config";
 import { waitForCondition } from "./helpers/wait-until";
-import { stopRedis, startRedis } from "./helpers/redis-control";
+import { stopRedis, startRedis, waitUntilRedisHealthy } from "./helpers/redis-control";
+
+test.afterEach(async ({ request }) => {
+  const res = await request.get(`${API_URL}/events/health`);
+  expect(res.status()).toBe(200);
+  const health = await res.json();
+  expect(health.status).toBe("healthy");
+  expect(health.redis.status).toBe("connected");
+  expect(health.workers.status).toBe("running");
+  expect(health.idempotency.status).toBe("available");
+});
 
 test.describe("RTE-03: Redis Reconnect (OI-023)", () => {
   test("health degrades when Redis stops and recovers when restarted", async ({ request }) => {
@@ -15,27 +25,14 @@ test.describe("RTE-03: Redis Reconnect (OI-023)", () => {
 
     stopRedis();
 
-    try {
-      await waitForCondition(async () => {
-        const res = await request.get(`${API_URL}/health`);
-        if (res.status() !== 200) return false;
-        const body = await res.json();
-        return body.eventRuntime?.redis === "disconnected" || body.eventRuntime?.status !== "healthy";
-      }, TIMEOUTS.REDIS_RECOVER);
-    } finally {
-      startRedis();
-    }
-
     await waitForCondition(async () => {
       const res = await request.get(`${API_URL}/health`);
       if (res.status() !== 200) return false;
       const body = await res.json();
-      return body.eventRuntime?.redis === "connected" && body.eventRuntime?.status === "healthy";
+      return body.eventRuntime?.redis === "disconnected" || body.eventRuntime?.status !== "healthy";
     }, TIMEOUTS.REDIS_RECOVER);
 
-    const finalRes = await request.get(`${API_URL}/health`);
-    const finalBody = await finalRes.json();
-    expect(finalBody.eventRuntime.redis).toBe("connected");
-    expect(finalBody.eventRuntime.status).toBe("healthy");
+    startRedis();
+    await waitUntilRedisHealthy(request, TIMEOUTS.REDIS_RECOVER);
   });
 });

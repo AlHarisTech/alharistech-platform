@@ -13,6 +13,8 @@ export function makeEventPayload(): Record<string, unknown> {
   };
 }
 
+export const BURST_SIZE = IS_CI ? 100 : 25;
+
 export const TIMEOUTS = {
   DLQ_WAIT: 45_000,
   IDEMPOTENCY_WAIT: 45_000,

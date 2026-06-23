@@ -1,6 +1,16 @@
 import { test, expect } from "@playwright/test";
 import { API_URL, EVENTS, makeEventPayload } from "./helpers/config";
 
+test.afterEach(async ({ request }) => {
+  const res = await request.get(`${API_URL}/events/health`);
+  expect(res.status()).toBe(200);
+  const health = await res.json();
+  expect(health.status).toBe("healthy");
+  expect(health.redis.status).toBe("connected");
+  expect(health.workers.status).toBe("running");
+  expect(health.idempotency.status).toBe("available");
+});
+
 test.describe("RTE-01: Publish → Trace (OI-021)", () => {
   test("published event appears in trace buffer and metrics", async ({ request }) => {
     await request.post(`${API_URL}/events/metrics/reset`);
