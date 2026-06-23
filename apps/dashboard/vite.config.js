@@ -6,11 +6,11 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/events': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:4000',
         changeOrigin: true,
       },
       '/health': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:4000',
         changeOrigin: true,
       },
     },
