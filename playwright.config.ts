@@ -39,13 +39,13 @@ export default defineConfig({
     {
       command: "pnpm --filter @aht/api start",
       port: 4000,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: true,
       timeout: 30_000,
     },
     {
       command: "pnpm --filter @aht/dashboard dev",
       port: 5173,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: true,
       timeout: 15_000,
     },
   ],
