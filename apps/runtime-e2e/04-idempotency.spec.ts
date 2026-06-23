@@ -12,9 +12,10 @@ test.afterEach(async ({ request }) => {
   expect(health.idempotency.status).toBe("available");
 });
 
-test.describe("RTE-04: Idempotency (OI-024)", () => {
-  test("duplicate event ID is skipped by idempotency mechanism", async ({ request }) => {
+test.describe("RTE-04: Idempotency / OI-027", () => {
+  test("duplicate event ID produces exactly one side effect", async ({ request }) => {
     await request.post(`${API_URL}/events/metrics/reset`);
+    await request.post(`${API_URL}/events/trace/clear`);
 
     const eventId = crypto.randomUUID();
     const payload = makeEventPayload();
@@ -43,13 +44,23 @@ test.describe("RTE-04: Idempotency (OI-024)", () => {
       const metricsRes = await request.get(`${API_URL}/events/metrics`);
       if (metricsRes.status() !== 200) return false;
       const metrics = await metricsRes.json();
-      return metrics.idempotencySkippedTotal > 0;
+      return metrics.idempotencySkippedTotal === 1;
     }, TIMEOUTS.IDEMPOTENCY_WAIT);
 
     const metricsRes = await request.get(`${API_URL}/events/metrics`);
     const metrics = await metricsRes.json();
-    expect(metrics.idempotencySkippedTotal).toBeGreaterThan(0);
-    expect(metrics.executionFailedTotal).toBeGreaterThanOrEqual(1);
+    expect(metrics.publishedTotal).toBe(2);
+    expect(metrics.publishedByType?.[EVENTS.SIMPLE.type]).toBe(2);
+    expect(metrics.idempotencySkippedTotal).toBe(1);
+    expect(metrics.executionFailedTotal).toBe(1);
+
+    const traceRes = await request.get(`${API_URL}/events/trace`);
+    const trace = await traceRes.json();
+    const idempotencySkips = trace.entries?.filter(
+      (e: { eventId: string; action: string }) =>
+        e.eventId === eventId && e.action === "idempotency_skip",
+    );
+    expect(idempotencySkips).toHaveLength(1);
 
     const healthRes = await request.get(`${API_URL}/events/health`);
     const health = await healthRes.json();

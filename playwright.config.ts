@@ -30,6 +30,7 @@ export default defineConfig({
       name: "runtime-e2e",
       testDir: "./apps/runtime-e2e",
       timeout: 120_000,
+      fullyParallel: false,
       use: { browserName: "chromium" },
     },
   ],

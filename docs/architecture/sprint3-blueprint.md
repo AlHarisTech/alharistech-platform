@@ -463,6 +463,7 @@ Commit ──▶ CI (lint + build + test)
 | OI-024 | Duplicate event IDs are skipped by idempotency | Runtime E2E RTE-04 |
 | OI-025 | Dashboard remains responsive under burst load (100 events) | Runtime E2E RTE-05 |
 | OI-026 | Runtime tests must leave the system healthy | `test.afterEach` in every spec file |
+| OI-027 | Duplicate events produce exactly one side effect | Idempotency RTE-04 (exact counts) |
 
 ### 9.2 Verification Gates
 
@@ -473,6 +474,7 @@ Commit ──▶ CI (lint + build + test)
 | G-03     | After Phase 3            | Runtime E2E suite passes (5 tests: RTE-01 to RTE-05) |
 | G-04     | Before v1.0              | Production deployment documented and tested on staging |
 | G-05     | After every RTE test      | System health restored: redis connected, workers running, idempotency available |
+| G-06     | Before all RTE tests      | Runtime Isolation Gate: DLQ empty, metrics at zero, workers active, idempotency available |
 
 ## 9.3 Phase 3 — Runtime Scenario Verification (v0.9.7)
 
