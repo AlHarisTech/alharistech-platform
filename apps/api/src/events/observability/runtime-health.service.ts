@@ -1,7 +1,7 @@
-import { Injectable, Inject, Optional, Logger } from '@nestjs/common';
-import type { Redis } from 'ioredis';
-import { REDIS_CLIENT_TOKEN, EVENT_QUEUES } from '../infrastructure/queue.constants';
+import { Injectable, Logger } from '@nestjs/common';
+import { EVENT_QUEUES } from '../infrastructure/queue.constants';
 import type { EventQueueName } from '../infrastructure/queue.constants';
+import { RedisManager } from '../infrastructure/redis-manager';
 import { QueueRegistry } from '../infrastructure/queue-registry';
 import { WorkerRegistry } from '../workers/worker-registry';
 import { DlqRouter } from '../dlq/dlq-router';
@@ -15,7 +15,7 @@ export class RuntimeHealthService {
   private readonly logger = new Logger(RuntimeHealthService.name);
 
   constructor(
-    @Optional() @Inject(REDIS_CLIENT_TOKEN) private readonly redis: Redis | null,
+    private readonly redisManager: RedisManager,
     private readonly queueRegistry: QueueRegistry,
     private readonly workerRegistry: WorkerRegistry,
     private readonly dlqRouter: DlqRouter,
@@ -47,13 +47,14 @@ export class RuntimeHealthService {
   }
 
   private async getRedisHealth(): Promise<RedisHealth> {
-    if (!this.redis) {
+    const client = this.redisManager.getClient();
+    if (!client) {
       return { status: 'unavailable' };
     }
 
     try {
       const start = Date.now();
-      await this.redis.ping();
+      await client.ping();
       return { status: 'connected', latencyMs: Date.now() - start };
     } catch {
       return { status: 'disconnected' };
