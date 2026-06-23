@@ -199,6 +199,9 @@ jobs:
             sleep 1
           done
 
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install chromium
+
       - name: Run Playwright tests
         run: pnpm test:e2e
 
@@ -314,6 +317,9 @@ jobs:
             fi
             sleep 2
           done
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install chromium
 
       - name: Run Runtime E2E tests
         run: |
