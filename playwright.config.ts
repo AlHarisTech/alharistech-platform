@@ -1,7 +1,6 @@
 import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
-  testDir: "./apps/dashboard/e2e",
   timeout: 30_000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
@@ -23,6 +22,14 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      testDir: "./apps/dashboard/e2e",
+      timeout: 30_000,
+      use: { browserName: "chromium" },
+    },
+    {
+      name: "runtime-e2e",
+      testDir: "./apps/runtime-e2e",
+      timeout: 120_000,
       use: { browserName: "chromium" },
     },
   ],

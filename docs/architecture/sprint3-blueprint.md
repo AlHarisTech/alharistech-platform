@@ -457,6 +457,11 @@ Commit ──▶ CI (lint + build + test)
 | OI-018 | Events health endpoint returns healthy with proper status | Playwright E2E-07 |
 | OI-019 | Responsive layout passes at mobile viewport | Playwright E2E-10 |
 | OI-020 | Playwright suite passes in CI (no flaky failures) | CI e2e job |
+| OI-021 | Published events become visible in Trace UI | Runtime E2E RTE-01 |
+| OI-022 | Unhandled events are routed to DLQ after max retries | Runtime E2E RTE-02 |
+| OI-023 | Runtime recovers after Redis restart | Runtime E2E RTE-03 |
+| OI-024 | Duplicate event IDs are skipped by idempotency | Runtime E2E RTE-04 |
+| OI-025 | Dashboard remains responsive under burst load (100 events) | Runtime E2E RTE-05 |
 
 ### 9.2 Verification Gates
 
@@ -464,7 +469,51 @@ Commit ──▶ CI (lint + build + test)
 |----------|--------------------------|---------------------------------------|
 | G-01     | After Phase 1            | API starts with real Postgres + Redis, all 4 observability endpoints return 200 |
 | G-02     | After Phase 2            | Playwright E2E suite passes (10 tests) |
-| G-03     | Before v1.0              | Production deployment documented and tested on staging |
+| G-03     | After Phase 3            | Runtime E2E suite passes (5 tests: RTE-01 to RTE-05) |
+| G-04     | Before v1.0              | Production deployment documented and tested on staging |
+
+## 9.3 Phase 3 — Runtime Scenario Verification (v0.9.7)
+
+### Approach — Lightweight Runtime Harness
+
+Instead of Docker Compose (resource-heavy for 4GB RAM / Core i5), runtime E2E uses a lightweight process-based approach:
+
+```
+Playwright
+    ↓
+API Process (Node)
+    ↓
+PostgreSQL Service (systemd)
+    ↓
+Redis Service (systemd)
+    ↓
+Failure Injection via shell commands
+```
+
+### RTE Test Descriptions
+
+| ID     | Scenario                              | OI      | Duration |
+|--------|---------------------------------------|---------|----------|
+| RTE-01 | Publish event → verify trace entry    | OI-021  | ~3s      |
+| RTE-02 | Publish unhandled event → DLQ capture | OI-022  | ~35s     |
+| RTE-03 | Stop Redis → degraded → restart → heal | OI-023  | ~20s     |
+| RTE-04 | Publish duplicate event ID → idempotency skip | OI-024 | ~35s |
+| RTE-05 | Publish 100 events → dashboard responsive | OI-025 | ~10s     |
+
+### CI Strategy
+
+- **Trigger:** `workflow_dispatch` only (not on push/PR)
+- **Services:** Postgres + Redis via GitHub Actions service containers (same as integration + e2e jobs)
+- **Failure injection:** `docker stop/start` on Redis service container
+- **No Docker Compose:** CI reuses existing service-based approach
+- **Location:** `apps/runtime-e2e/`
+- **Helpers:** `apps/runtime-e2e/helpers/{config,wait-until,redis-control}.ts`
+
+### Invariants Enforced
+
+- All 5 RTE scenarios pass against real Postgres + Redis + running workers
+- `POST /events/test/publish` endpoint available (dashboard controller, `@Public()`)
+- Idempotency, DLQ, workers, and Redis connectivity all validated at runtime level
 
 ---
 

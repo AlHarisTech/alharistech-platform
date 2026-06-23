@@ -1,9 +1,19 @@
-import { Controller, Get, Post, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Body, HttpCode } from '@nestjs/common';
 import { Public } from '../../common/decorators/public.decorator';
 import { EventMetricsService } from './event-metrics.service';
 import { EventTracerService } from './event-tracer.service';
 import { RuntimeHealthService } from './runtime-health.service';
+import { EventBus } from '../bus/event-bus';
+import type { DomainEvent } from '../contracts/domain-event';
+import type { EventReceipt } from '../bus/event-receipt';
 import type { DashboardData } from './dashboard.dto';
+
+interface TestPublishDto {
+  type: string;
+  version?: number;
+  payload?: Record<string, unknown>;
+  id?: string;
+}
 
 @Public()
 @Controller('events')
@@ -12,6 +22,7 @@ export class DashboardController {
     private readonly metrics: EventMetricsService,
     private readonly tracer: EventTracerService,
     private readonly health: RuntimeHealthService,
+    private readonly eventBus: EventBus,
   ) {}
 
   @Get('metrics')
@@ -50,5 +61,18 @@ export class DashboardController {
   @HttpCode(204)
   clearTrace(): void {
     this.tracer.clear();
+  }
+
+  @Post('test/publish')
+  async testPublish(@Body() dto: TestPublishDto): Promise<EventReceipt> {
+    const event: DomainEvent<unknown> = {
+      id: dto.id ?? crypto.randomUUID(),
+      type: dto.type,
+      version: dto.version ?? 1,
+      occurredAt: new Date().toISOString(),
+      correlationId: crypto.randomUUID(),
+      payload: dto.payload ?? {},
+    };
+    return this.eventBus.publish(event);
   }
 }

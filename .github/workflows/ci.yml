@@ -214,6 +214,116 @@ jobs:
           kill $(echo "${{ env.VITE_PID }}") 2>/dev/null || true
           kill $(echo "${{ env.API_PID }}") 2>/dev/null || true
 
+  runtime-e2e:
+    name: Runtime E2E (Scenario Tests)
+    if: github.event_name == 'workflow_dispatch'
+    needs: integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: alharistech
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Wait for Postgres
+        run: |
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for Postgres..."
+            sleep 1
+          done
+          echo "Postgres ready"
+
+      - name: Wait for Redis
+        run: |
+          until redis-cli -h localhost ping; do
+            echo "Waiting for Redis..."
+            sleep 1
+          done
+          echo "Redis ready"
+
+      - name: Start API
+        run: |
+          NODE_ENV=test \
+          DB_HOST=localhost \
+          DB_PORT=5432 \
+          DB_USER=postgres \
+          DB_PASSWORD=postgres \
+          DB_NAME=alharistech \
+          REDIS_HOST=localhost \
+          REDIS_PORT=6379 \
+          CONTRACT_RESPONSE_MODE=strict \
+          node apps/api/dist/apps/api/src/main.js &
+          echo "API_PID=$!" >> "$GITHUB_ENV"
+
+      - name: Wait for API
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:4000/health > /dev/null 2>&1; then
+              echo "API ready (attempt $i)"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Run Runtime E2E tests
+        run: pnpm test:runtime-e2e
+
+      - name: Upload Runtime E2E artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-e2e-report
+          path: |
+            e2e-report/
+            test-results/
+          if-no-files-found: ignore
+
+      - name: Cleanup
+        if: always()
+        run: kill $(echo "${{ env.API_PID }}") 2>/dev/null || true
+
   integration:
     name: Integration Runtime (Postgres + Redis)
     needs: verify
