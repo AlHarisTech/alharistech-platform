@@ -28,7 +28,7 @@ interface EventSchemaEntry {
   retention: string;
 }
 
-interface SchemaStats {
+export interface SchemaStats {
   openapiSpecs: number;
   endpoints: number;
   eventSchemas: number;

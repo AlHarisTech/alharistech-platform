@@ -58,9 +58,7 @@ Full matrix in `docs/architecture/sprint3-blueprint.md`.
 | G-06 | Runtime isolation | `00-isolation.spec.ts` |
 
 ## Deferred to Sprint 4
-1. SchemaRegistry stats endpoint (`GET /events/schema/stats`)
-2. Remove `@Public()` from DashboardController
-3. Flakiness validation (10–20 local runs)
-4. Docker Compose production deployment model
-5. Container registry + release pipeline
-6. ADR-003: Lightweight Runtime Harness (formalize this session's decision)
+1. Flakiness validation (10–20 local runs)
+2. Docker Compose production deployment model
+3. Container registry + release pipeline
+4. Auth middleware — locked-down mutation routes need real auth

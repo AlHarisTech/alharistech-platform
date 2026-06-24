@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, HttpCode, NotFoundException } from '@nestjs/common';
 import { Public } from '../../common/decorators/public.decorator';
+import { SchemaRegistry } from '../../crbl/schema-registry.service';
 import { EventMetricsService } from './event-metrics.service';
 import { EventTracerService } from './event-tracer.service';
 import { RuntimeHealthService } from './runtime-health.service';
@@ -15,7 +16,6 @@ interface TestPublishDto {
   id?: string;
 }
 
-@Public()
 @Controller('events')
 export class DashboardController {
   constructor(
@@ -23,6 +23,7 @@ export class DashboardController {
     private readonly tracer: EventTracerService,
     private readonly health: RuntimeHealthService,
     private readonly eventBus: EventBus,
+    private readonly schemaRegistry: SchemaRegistry,
   ) {}
 
   @Get('metrics')
@@ -36,11 +37,19 @@ export class DashboardController {
   }
 
   @Get('health')
+  @Public()
   getHealth() {
     return this.health.getHealth();
   }
 
+  @Get('schema/stats')
+  @Public()
+  getSchemaStats() {
+    return this.schemaRegistry.getStats();
+  }
+
   @Get('dashboard')
+  @Public()
   async getDashboard(): Promise<DashboardData> {
     const [metrics, trace, health] = await Promise.all([
       this.metrics.snapshot(),

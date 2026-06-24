@@ -470,6 +470,12 @@ jobs:
           fi
           echo "Trace endpoint: HTTP 200 ✓"
 
+      - name: Schema stats (OI-012 direct enforcement)
+        run: |
+          BODY=$(curl -sf http://127.0.0.1:4000/events/schema/stats)
+          echo "$BODY"
+          echo "$BODY" | python3 -c 'import sys,json; d=json.load(sys.stdin); assert d.get("openapiSpecs",0)>=9,"ops:"+str(d.get("openapiSpecs")); assert d.get("endpoints",0)>=149,"ep:"+str(d.get("endpoints")); assert d.get("eventSchemas",0)>=94,"es:"+str(d.get("eventSchemas")); assert d.get("status")=="healthy","s:"+str(d.get("status")); print("OI-012: openapiSpecs>=9, endpoints>=149, eventSchemas>=94, status=healthy")'
+
       - name: Events health (Runtime system status)
         run: |
           BODY=$(curl -sf http://127.0.0.1:4000/events/health)

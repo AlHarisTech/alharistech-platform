@@ -24,5 +24,10 @@
 | ADR-018 | استراتيجية GraphQL — NestJS code-first | مقبول | 2026-06 |
 | ADR-019 | إطار الجوال — React Native | مقبول | 2026-06 |
 | ADR-020 | إطار سطح المكتب — Tauri | مقبول | 2026-06 |
+| ADR-021 | Contract Runtime Bridge Layer (CRBL) | مقبول | 2026-06 |
+| ADR-022 | CRBL Runtime Anchor (NestJS) | مقبول | 2026-06 |
+| ADR-023 | CRBL Activation Strategy | مقبول | 2026-06 |
+| ADR-024 | Event Enforcement Parity | مقبول | 2026-06 |
+| ADR-025 | Lightweight Runtime Harness | مقبول | 2026-06-23 |
 
-**جميع ADRs مكتملة — 20/20 مقبولة.** لا توجد قرارات معلقة.
+**جميع ADRs مكتملة — 25/25 مقبولة.** لا توجد قرارات معلقة.
