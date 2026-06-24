@@ -419,7 +419,12 @@ export class SchemaRegistry implements OnModuleInit {
         this.ajv.addSchema(schema, refPath);
         this.logger.debug(`Registered component schema: ${refPath}`);
       } catch (error) {
-        this.logger.error(`Failed to register component schema ${refPath}: ${error}`);
+        const msg = String(error);
+        if (msg.includes('already exists')) {
+          this.logger.debug(`Schema ${refPath} already registered (shared across specs)`);
+        } else {
+          this.logger.error(`Failed to register component schema ${refPath}: ${error}`);
+        }
       }
     }
   }
