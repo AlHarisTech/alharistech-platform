@@ -257,6 +257,30 @@ export class AuthService {
     return { message: 'Logged out' };
   }
 
+  verifyAccessToken(token: string): { sub: string; email: string; role: string } {
+    try {
+      const payload = jwtVerify(token, this.jwtSecret) as Record<string, unknown>;
+      if (payload.type !== 'access') {
+        throw new Error('Invalid token type');
+      }
+      return {
+        sub: String(payload.sub),
+        email: String(payload.email),
+        role: String(payload.role),
+      };
+    } catch {
+      throw new UnauthorizedException({
+        error: {
+          code: 'INVALID_ACCESS_TOKEN',
+          message: 'رمز الوصول غير صالح أو منتهي الصلاحية',
+          message_en: 'Invalid or expired access token',
+          statusCode: 401,
+        },
+        meta: { timestamp: new Date().toISOString() },
+      });
+    }
+  }
+
   private generateAccessToken(userId: string, email: string, role: string): string {
     return sign(
       { sub: userId, email, role, type: 'access' },
