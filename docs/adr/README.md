@@ -29,5 +29,6 @@
 | ADR-023 | CRBL Activation Strategy | مقبول | 2026-06 |
 | ADR-024 | Event Enforcement Parity | مقبول | 2026-06 |
 | ADR-025 | Lightweight Runtime Harness | مقبول | 2026-06-23 |
+| ADR-026 | Recursive Schema Validation | مقترح | 2026-06-24 |
 
-**جميع ADRs مكتملة — 25/25 مقبولة.** لا توجد قرارات معلقة.
+**إجمالي ADRs — 26. منها 25 مقبولة + 1 مقترح.**
