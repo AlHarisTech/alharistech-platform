@@ -628,8 +628,8 @@ export class SchemaRegistry implements OnModuleInit {
     if ('$ref' in record && typeof record.$ref === 'string') {
       const ref = record.$ref;
       if (visitedRefs.has(ref)) {
-        this.logger.debug(`Circular $ref resolved via open schema: ${ref}`);
-        return true;
+        this.logger.debug(`Circular $ref bounded to type:object (recursive schema): ${ref}`);
+        return { type: 'object' };
       }
       visitedRefs.add(ref);
       const resolved = this.resolveRef(ref, rootSpec, visitedRefs);
