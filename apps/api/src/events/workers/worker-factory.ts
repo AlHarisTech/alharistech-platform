@@ -53,26 +53,28 @@ export class WorkerFactory implements OnApplicationShutdown {
           throw new Error('Job missing event type');
         }
 
-        const handler = this.registry.resolve(eventType);
-        if (!handler) {
-          this.logger.error(`No handler registered for event type '${eventType}' (job ${job.id})`);
-          throw new Error(`No handler for event type '${eventType}'`);
-        }
-
         const payload = job.data.payload as Record<string, unknown>;
-
-        const canProceed = await this.idempotency.checkAndLock(eventType, eventId ?? 'unknown');
-        if (!canProceed) {
-          this.logger.debug(`Idempotency skip: ${eventType} (id=${eventId}) — already processed`);
-          this.metrics?.incrementIdempotencySkipped();
-          this.tracer?.traceIdempotencySkip(eventId ?? 'unknown', eventType);
-          return;
-        }
-
-        this.metrics?.incrementExecutionStarted();
-        this.tracer?.traceExecutionStarted(eventId ?? 'unknown', eventType);
+        const handler = this.registry.resolve(eventType);
 
         try {
+          if (!handler) {
+            this.logger.error(
+              `No handler registered for event type '${eventType}' (job ${job.id})`,
+            );
+            throw new Error(`No handler for event type '${eventType}'`);
+          }
+
+          const canProceed = await this.idempotency.checkAndLock(eventType, eventId ?? 'unknown');
+          if (!canProceed) {
+            this.logger.debug(`Idempotency skip: ${eventType} (id=${eventId}) — already processed`);
+            this.metrics?.incrementIdempotencySkipped();
+            this.tracer?.traceIdempotencySkip(eventId ?? 'unknown', eventType);
+            return;
+          }
+
+          this.metrics?.incrementExecutionStarted();
+          this.tracer?.traceExecutionStarted(eventId ?? 'unknown', eventType);
+
           const start = Date.now();
           await handler.execute(payload);
           await handler.onSuccess?.();
@@ -84,10 +86,10 @@ export class WorkerFactory implements OnApplicationShutdown {
           const execError = error instanceof Error ? error : new Error(String(error));
           const attempt = (job.attemptsMade || 0) + 1;
 
-          await handler.onRetry?.(attempt, execError);
+          await handler!.onRetry?.(attempt, execError);
 
           if (attempt >= retryConfig.maxAttempts) {
-            await handler.onFailure?.(execError);
+            await handler!.onFailure?.(execError);
             await this.idempotency.markFailed(eventType, eventId ?? 'unknown', (job.data.version as number) ?? 0, attempt, execError.message);
             this.metrics?.incrementExecutionFailed();
             this.tracer?.traceExecutionFailed(eventId ?? 'unknown', eventType, execError.message);

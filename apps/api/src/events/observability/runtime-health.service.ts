@@ -4,6 +4,7 @@ import type { EventQueueName } from '../infrastructure/queue.constants';
 import { RedisManager } from '../infrastructure/redis-manager';
 import { QueueRegistry } from '../infrastructure/queue-registry';
 import { WorkerRegistry } from '../workers/worker-registry';
+import { WorkerOrchestrator } from '../workers/worker-orchestrator';
 import { DlqRouter } from '../dlq/dlq-router';
 import type { EventRuntimeHealth, QueueHealth, RedisHealth, DlqHealth, IdempotencyHealth, WorkerHealth } from './runtime-health.types';
 
@@ -18,6 +19,7 @@ export class RuntimeHealthService {
     private readonly redisManager: RedisManager,
     private readonly queueRegistry: QueueRegistry,
     private readonly workerRegistry: WorkerRegistry,
+    private readonly workerOrchestrator: WorkerOrchestrator,
     private readonly dlqRouter: DlqRouter,
   ) {}
 
@@ -92,9 +94,10 @@ export class RuntimeHealthService {
 
   private getWorkerHealth(): WorkerHealth {
     const handlers = this.workerRegistry.resolveAll();
+    const orchestratorHealth = this.workerOrchestrator.health();
     return {
-      status: 'running',
-      activeCount: handlers.length,
+      status: orchestratorHealth.activeWorkers > 0 ? 'running' : 'stopped',
+      activeCount: orchestratorHealth.activeWorkers,
       registeredHandlers: handlers.length,
     };
   }
