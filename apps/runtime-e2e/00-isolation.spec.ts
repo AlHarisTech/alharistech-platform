@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { API_URL } from "./helpers/config";
 
 test.describe("G-06: Runtime Isolation Gate", () => {
+  test.describe.configure({ retries: 0 });
   test("system starts in clean state — no residual state from prior runs", async ({ request }) => {
     const healthRes = await request.get(`${API_URL}/events/health`);
     expect(healthRes.status()).toBe(200);

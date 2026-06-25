@@ -135,6 +135,7 @@ export class WorkerFactory implements OnApplicationShutdown {
       },
       {
         connection: this.redis as ConnectionOptions,
+        prefix: process.env.EVENT_QUEUE_PREFIX || 'aht',
         concurrency: 5,
         lockDuration: 30000,
         maxStalledCount: 3,
