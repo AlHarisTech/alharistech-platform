@@ -34,10 +34,8 @@ async function bootstrap(): Promise<void> {
   await app.listen(port, "0.0.0.0");
   console.log(`API running on http://localhost:${port}`);
 
-  if (process.env.RUNTIME_TEST_MODE === "true") {
-    const orchestrator = app.get(WorkerOrchestrator);
-    orchestrator.start();
-  }
+  const orchestrator = app.get(WorkerOrchestrator);
+  orchestrator.start();
 }
 
 bootstrap();
