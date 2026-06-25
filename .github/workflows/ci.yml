@@ -307,6 +307,7 @@ jobs:
           REDIS_HOST=localhost \
           REDIS_PORT=6379 \
           CONTRACT_RESPONSE_MODE=strict \
+          RUNTIME_TEST_MODE=true \
           node apps/api/dist/apps/api/src/main.js &
           echo "API_PID=$!" >> "$GITHUB_ENV"
 
@@ -325,7 +326,6 @@ jobs:
 
       - name: Run Runtime E2E tests
         run: |
-          RUNTIME_TEST_MODE=true \
           pnpm test:runtime-e2e
 
       - name: Upload Runtime E2E artifacts

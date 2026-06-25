@@ -7,6 +7,7 @@ import { PolicyGuard } from "./common/guards/policy.guard";
 import { ContractInterceptor } from "./common/interceptors/contract.interceptor";
 import { SchemaRegistry } from "./crbl/schema-registry.service";
 import { AuthService } from "./modules/auth/auth.service";
+import { WorkerOrchestrator } from "./events/workers/worker-orchestrator";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -32,6 +33,11 @@ async function bootstrap(): Promise<void> {
   const port = process.env.PORT || 4000;
   await app.listen(port, "0.0.0.0");
   console.log(`API running on http://localhost:${port}`);
+
+  if (process.env.RUNTIME_TEST_MODE === "true") {
+    const orchestrator = app.get(WorkerOrchestrator);
+    orchestrator.start();
+  }
 }
 
 bootstrap();

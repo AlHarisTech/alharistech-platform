@@ -75,6 +75,7 @@ export class DashboardController {
   }
 
   @Post('test/publish')
+  @Public()
   async testPublish(@Body() dto: TestPublishDto): Promise<EventReceipt> {
     if (process.env.RUNTIME_TEST_MODE !== 'true') {
       throw new NotFoundException();
