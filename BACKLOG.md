@@ -2,18 +2,6 @@
 
 ## OPEN
 
-### CRBL-002: Deep Recursive Validation (AJV $ref + $id)
-**الحالة:** لم يبدأ
-**الوصف:** schemas ذات self-reference (Category, MenuItem) تمر بـ AJV دون تحقق فعلي.
-**الحل المطلوب:** تسجيل كل schema بـ $id في AJV registry واستخدام $ref native.
-**الـ specs المعنية:** 9 specs (تحديدها عند البدء)
-**الأولوية:** P2
-
-### Ajv Duplicate Schema Registration
-**الحالة:** تم (v0.9.9-rc2)
-**الوصف:** `already exists` errors تُسجّل كـ ERROR في stderr.
-**الحل:** تحويل duplicate إلى debug log (تم).
-
 ### Runtime E2E Flakiness Validation
 **الحالة:** لم يبدأ
 **الوصف:** 10–20 run محلياً قبل promotion. محجوب حالياً: لا PG/Redis على البيئة المحلية.
@@ -23,21 +11,21 @@
 
 ## CLOSED
 
-### @Public() على DashboardController
-**أُغلق في:** v0.9.9-rc2
-**الثغرة:** جميع EventRuntime routes كانت public بدون تمييز بين read/mutation.
-**الحل:** إزالة `@Public()` من مستوى controller وإضافته فقط على read-only routes (health, dashboard, schema/stats).
+### CRBL-002: Deep Recursive Validation (AJV-native $ref)
+**أُغلق في:** v0.9.9-rc2 (`e3d1b14`)
+**الثغرة:** schemas ذات self-reference (Category children, MenuItem modifiers) تُحوّل إلى `{ type: 'object' }` → لا تحقق للـ nested properties.
+**الحل الجذري:** حفظ `$ref` الأصلي وإمراره إلى AJV الذي يحل circular references عبر الـ registry الداخلي (`addSchema`). الآن كل مستويات الـ recursion تُتحقّق بالكامل.
+**Ref:** ADR-026 — Option A
 
 ### JwtAuthGuard — التحقق من توقيع JWT
 **أُغلق في:** v0.9.9-rc2
 **الثغرة:** PolicyGuard يفك JWT بـ base64 decode فقط (لا تحقق توقيع). أي token مزور يمر.
 **الحل:** إنشاء `JwtAuthGuard` يستخدم `jwtVerify` مع `jwtSecret` من AuthService، وتسجيله كأول global guard.
 
-### CRBL-002: Silent Validation Bypass — Tactical Fix
+### @Public() على DashboardController
 **أُغلق في:** v0.9.9-rc2
-**الثغرة:** `resolveRefsRecursive` يُعيد `true` عند اكتشاف circular $ref → أي payload يمر دون تحقق.
-**الحل المؤقت:** استبدال `true` بـ `{ type: 'object' }` — يمنع primitive injection.
-**ملاحظة:** الحل الجذري (CRBL-002 Deep Recursive Validation) لا يزال OPEN أعلاه.
+**الثغرة:** جميع EventRuntime routes كانت public بدون تمييز بين read/mutation.
+**الحل:** إزالة `@Public()` من مستوى controller وإضافته فقط على read-only routes (health, dashboard, schema/stats).
 
 ### AJV Duplicate Schema Registration Guard
 **أُغلق في:** v0.9.9-rc2
@@ -50,4 +38,4 @@
 
 ### ADR-026: Recursive Schema Validation Strategy
 **أُغلق في:** v0.9.9-rc2
-**القرار:** Option C — Hybrid: تكتيكي (Option B) الآن، جذري (Option A) لاحقاً.
+**القرار:** Option C — Hybrid: تكتيكي (Option B) أولاً، ثم جذري (Option A) في نفس الـ Sprint.
