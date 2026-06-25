@@ -27,11 +27,13 @@ export class DashboardController {
   ) {}
 
   @Get('metrics')
+  @Public()
   getMetrics() {
     return this.metrics.snapshot();
   }
 
   @Get('trace')
+  @Public()
   getTrace() {
     return this.tracer.snapshot();
   }
